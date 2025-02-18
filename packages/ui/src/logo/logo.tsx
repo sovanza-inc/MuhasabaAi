@@ -8,6 +8,6 @@ export const Logo = (props: FlexProps) => {
 
 export const LogoIcon = (props: ImageProps) => {
   const { colorMode } = useColorMode()
-  const logoSrc = colorMode === 'dark' ? '/img/onboarding/dark.svg' : '/img/onboarding/light.svg'
+  const logoSrc = colorMode === 'dark' ? '/img/onboarding/logo.svg' : '/img/onboarding/logo.svg'
   return <Image src={logoSrc} alt="Muhasaba AI" {...props} />
 }
