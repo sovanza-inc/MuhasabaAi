@@ -24,7 +24,7 @@ export const InviteTeamMembersStep = () => {
     <OnboardingStep
       schema={inviteTeamSchema}
       title="Invite your team"
-      description="Saas UI works better with your team."
+      description="Muhasaba AI works better with your team."
       defaultValues={{ emails: '' }}
       onSubmit={async (data) => {
         if (workspace.value && data.emails) {

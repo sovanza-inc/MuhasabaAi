@@ -249,7 +249,7 @@ export function AccountNotificationsPage() {
   return (
     <SettingsPage
       title="Notifications"
-      description="Manage how and where you want to be notified."
+      description="Receive updates about Muhasaba AI."
     >
       <NotificationChannels
         data={{

@@ -15,6 +15,11 @@ export const theme = extendTheme(
   {
     semanticTokens,
     components,
+    fonts: {
+      heading: 'Lato, sans-serif',
+      body: 'Lato, sans-serif',
+      mono: 'SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace',
+    },
   },
   /**
    * Uncomment this to use any of the built-in color schemes.

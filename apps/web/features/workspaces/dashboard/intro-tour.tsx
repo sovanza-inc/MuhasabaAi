@@ -1,6 +1,5 @@
 import * as React from 'react'
-
-import { ButtonGroup, Text, useBreakpointValue } from '@chakra-ui/react'
+import { ButtonGroup, Text, useBreakpointValue, Box } from '@chakra-ui/react'
 import {
   BenefitsModal,
   BenefitsModalBody,
@@ -17,31 +16,33 @@ import {
   TourSpotlight,
 } from '@saas-ui-pro/onboarding'
 import { ErrorBoundary, useLocalStorage } from '@saas-ui/react'
-
 import { LogoIcon } from '@acme/ui/logo'
 
 /**
- * @todo move this to a TourManager context provider
+ * Step type to avoid TypeScript errors
  */
-export const IntroTour = () => {
-  const [tour, setTour] = useLocalStorage('saas-ui.intro-tour', false)
+type Step = {
+  target: string
+  title: string
+  content: string
+  placement: string
+}
 
-  const steps = [
+export const IntroTour = () => {
+  const [tour, setTour] = useLocalStorage('muhasaba.intro-tour', false)
+
+  const steps: Step[] = [
     {
-      target: useBreakpointValue({
-        base: '.sui-sidebar__toggle-button',
-        lg: '.workspaces-menu',
-      }),
-      title: 'Switch workspaces',
-      content: 'Saas UI Pro supports multiple workspaces.',
-      disableBeacon: true,
-      primaryAction: 'Next',
+      target: '[data-tour="workspaces"]',
+      title: 'Workspaces',
+      content: 'Muhasaba AI supports multiple workspaces for different organizations.',
+      placement: 'right',
     },
     {
-      target: '.pre-order',
-      title: 'Share the love ❤️',
-      content: 'Pre-order Saas UI Pro now.',
-      primaryAction: 'Complete',
+      target: '[data-tour="billing"]',
+      title: 'Get Started',
+      content: 'Start managing your Islamic finances with Muhasaba AI.',
+      placement: 'right',
     },
   ]
 
@@ -62,7 +63,9 @@ export const IntroTour = () => {
       >
         <BenefitsModal data-target="modal" hideOverlay>
           <BenefitsModalHeader>
-            <LogoIcon boxSize="8" mb="4" /> <Text>Welcome to Saas UI</Text>
+            <Box textAlign="center" mb="8">
+              <LogoIcon boxSize="8" mb="4" /> <Text>Welcome to Muhasaba AI</Text>
+            </Box>
           </BenefitsModalHeader>
           <BenefitsModalBody fontSize="md" color="muted">
             Benefits modals can be used to highlight new features and their
@@ -82,12 +85,12 @@ export const IntroTour = () => {
             <TourDialogBody>{step.content}</TourDialogBody>
             <TourDialogFooter>
               <Text>
-                Step {i + 2} of {steps.length + 1}
+                Step {i + 1} of {steps.length}
               </Text>
               <TourDialogActions>
                 <TourDismissButton />
                 <TourNextButton variant="subtle" colorScheme="white">
-                  {step.primaryAction}
+                  {i === steps.length - 1 ? 'Finish' : 'Next'}
                 </TourNextButton>
               </TourDialogActions>
             </TourDialogFooter>

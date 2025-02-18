@@ -83,22 +83,22 @@ export function SettingsOverviewPage() {
         <SectionBody>
           <SimpleGrid columns={[1, null, 3]} spacing={4}>
             <SupportCard
-              title="Start guide"
-              description="Read how to get started with Saas UI Pro."
+              title="Start Guide"
+              description="Read how to get started with Muhasaba AI."
               icon={LuCircleHelp}
-              href="https://saas-ui.dev/docs/pro/overview"
+              href="https://docs.muhasaba.ai/getting-started"
             />
             <SupportCard
-              title="Components"
-              description="See all components and how they work."
+              title="Features"
+              description="Explore our Islamic finance features."
               icon={LuBox}
-              href="https://www.saas-ui.dev/docs/components"
+              href="https://docs.muhasaba.ai/features"
             />
             <SupportCard
-              title="Roadmap"
-              description="Post feedback, bugs and feature requests."
+              title="Feedback"
+              description="Share your feedback and suggestions."
               icon={LuGithub}
-              href="https://roadmap.saas-ui.dev"
+              href="https://feedback.muhasaba.ai"
             />
           </SimpleGrid>
         </SectionBody>

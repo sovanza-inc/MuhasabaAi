@@ -81,8 +81,8 @@ export function AcceptInvitePage({ params }: { params: { token: string } }) {
               </>
             )}
           </Heading>
-          <Text fontSize="md" mb="6">
-            Saas UI helps you build intuitive SaaS products with speed.
+          <Text color="muted" fontSize="lg" mb="8">
+            Muhasaba AI helps you manage your Islamic finances with ease.
           </Text>
           <Button
             colorScheme="primary"

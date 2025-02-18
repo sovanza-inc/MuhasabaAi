@@ -40,7 +40,8 @@ yarn dev:web
 - TypeScript
 - tRPC
 - Chakra UI
-- SaaS UI Pro
+- Prisma
+- PostgreSQL
 
 ## Contributing
 

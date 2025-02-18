@@ -68,5 +68,8 @@
   "packageManager": "yarn@4.5.0",
   "engines": {
     "node": ">=20.14.0"
+  },
+  "dependencies": {
+    "@fontsource/lato": "^5.1.1"
   }
 }

@@ -4452,6 +4452,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@fontsource/lato@npm:^5.1.1":
+  version: 5.1.1
+  resolution: "@fontsource/lato@npm:5.1.1"
+  checksum: 10c0/7786998c454782c4d9588318829d04987933d674956d36bebf55c482c68a84945f3faf9a68fe7ee4d07ffffa13e71e056d24052b933e8852fc1bbea2a7e7b258
+  languageName: node
+  linkType: hard
+
 "@formatjs/cli@npm:^6.3.15":
   version: 6.3.15
   resolution: "@formatjs/cli@npm:6.3.15"
@@ -16474,6 +16481,36 @@ __metadata:
   languageName: node
   linkType: hard
 
+"muhasaba-ai@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "muhasaba-ai@workspace:."
+  dependencies:
+    "@chakra-ui/cli": "npm:^2.5.6"
+    "@changesets/cli": "npm:^2.27.11"
+    "@eslint/js": "npm:^9.18.0"
+    "@fontsource/lato": "npm:^5.1.1"
+    "@formatjs/cli": "npm:^6.3.15"
+    "@ngneat/falso": "npm:^7.3.0"
+    "@trivago/prettier-plugin-sort-imports": "npm:^5.2.1"
+    "@turbo/gen": "npm:^2.3.3"
+    "@types/node": "npm:^20.17.10"
+    eslint: "npm:^9.18.0"
+    eslint-config-next: "npm:^15.1.5"
+    eslint-config-prettier: "npm:^10.0.1"
+    husky: "npm:^9.1.7"
+    lint-staged: "npm:^15.4.1"
+    pkg-types: "npm:^1.3.1"
+    prettier: "npm:^3.4.2"
+    rimraf: "npm:^6.0.1"
+    tsx: "npm:^4.19.2"
+    turbo: "npm:^2.3.3"
+    typescript: "npm:^5.7.3"
+    typescript-eslint: "npm:^8.20.0"
+    vitest: "npm:^2.1.8"
+    yargs: "npm:^17.7.2"
+  languageName: unknown
+  linkType: soft
+
 "mute-stream@npm:0.0.8":
   version: 0.0.8
   resolution: "mute-stream@npm:0.0.8"
@@ -19074,35 +19111,6 @@ __metadata:
   checksum: 10c0/3c49c1ecd66170b175c9cacf5cef67f8914dcbc7cd0162855538d365c83fea631167cacb644b3ce533b2ea0e9a4d0b12175186985f89d75abe73dbd8f7f06f68
   languageName: node
   linkType: hard
-
-"saas-ui-pro-nextjs-starter-kit@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "saas-ui-pro-nextjs-starter-kit@workspace:."
-  dependencies:
-    "@chakra-ui/cli": "npm:^2.5.6"
-    "@changesets/cli": "npm:^2.27.11"
-    "@eslint/js": "npm:^9.18.0"
-    "@formatjs/cli": "npm:^6.3.15"
-    "@ngneat/falso": "npm:^7.3.0"
-    "@trivago/prettier-plugin-sort-imports": "npm:^5.2.1"
-    "@turbo/gen": "npm:^2.3.3"
-    "@types/node": "npm:^20.17.10"
-    eslint: "npm:^9.18.0"
-    eslint-config-next: "npm:^15.1.5"
-    eslint-config-prettier: "npm:^10.0.1"
-    husky: "npm:^9.1.7"
-    lint-staged: "npm:^15.4.1"
-    pkg-types: "npm:^1.3.1"
-    prettier: "npm:^3.4.2"
-    rimraf: "npm:^6.0.1"
-    tsx: "npm:^4.19.2"
-    turbo: "npm:^2.3.3"
-    typescript: "npm:^5.7.3"
-    typescript-eslint: "npm:^8.20.0"
-    vitest: "npm:^2.1.8"
-    yargs: "npm:^17.7.2"
-  languageName: unknown
-  linkType: soft
 
 "safe-array-concat@npm:^1.1.2":
   version: 1.1.2
