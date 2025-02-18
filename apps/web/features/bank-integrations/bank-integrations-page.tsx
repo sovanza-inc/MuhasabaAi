@@ -12,9 +12,7 @@ import { EmptyState } from '@saas-ui/react'
 import { LuWallet } from 'react-icons/lu'
 import { Button } from '@chakra-ui/react'
 
-import { WorkspacePageProps } from '#lib/create-page'
-
-export function BankIntegrationsPage({ params }: WorkspacePageProps) {
+export function BankIntegrationsPage() {
   const toolbar = (
     <Toolbar>
       <Button colorScheme="primary">Add Bank Integration</Button>

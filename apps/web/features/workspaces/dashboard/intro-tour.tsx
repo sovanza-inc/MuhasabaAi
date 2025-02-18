@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { ButtonGroup, Text, useBreakpointValue, Box } from '@chakra-ui/react'
+import { ButtonGroup, Text, Box } from '@chakra-ui/react'
 import {
   BenefitsModal,
   BenefitsModalBody,

@@ -20,7 +20,7 @@ export const Testimonial = () => {
         </Box>
       </HStack>
       <Text color="white" fontSize="lg">
-        "Muhasaba AI has transformed how we manage Islamic finance operations. The Shariah-compliant insights and automated Zakat calculations have been invaluable for our clients. A must-have tool for any Muslim business owner."
+        &ldquo;Muhasaba AI has transformed how we manage Islamic finance operations. The Shariah-compliant insights and automated Zakat calculations have been invaluable for our clients. A must-have tool for any Muslim business owner.&rdquo;
       </Text>
     </Container>
   )
