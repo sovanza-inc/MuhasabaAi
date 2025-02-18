@@ -33,7 +33,7 @@ export default async function AppRootLayout({
   const cookieStore = await cookies()
 
   const colorMode = (cookieStore.get('chakra-ui-color-mode')?.value ??
-    'dark') as 'light' | 'dark'
+    'light') as 'light' | 'dark'
 
   return (
     <html data-theme={colorMode} style={{ colorScheme: colorMode, fontFamily: 'Lato, sans-serif' }}>
