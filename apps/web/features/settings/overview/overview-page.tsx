@@ -4,6 +4,7 @@ import { Button, SimpleGrid } from '@chakra-ui/react'
 import { useBilling } from '@saas-ui-pro/billing'
 import { Section, SectionBody, SectionHeader } from '@saas-ui-pro/react'
 import { Property, PropertyList } from '@saas-ui/react'
+import { Card, CardBody, Stack, Heading, ButtonGroup } from '@chakra-ui/react'
 import {
   LuBox,
   LuBriefcase,
@@ -11,6 +12,7 @@ import {
   LuGithub,
   LuShield,
 } from 'react-icons/lu'
+import { FiBook, FiCode, FiMap } from 'react-icons/fi'
 
 import { FormattedDate } from '@acme/i18n'
 import { LinkButton } from '@acme/ui/button'
@@ -98,6 +100,44 @@ export function SettingsOverviewPage() {
               icon={LuGithub}
               href="https://roadmap.saas-ui.dev"
             />
+          </SimpleGrid>
+        </SectionBody>
+      </Section>
+
+      <Section>
+        <SectionHeader title="Documentation" />
+        <SectionBody>
+          <SimpleGrid columns={[1, null, 3]} spacing={4}>
+            <Card>
+              <CardBody>
+                <Stack spacing="4">
+                  <Heading size="sm">Documentation</Heading>
+                  <ButtonGroup>
+                    <LinkButton
+                      variant="outline"
+                      href="https://docs.muhasaba.ai/overview"
+                      leftIcon={<FiBook />}
+                    >
+                      Documentation
+                    </LinkButton>
+                    <LinkButton
+                      variant="outline"
+                      href="https://docs.muhasaba.ai/api"
+                      leftIcon={<FiCode />}
+                    >
+                      API Reference
+                    </LinkButton>
+                    <LinkButton
+                      variant="outline"
+                      href="https://roadmap.muhasaba.ai"
+                      leftIcon={<FiMap />}
+                    >
+                      Roadmap
+                    </LinkButton>
+                  </ButtonGroup>
+                </Stack>
+              </CardBody>
+            </Card>
           </SimpleGrid>
         </SectionBody>
       </Section>

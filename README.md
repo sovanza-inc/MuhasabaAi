@@ -2,16 +2,18 @@
 
 ## About
 
-Muhasaba AI is a cutting-edge financial management system that combines traditional accounting principles with modern artificial intelligence. Our platform helps businesses and individuals manage their finances more effectively through smart bank integrations, automated bookkeeping, and intelligent financial insights.
+Muhasaba AI is a cutting-edge financial management system that combines Islamic finance principles with modern artificial intelligence. Our platform helps businesses and individuals manage their finances more effectively through smart bank integrations, automated bookkeeping, and Shariah-compliant financial insights.
 
 ## Features
 
 - Smart Bank Integrations
 - Automated Bookkeeping
-- Financial Analytics
+- Shariah-Compliant Financial Analytics
 - AI-Powered Insights
 - Multi-workspace Support
 - Real-time Financial Tracking
+- Zakat Calculation
+- Islamic Investment Screening
 
 ## Getting Started
 
@@ -46,15 +48,15 @@ We welcome contributions from the community. Please read our [Contributing Guide
 
 ## Social Media
 
-- Twitter: [@MuhasabaAI](https://twitter.com/MuhasabaAI)
-- LinkedIn: [Muhasaba AI](https://linkedin.com/company/muhasaba-ai)
-- Instagram: [@muhasaba.ai](https://instagram.com/muhasaba.ai)
+- Twitter: [@muhasabaai](https://twitter.com/muhasabaai)
+- LinkedIn: [Muhasaba AI](https://linkedin.com/company/muhasabaai)
+- Instagram: [@muhasabaai](https://instagram.com/muhasabaai)
 
 ## Testimonials
 
-> "Muhasaba AI has revolutionized how we handle our financial management. The AI-powered insights have helped us make better financial decisions." - Sarah Johnson, CFO
+> "Muhasaba AI has transformed how we manage our Islamic finance operations. The Shariah-compliant insights and automated Zakat calculations have been invaluable." - Abdullah Rahman, Islamic Finance Advisor
 
-> "The automated bookkeeping feature saves us countless hours every month. It's an essential tool for any modern business." - Michael Chen, Business Owner
+> "As a Muslim business owner, finding a financial management tool that aligns with Islamic principles was crucial. Muhasaba AI delivers exactly what we needed." - Fatima Hassan, CEO of Halal Ventures
 
 ## Support
 

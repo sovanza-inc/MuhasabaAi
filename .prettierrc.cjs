@@ -10,6 +10,7 @@ module.exports = {
     '^env$',
     '<THIRD_PARTY_MODULES>',
     '^@acme/(.*)$',
+    '^@muhasaba/(.*)$',
     '^#.(.*)$',
     '^[./]',
   ],
