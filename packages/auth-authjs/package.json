@@ -1,0 +1,38 @@
+{
+  "name": "@acme/auth-authjs",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": "./src/client.ts",
+    "./middleware": "./src/middleware.ts",
+    "./env": "./src/env.ts"
+  },
+  "scripts": {
+    "clean": "rm -rf .turbo node_modules",
+    "format": "prettier --check . --ignore-path ../../.gitignore",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@acme/db": "workspace:*",
+    "@auth/drizzle-adapter": "^1.7.4",
+    "env": "workspace:*",
+    "next-auth": "5.0.0-beta.25",
+    "zod": "^3.24.1"
+  },
+  "peerDependencies": {
+    "next": ">=14",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "eslint": "^9.18.0",
+    "next": "^15.1.5",
+    "prettier": "^3.4.2",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "typescript": "^5.7.3"
+  }
+}

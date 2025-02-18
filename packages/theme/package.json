@@ -1,0 +1,29 @@
+{
+  "name": "@acme/theme",
+  "version": "1.0.0",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@chakra-ui/anatomy": "^2.3.5",
+    "@chakra-ui/styled-system": "^2.12.1",
+    "@fontsource-variable/inter": "^5.1.1",
+    "@saas-ui-pro/theme-glass": "^0.12.14",
+    "@saas-ui/theme": "^2.6.1"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": ">=2.10.0",
+    "@emotion/react": ">=11.0.0",
+    "@emotion/styled": ">=11.0.0",
+    "@saas-ui-pro/react": ">=0.36.0",
+    "@saas-ui/react": ">=2.0.0",
+    "framer-motion": ">=6",
+    "react": ">=18",
+    "react-dom": ">=18"
+  }
+}

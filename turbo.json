@@ -1,0 +1,50 @@
+{
+  "$schema": "https://turborepo.org/schema.json",
+  "ui": "tui",
+  "tasks": {
+    "clean": {
+      "outputs": []
+    },
+    "build": {
+      "dependsOn": ["^lint", "^build"],
+      "outputs": ["dist/**", ".next/**"]
+    },
+    "web#build": {
+      "dependsOn": ["//#lint", "^build"],
+      "outputs": [".next/**"]
+    },
+    "test": {
+      "dependsOn": ["^build"],
+      "outputs": []
+    },
+    "lint": {
+      "outputs": []
+    },
+    "//#lint": {
+      "dependsOn": ["^lint"],
+      "outputs": []
+    },
+    "dev": {
+      "cache": true
+    },
+    "billing:sync": {
+      "cache": false
+    },
+    "db:migrate": {
+      "dependsOn": ["db:generate"],
+      "inputs": ["drizzle/**"],
+      "persistent": true
+    },
+    "db:generate": {
+      "inputs": ["src/**", "drizzle.config.ts"],
+      "outputs": ["drizzle/**"],
+      "persistent": true
+    },
+    "db:studio": {
+      "cache": false,
+      "persistent": true
+    },
+    "db:check": { "cache": false },
+    "db:push": { "cache": false }
+  }
+}

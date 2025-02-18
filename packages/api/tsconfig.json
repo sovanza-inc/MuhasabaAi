@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "noErrorTruncation": true,
+    "noEmit": true,
+    "baseUrl": ".",
+    "paths": {
+      "#*": ["./*"]
+    }
+  },
+  "include": ["**/*.ts"],
+  "exclude": ["**/node_modules"]
+}

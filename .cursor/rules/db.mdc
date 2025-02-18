@@ -1,0 +1,35 @@
+---
+description: When adding or updating database schemas
+globs: packages/db/src/**/*.ts
+---
+
+# Db rules
+
+- Use Drizzle as ORM with Postgresql
+- NEVER use Prisma
+- Use utilities like `pgTable`, `id`, `workspaceId`, `userId` and `timestamps` in [utils.ts](mdc:packages/db/src/utils.ts) above other functions
+- `workspaceId` adds both `id` and `workspaceId` and should be spread into the config
+- Use `table-name.sql.ts` for schema file names
+- Schemas live in `packages/db/src/[table]/[table].sql.ts`
+- Make sure to import new schemas in [db.ts](mdc:packages/db/src/db.ts) and add them to the `const = schema` object
+- Export new schema files from [index.ts](mdc:packages/db/src/index.ts)
+- Table names are plural
+
+# Example schema
+
+Here is an example schema for reference.
+
+```ts
+import { index, text, varchar } from 'drizzle-orm/pg-core'
+import { pgTable, workspaceId, timestamps } from '../utils'
+
+export const examples = pgTable('examples', {
+  ...workspaceId,
+  name: varchar('name', { length: 255 }).notNull(),
+  anotherTextField: text('another_field'),
+  ...timestamps,
+}, (t) => [index('workspaceIdx').on(t.id, t.workspaceId)],)
+
+export type ExampleModel = typeof examples.$inferSelect
+```
+

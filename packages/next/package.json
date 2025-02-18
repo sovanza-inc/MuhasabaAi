@@ -1,0 +1,22 @@
+{
+  "name": "@acme/next",
+  "version": "1.0.0",
+  "description": "Next.js helpers and utilities",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "peerDependencies": {
+    "@chakra-ui/react": ">=2.10.0",
+    "@emotion/react": ">=11",
+    "@emotion/styled": ">=11",
+    "framer-motion": ">=6.0",
+    "next": ">=14",
+    "react": ">=18",
+    "react-dom": ">=18"
+  },
+  "devDependencies": {
+    "next": "^15.1.5",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  }
+}

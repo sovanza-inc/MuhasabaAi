@@ -1,0 +1,43 @@
+{
+  "name": "@acme/api",
+  "description": "API services",
+  "version": "1.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "default": "./index.ts"
+    },
+    "./shared": {
+      "default": "./shared.ts"
+    },
+    "./modules/*": "./modules/*.ts",
+    "./types": "./types.ts"
+  },
+  "scripts": {
+    "billing:sync": "tsx --env-file ../../.env scripts/sync-billing-plans.ts"
+  },
+  "imports": {
+    "#trpc": "./trpc/trpc.ts",
+    "#adapters": "./adapters/index.ts",
+    "#adapters/*": "./adapters/*.ts",
+    "#modules/*": "./modules/*.ts",
+    "#utils/*": "./utils/*.ts"
+  },
+  "dependencies": {
+    "@acme/config": "workspace:*",
+    "@acme/db": "workspace:*",
+    "@acme/email": "workspace:*",
+    "@ngneat/falso": "^7.3.0",
+    "@trpc/server": "^11.0.0-rc.666",
+    "date-fns": "^4.1.0",
+    "env": "workspace:*",
+    "slug": "^10.0.0",
+    "superjson": "2.2.2",
+    "zod": "^3.24.1"
+  },
+  "devDependencies": {
+    "@types/slug": "^5.0.9",
+    "tsx": "^4.19.2",
+    "typescript": "^5.7.3"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "env",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./env.ts",
+    "./create": "./create-env.ts"
+  },
+  "dependencies": {
+    "zod": "^3.24.1"
+  }
+}
