@@ -38,6 +38,10 @@ export const appHotkeys = {
         label: 'Go to Contacts',
         command: 'G then C',
       },
+      bankIntegrations: {
+        label: 'Go to Bank Integrations',
+        command: 'G then B',
+      },
     },
   },
   contacts: {

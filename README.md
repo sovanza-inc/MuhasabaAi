@@ -1,59 +1,65 @@
-# Saas UI Pro - Next.js Starter Kit
+# Muhasaba AI - Financial Management System
 
-## Getting started
+## About
 
-To get started you can follow the instructions below.
+Muhasaba AI is a cutting-edge financial management system that combines traditional accounting principles with modern artificial intelligence. Our platform helps businesses and individuals manage their finances more effectively through smart bank integrations, automated bookkeeping, and intelligent financial insights.
 
-For more information and detailed guides please visit [the official documentation](https://saas-ui.dev/docs/nextjs-starter-kit).
+## Features
 
-## Branches
+- Smart Bank Integrations
+- Automated Bookkeeping
+- Financial Analytics
+- AI-Powered Insights
+- Multi-workspace Support
+- Real-time Financial Tracking
 
-- `main` is the latest version with Better Auth
-- `supabase` is the version with Supabase Auth
+## Getting Started
 
-## Installation
-
-### Cloning the starter project
-
-Clone this repository to get started.
-
-```bash
-git clone --single-branch --branch=main git@github.com:saas-js/saas-ui-pro-nextjs-starter-kit.git my-project
-```
-
-[Read full instructions to clone this repository](https://saas-ui.dev/docs/nextjs-starter-kit/installation/clone-repository).
-
-After cloning the repository, log in to the private NPM registry with your license key.
-
-- The `username` is the Github username you used to activate the license.
-- The `password` is your license key that you received from Lemonsqueezy or Gumroad.
+To get started with Muhasaba AI, follow these steps:
 
 ```bash
-yarn npm login --scope saas-ui-pro --always-auth
-```
+# Clone the repository
+git clone https://github.com/muhasaba/muhasaba-ai.git
 
-Install the dependencies.
+# Install dependencies
+yarn install
 
-```bash
-yarn
-```
-
-Create a `.env` file:
-
-```bash
+# Set up environment variables
 yarn turbo gen env
-```
 
-    > If you're on Windows, you need to manualy link or copy the .env to `apps/web/.env`.
-
-## Running the app
-
-To run the Next.js app, use the following command:
-
-```bash
+# Start the development server
 yarn dev:web
 ```
 
+## Technology Stack
+
+- Next.js 15
+- React
+- TypeScript
+- tRPC
+- Chakra UI
+- SaaS UI Pro
+
+## Contributing
+
+We welcome contributions from the community. Please read our [Contributing Guidelines](./CONTRIBUTING.md) before submitting any pull requests.
+
+## Social Media
+
+- Twitter: [@MuhasabaAI](https://twitter.com/MuhasabaAI)
+- LinkedIn: [Muhasaba AI](https://linkedin.com/company/muhasaba-ai)
+- Instagram: [@muhasaba.ai](https://instagram.com/muhasaba.ai)
+
+## Testimonials
+
+> "Muhasaba AI has revolutionized how we handle our financial management. The AI-powered insights have helped us make better financial decisions." - Sarah Johnson, CFO
+
+> "The automated bookkeeping feature saves us countless hours every month. It's an essential tool for any modern business." - Michael Chen, Business Owner
+
+## Support
+
+For support, please email support@muhasaba.ai or visit our [Help Center](https://help.muhasaba.ai).
+
 ## License
 
-See [LICENSE](./LICENSE).
+Copyright © 2024 Muhasaba AI. All rights reserved.

@@ -37,6 +37,7 @@ import {
   LuPlus,
   LuSearch,
   LuSquareUser,
+  LuWallet,
 } from 'react-icons/lu'
 
 import { useActivePath } from '@acme/next'
@@ -128,6 +129,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 label="Contacts"
                 icon={<LuSquareUser />}
                 hotkey="navigation.contacts"
+              />
+              <AppSidebarLink
+                href={usePath('bank-integrations')}
+                isActive={useActivePath('bank-integrations', { end: false })}
+                label="Bank Integrations"
+                icon={<LuWallet />}
+                hotkey="navigation.bankIntegrations"
               />
             </NavGroup>
 

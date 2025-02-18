@@ -1,10 +1,10 @@
 {
-  "name": "saas-ui-pro-nextjs-starter-kit",
-  "version": "1.0",
+  "name": "muhasaba-ai",
+  "version": "0.1.0",
   "description": "Production ready Next.js SaaS starter kit",
-  "repository": "git@github.com:saas-js/saas-ui-pro-nextjs-starter-kit.git",
-  "author": "Eelco Wiersma <eelco@saas-ui.dev>",
-  "license": "https://saas-ui.dev/license",
+  "repository": "https://github.com/muhasaba/muhasaba-ai",
+  "author": "Muhasaba AI <info@muhasaba.ai>",
+  "license": "SEE LICENSE IN LICENSE",
   "private": true,
   "type": "module",
   "scripts": {
