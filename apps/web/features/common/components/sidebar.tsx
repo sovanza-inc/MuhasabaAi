@@ -137,6 +137,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 icon={<LuWallet />}
                 hotkey="navigation.bankIntegrations"
               />
+              <AppSidebarLink
+                href={usePath('accounting')}
+                isActive={useActivePath('accounting', { end: false })}
+                label="Accounting"
+                icon={<LuWallet />}
+                hotkey="navigation.accounting"
+              />
             </NavGroup>
 
             {!isCompact && <AppSidebarTags />}
