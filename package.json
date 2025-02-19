@@ -70,7 +70,6 @@
     "node": ">=20.14.0"
   },
   "dependencies": {
-    "@fontsource/lato": "^5.1.1",
-    "framer-motion": "^11.18.1"
+    "@fontsource/lato": "^5.1.1"
   }
 }
