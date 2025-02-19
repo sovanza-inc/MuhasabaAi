@@ -2,7 +2,7 @@
 
 import { Box, Heading, Text, VStack } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
-import { PageHeader } from 'features/common/components/page-header'
+import { PageHeader } from '#features/common/components/page-header'
 
 export default function IdentityPage() {
   const identityData = {
@@ -18,7 +18,7 @@ export default function IdentityPage() {
 
   return (
     <Box>
-      <PageHeader title="Identity" />
+      <PageHeader />
       <Box 
         height="calc(100vh - 128px)"
         overflow="auto"

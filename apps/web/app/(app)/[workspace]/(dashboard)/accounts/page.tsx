@@ -2,7 +2,7 @@
 
 import { Box, Heading, Text, SimpleGrid } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
-import { PageHeader } from 'features/common/components/page-header'
+import { PageHeader } from '#features/common/components/page-header'
 
 export default function AccountsPage() {
   const accounts = Array(5).fill({
@@ -15,7 +15,7 @@ export default function AccountsPage() {
 
   return (
     <Box>
-      <PageHeader title="Accounts" />
+      <PageHeader />
       <Box 
         height="calc(100vh - 128px)"
         overflow="auto"

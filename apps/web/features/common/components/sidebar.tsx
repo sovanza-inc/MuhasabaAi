@@ -76,8 +76,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
     setUserSettings('sidebarWidth', width)
   }
 
-  const [isAccountingOpen, setIsAccountingOpen] = React.useState(false) // State for toggling the Accounting section
-  const router = useRouter()
+  const [isAccountingOpen, setIsAccountingOpen] = React.useState(false)
 
   // Track the active path to check if any subpage under Accounting is active
   const isAccountsActive = useActivePath('accounts', { end: false })

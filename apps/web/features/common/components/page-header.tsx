@@ -3,11 +3,7 @@
 import { Box, HStack, Text, Flex, Input, InputGroup, InputLeftElement, Image } from '@chakra-ui/react'
 import { LuArrowLeft, LuSearch, LuBell, LuUser } from 'react-icons/lu'
 
-interface PageHeaderProps {
-  title: string
-}
-
-export const PageHeader = ({ title }: PageHeaderProps) => {
+export const PageHeader = () => {
   return (
     <Box borderBottom="1px solid" borderColor="gray.100" bg="white" px={8} py={4}>
       <Flex justify="space-between" align="center">
