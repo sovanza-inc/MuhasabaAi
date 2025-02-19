@@ -7,5 +7,7 @@ const { Page, metadata } = createPage({
   component: BankIntegrationsPage,
 })
 
+// Hello
+
 export { metadata }
 export default Page 
