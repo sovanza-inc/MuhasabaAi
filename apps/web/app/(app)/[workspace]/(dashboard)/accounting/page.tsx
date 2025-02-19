@@ -3,7 +3,7 @@
 import { Box, Heading, Text, SimpleGrid } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
 
-export default function AccountsPage() {
+export default function AccountingPage() {
   const accounts = Array(5).fill({
     name: 'Beyond Current Account',
     enbd: '12 Current',
@@ -17,12 +17,12 @@ export default function AccountsPage() {
       <Box mb={6}>
         <Box display="flex" justifyContent="space-between" alignItems="flex-start" mb={1}>
           <Heading as="h2" fontSize="xl" fontWeight="semibold" color="gray.900">
-            Accounts
+            Accounts Overview
           </Heading>
           <Text fontSize="sm" color="gray.600">Total Accounts: {accounts.length}</Text>
         </Box>
         <Text fontSize="sm" color="gray.500">
-          Effortlessly view and manage your accounts in one place with real-time balance updates.
+          Manage your financial accounts and track your business transactions
         </Text>
       </Box>
 
