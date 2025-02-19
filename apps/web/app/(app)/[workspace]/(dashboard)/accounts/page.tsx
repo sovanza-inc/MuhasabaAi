@@ -4,7 +4,7 @@ import { Box, Heading, Text, SimpleGrid } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from 'features/common/components/page-header'
 
-export default function AccountingPage() {
+export default function AccountsPage() {
   const accounts = Array(5).fill({
     name: 'Beyond Current Account',
     enbd: '12 Current',
@@ -15,7 +15,7 @@ export default function AccountingPage() {
 
   return (
     <Box>
-      <PageHeader title="Accounting" />
+      <PageHeader title="Accounts" />
       <Box 
         height="calc(100vh - 128px)"
         overflow="auto"
