@@ -31,7 +31,7 @@
     "lint:fix": "eslint . --cache --cache-location=node_modules/.cache/.eslintcache --fix",
     "lint:staged": "lint-staged --allow-empty --config lint-staged.config.cjs",
     "build": "turbo run build",
-    "vercel-build": "yarn install && yarn build"
+    "vercel-build": "yarn install --no-immutable && yarn build"
   },
   "workspaces": [
     "apps/*",
