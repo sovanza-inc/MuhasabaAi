@@ -14,7 +14,7 @@ import { UserSettings } from '#lib/user-settings/user-settings'
 import { Provider } from './provider'
 import { Script } from './script'
 
-// Exporting
+// Exporting hello
 
 export const metadata: Metadata = {
   title: {
