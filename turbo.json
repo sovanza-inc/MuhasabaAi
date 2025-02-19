@@ -46,5 +46,22 @@
     },
     "db:check": { "cache": false },
     "db:push": { "cache": false }
-  }
+  },
+  "globalEnv": [
+    "APP_URL",
+    "DEFAULT_PLAN_ID",
+    "EMAIL_FROM",
+    "AUTH_SECRET",
+    "RESEND_API_KEY",
+    "DATABASE_URL",
+    "SUPABASE_SERVICE_KEY",
+    "STRIPE_SECRET_KEY",
+    "STRIPE_WEBHOOK_SECRET",
+    "SALTEDGE_APP_ID",
+    "SALTEDGE_SECRET",
+    "SALTEDGE_RETURN_URL",
+    "SAAS_UI_USER",
+    "SAAS_UI_LICENSE_KEY",
+    "DEFAULT_IS_FREE"
+  ]
 }
