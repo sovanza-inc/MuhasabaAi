@@ -9,6 +9,7 @@ import {
   Spacer,
   Stack,
   useBreakpointValue,
+  Icon,
 } from '@chakra-ui/react'
 import {
   Command,
@@ -38,6 +39,10 @@ import {
   LuSearch,
   LuSquareUser,
   LuWallet,
+  LuChartArea,
+  LuReceipt,
+  LuUser,
+  LuBanknote,
 } from 'react-icons/lu'
 
 import { useActivePath } from '@acme/next'
@@ -141,8 +146,29 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 href={usePath('accounting')}
                 isActive={useActivePath('accounting', { end: false })}
                 label="Accounting"
-                icon={<LuWallet />}
+                icon={<LuBanknote />}
                 hotkey="navigation.accounting"
+              />
+              <AppSidebarLink
+                href={usePath('transaction')}
+                isActive={useActivePath('transaction', { end: false })}
+                label="Transaction"
+                icon={<LuReceipt />}
+                hotkey="navigation.transaction"
+              />
+              <AppSidebarLink
+                href={usePath('identity')}
+                isActive={useActivePath('identity', { end: false })}
+                label="Identity"
+                icon={<LuUser />}
+                hotkey="navigation.identity"
+              />
+              <AppSidebarLink
+                href={usePath('cashflow')}
+                isActive={useActivePath('cashflow', { end: false })}
+                label="Cashflow"
+                icon={<LuChartArea />}
+                hotkey="navigation.cashflow"
               />
             </NavGroup>
 
