@@ -6,6 +6,6 @@ const { Page, metadata } = createPage({
   params: ['workspace'],
   component: BankIntegrationsPage,
 })
-// HI
+
 export { metadata }
 export default Page 
