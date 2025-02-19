@@ -14,6 +14,8 @@ import { UserSettings } from '#lib/user-settings/user-settings'
 import { Provider } from './provider'
 import { Script } from './script'
 
+// Exporting
+
 export const metadata: Metadata = {
   title: {
     template: "%s | Muhasaba AI",
