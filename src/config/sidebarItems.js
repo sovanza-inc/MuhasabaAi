@@ -7,6 +7,4 @@ const sidebarItems = [
     path: '/accounting'
   },
   // ... rest of the items ...
-];
-
-export default sidebarItems; 
+]; 
