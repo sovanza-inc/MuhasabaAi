@@ -31,7 +31,6 @@ import {
 import { Route } from 'next'
 import { useRouter } from 'next/navigation'
 import {
-  LuCalculator,
   LuCircleHelp,
   LuHouse,
   LuInbox,
@@ -137,13 +136,6 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 label="Bank Integrations"
                 icon={<LuWallet />}
                 hotkey="navigation.bankIntegrations"
-              />
-              <AppSidebarLink
-                href={usePath('accounting')}
-                isActive={useActivePath('accounting', { end: false })}
-                label="Accounting"
-                icon={<LuCalculator />}
-                hotkey="navigation.accounting"
               />
             </NavGroup>
 
