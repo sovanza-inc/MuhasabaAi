@@ -9,6 +9,7 @@ import {
   Heading,
   Stack,
   Text,
+  Box,
 } from '@chakra-ui/react'
 import { useLocalStorageValue } from '@react-hookz/web'
 import { useAuth } from '@saas-ui/auth-provider'
@@ -66,32 +67,53 @@ export const LoginPage = () => {
   }
 
   return (
-    <Stack flex="1" direction="row">
+    <Stack 
+      flex="1" 
+      direction="row"
+      bgImage="url('/img/onboarding/DASH.png')"
+      bgSize="cover"
+      // bgPosition="center"
+      bgRepeat="round"
+      position="relative"
+      _before={{
+        content: '""',
+        position: 'absolute',
+        top: 0,
+        right: 0,
+        bottom: 0,
+        left: 0,
+        zIndex: 0,
+      }}
+    >
       <Stack
         flex="1"
         alignItems="center"
         justify="center"
         direction="column"
         spacing="8"
+        position="relative"
+        zIndex={1}
       >
         <Container maxW="container.sm" py="8">
-          <Logo mb="12" width="120px" />
+        <Box display="flex" justifyContent="center" width="100%">
+            <Logo mb="12" width="120px" />
+          </Box>
 
-          <Heading as="h2" size="md" mb="4">
-            Log in
+          <Heading as="h2" size="md" mb="4" textAlign="center">
+            Login
           </Heading>
 
-          <Providers />
-
-          <HStack my="4">
-            <Divider />
-            <Text flexShrink={0} color="muted">
-              Or continue with
-            </Text>
-            <Divider />
-          </HStack>
-
-          <Form mode="onSubmit" schema={loginSchema} onSubmit={onSubmit}>
+          <Form 
+            mode="onSubmit" 
+            schema={loginSchema} 
+            onSubmit={onSubmit}
+            sx={{
+              'input:focus-visible, select:focus-visible': {
+                borderColor: '#1AB294 !important',
+                boxShadow: '0 0 0 1px #1AB294 !important',
+              }
+            }}
+          >
             {({ Field }) => (
               <FormLayout>
                 <Field
@@ -116,7 +138,23 @@ export const LoginPage = () => {
 
                 <Link href="/forgot-password">Forgot your password?</Link>
 
-                <SubmitButton>Log in</SubmitButton>
+                <SubmitButton 
+                  backgroundColor="#1AB294"
+                  _hover={{ backgroundColor: 'green.800' }}
+                  color="white"
+                >
+                  Login
+                </SubmitButton>
+
+                <HStack my="4">
+                  <Divider />
+                  <Text flexShrink={0} color="muted">
+                    Or continue with
+                  </Text>
+                  <Divider />
+                </HStack>
+
+                <Providers />
               </FormLayout>
             )}
           </Form>
@@ -124,7 +162,7 @@ export const LoginPage = () => {
 
         <Text color="muted">
           Don&apos;t have an account yet?{' '}
-          <Link href="/signup" color="chakra-body-text">
+          <Link href="/signup" color="green.500">
             Sign up
           </Link>
           .
