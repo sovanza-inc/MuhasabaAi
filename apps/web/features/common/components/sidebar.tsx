@@ -212,6 +212,15 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                   />
                 </Stack>
               </Collapse>
+
+              <AppSidebarLink
+                href={usePath('profit-loss')}
+                isActive={useActivePath('profit-loss', { end: false })}
+                label="Profit & Loss"
+                icon={<LuWallet />}
+                hotkey="navigation.profitLoss"
+              />
+
             </NavGroup>
 
             {!isCompact && <AppSidebarTags />}
