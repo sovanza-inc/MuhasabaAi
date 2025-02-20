@@ -7,11 +7,11 @@ export const PageHeader = () => {
   return (
     <Box borderBottom="1px solid" borderColor="gray.100" bg="white" px={8} py={4}>
       <Flex justify="space-between" align="center">
-        {/* Left: Restart */}
+        {/* Left: Restart
         <HStack spacing={2} color="#105157" cursor="pointer">
           <LuArrowLeft size={18} />
           <Text fontSize="md">Restart</Text>
-        </HStack>
+        </HStack> */}
 
         {/* Center: Logo */}
         <Image 
@@ -21,7 +21,7 @@ export const PageHeader = () => {
         />
 
         {/* Right: Search & Icons */}
-        <HStack spacing={4}>
+        {/* <HStack spacing={4}>
           <InputGroup maxW="240px">
             <InputLeftElement>
               <LuSearch color="gray.400" />
@@ -37,7 +37,7 @@ export const PageHeader = () => {
             <Box as={LuBell} size={20} color="gray.600" cursor="pointer" />
             <Box as={LuUser} size={20} color="gray.600" cursor="pointer" />
           </HStack>
-        </HStack>
+        </HStack> */}
       </Flex>
     </Box>
   )

@@ -44,6 +44,7 @@ import {
   LuReceipt,
   LuUser,
   LuBanknote,
+  LuFileText,
 } from 'react-icons/lu'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa' // Import arrow icons
 
@@ -77,12 +78,16 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
   }
 
   const [isAccountingOpen, setIsAccountingOpen] = React.useState(false)
+  const [isReportsOpen, setIsReportsOpen] = React.useState(false)
 
   // Track the active path to check if any subpage under Accounting is active
   const isAccountsActive = useActivePath('accounts', { end: false })
   const isIdentityActive = useActivePath('identity', { end: false })
   const isTransactionActive = useActivePath('transaction', { end: false })
   const isCashflowActive = useActivePath('cashflow', { end: false })
+  const isProfitLossActive = useActivePath('profit-loss', { end: false })
+  const isBalanceSheetActive = useActivePath('balance-sheet', { end: false })
+  const isCashflowStatementActive = useActivePath('cashflow-statement', { end: false })
 
   // Set the parent item to be open if any subpage is active
   React.useEffect(() => {
@@ -90,6 +95,12 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
       setIsAccountingOpen(true)
     }
   }, [isAccountsActive, isIdentityActive, isTransactionActive, isCashflowActive])
+
+  React.useEffect(() => {
+    if (isProfitLossActive || isBalanceSheetActive || isCashflowStatementActive) {
+      setIsReportsOpen(true)
+    }
+  }, [isProfitLossActive, isBalanceSheetActive, isCashflowStatementActive])
 
   return (
     <Resizer
@@ -137,7 +148,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 icon={<LuHouse />}
                 hotkey="navigation.dashboard"
               />
-              <AppSidebarLink
+              {/* <AppSidebarLink
                 href={usePath('inbox')}
                 isActive={useActivePath('inbox', { end: false })}
                 label="Inbox"
@@ -151,7 +162,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 label="Contacts"
                 icon={<LuSquareUser />}
                 hotkey="navigation.contacts"
-              />
+              /> */}
               <AppSidebarLink
                 href={usePath('bank-integrations')}
                 isActive={useActivePath('bank-integrations', { end: false })}
@@ -163,23 +174,23 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
               {/* Parent Accounting Item */}
               <NavItem
                 icon={<LuBanknote />}
-                onClick={() => setIsAccountingOpen(!isAccountingOpen)} // Toggle the collapse state
+                onClick={() => setIsAccountingOpen(!isAccountingOpen)}
                 display="flex"
                 alignItems="center"
               >
                 Accounting
                 <Box ml="auto">
                   <Icon
-                    as={isAccountingOpen ? FaChevronDown : FaChevronUp} // Toggle arrow based on state
+                    as={isAccountingOpen ? FaChevronDown : FaChevronUp}
                     boxSize={3}
-                    transform={isAccountingOpen ? 'rotate(0deg)' : 'rotate(90deg)'} // Rotate arrow
-                    transition="transform 0.3s ease" // Smooth transition for rotation
-                    color="gray.600" // Lighter color for less bold appearance
+                    transform={isAccountingOpen ? 'rotate(0deg)' : 'rotate(90deg)'}
+                    transition="transform 0.3s ease"
+                    color="gray.600"
                   />
                 </Box>
               </NavItem>
 
-              {/* Collapse section for subpages under Accounts */}
+              {/* Accounting subitems */}
               <Collapse in={isAccountingOpen}>
                 <Stack pl={4}>
                   <AppSidebarLink
@@ -213,28 +224,51 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 </Stack>
               </Collapse>
 
-              <AppSidebarLink
-                href={usePath('profit-loss')}
-                isActive={useActivePath('profit-loss', { end: false })}
-                label="Profit & Loss"
-                icon={<LuWallet />}
-                hotkey="navigation.profitLoss"
-              />
-              
-              <AppSidebarLink
-                href={usePath('balance-sheet')}
-                isActive={useActivePath('balance-sheet', { end: false })}
-                label="Balance Sheet"
-                icon={<LuWallet />}
-                hotkey="navigation.balanceSheet"
-              />
-               <AppSidebarLink
-                href={usePath('cashflow-statement')}
-                isActive={useActivePath('cashflow-statement', { end: false })}
-                label="Cashflow Statement"
-                icon={<LuWallet />}
-                hotkey="navigation.cashflowStatement"
-              />
+              {/* Parent Reports Item */}
+              <NavItem
+                icon={<LuFileText />}
+                onClick={() => setIsReportsOpen(!isReportsOpen)}
+                display="flex"
+                alignItems="center"
+              >
+                Reports
+                <Box ml="auto">
+                  <Icon
+                    as={isReportsOpen ? FaChevronDown : FaChevronUp}
+                    boxSize={3}
+                    transform={isReportsOpen ? 'rotate(0deg)' : 'rotate(90deg)'}
+                    transition="transform 0.3s ease"
+                    color="gray.600"
+                  />
+                </Box>
+              </NavItem>
+
+              {/* Reports subitems */}
+              <Collapse in={isReportsOpen}>
+                <Stack pl={4}>
+                  <AppSidebarLink
+                    href={usePath('profit-loss')}
+                    isActive={isProfitLossActive}
+                    label="Profit & Loss"
+                    icon={<LuWallet />}
+                    hotkey="navigation.profitLoss"
+                  />
+                  <AppSidebarLink
+                    href={usePath('balance-sheet')}
+                    isActive={isBalanceSheetActive}
+                    label="Balance Sheet"
+                    icon={<LuWallet />}
+                    hotkey="navigation.balanceSheet"
+                  />
+                  <AppSidebarLink
+                    href={usePath('cashflow-statement')}
+                    isActive={isCashflowStatementActive}
+                    label="Cashflow Statement"
+                    icon={<LuWallet />}
+                    hotkey="navigation.cashflowStatement"
+                  />
+                </Stack>
+              </Collapse>
             </NavGroup>
 
             {!isCompact && <AppSidebarTags />}
