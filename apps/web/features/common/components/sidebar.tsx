@@ -228,6 +228,13 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 icon={<LuWallet />}
                 hotkey="navigation.balanceSheet"
               />
+               <AppSidebarLink
+                href={usePath('cashflow-statement')}
+                isActive={useActivePath('cashflow-statement', { end: false })}
+                label="Cashflow Statement"
+                icon={<LuWallet />}
+                hotkey="navigation.cashflowStatement"
+              />
             </NavGroup>
 
             {!isCompact && <AppSidebarTags />}
