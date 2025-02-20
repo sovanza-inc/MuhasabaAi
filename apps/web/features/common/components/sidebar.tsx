@@ -220,7 +220,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 icon={<LuWallet />}
                 hotkey="navigation.profitLoss"
               />
-
+              
+              <AppSidebarLink
+                href={usePath('balance-sheet')}
+                isActive={useActivePath('balance-sheet', { end: false })}
+                label="Balance Sheet"
+                icon={<LuWallet />}
+                hotkey="navigation.balanceSheet"
+              />
             </NavGroup>
 
             {!isCompact && <AppSidebarTags />}
