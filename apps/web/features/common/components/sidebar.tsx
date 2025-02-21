@@ -45,6 +45,10 @@ import {
   LuUser,
   LuBanknote,
   LuFileText,
+  LuLayoutGrid,
+  LuTrendingUp,
+  LuClipboardList,
+  LuChartPie,
 } from 'react-icons/lu'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa' // Import arrow icons
 
@@ -197,7 +201,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                     href={usePath('accounts')}
                     isActive={isAccountsActive}
                     label="Accounts"
-                    icon={<LuBanknote />}
+                    icon={<LuLayoutGrid />}
                     hotkey="navigation.accounts"
                   />
                   <AppSidebarLink
@@ -250,21 +254,21 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                     href={usePath('profit-loss')}
                     isActive={isProfitLossActive}
                     label="Profit & Loss"
-                    icon={<LuWallet />}
+                    icon={<LuTrendingUp />}
                     hotkey="navigation.profitLoss"
                   />
                   <AppSidebarLink
                     href={usePath('balance-sheet')}
                     isActive={isBalanceSheetActive}
                     label="Balance Sheet"
-                    icon={<LuWallet />}
+                    icon={<LuClipboardList />}
                     hotkey="navigation.balanceSheet"
                   />
                   <AppSidebarLink
                     href={usePath('cashflow-statement')}
                     isActive={isCashflowStatementActive}
                     label="Cashflow Statement"
-                    icon={<LuWallet />}
+                    icon={<LuChartPie />}
                     hotkey="navigation.cashflowStatement"
                   />
                 </Stack>
