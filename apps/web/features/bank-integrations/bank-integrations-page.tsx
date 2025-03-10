@@ -157,6 +157,97 @@ declare global {
   }
 }
 
+// LeanSDKWrapper component - isolated from React's rendering cycle
+const LeanSDKWrapper: React.FC<{
+  authToken: string;
+  customerId: string;
+  selectedBank: Bank;
+  onSuccess: (connectionId: string) => void;
+  onExit: () => void;
+}> = ({ authToken, customerId, selectedBank, onSuccess, onExit }) => {
+  // Use ref to track if the component is mounted
+  const isMountedRef = React.useRef(true);
+  
+  React.useEffect(() => {
+    // Set mounted flag
+    isMountedRef.current = true;
+    
+    // Function to initialize Lean SDK
+    const initializeLeanSDK = () => {
+      if (!window.Lean) {
+        console.error('Lean SDK not available');
+        return;
+      }
+      
+      try {
+        console.log('Initializing Lean SDK with:', {
+          bankIdentifier: selectedBank.identifier || selectedBank.id,
+          customerId,
+          sandbox: process.env.NODE_ENV !== 'production'
+        });
+        
+        const config = {
+          app_token: authToken,
+          customer_id: customerId,
+          permissions: ["identity", "transactions", "balance", "accounts"],
+          sandbox: process.env.NODE_ENV !== 'production',
+          callback: (event: any) => {
+            console.log('Lean SDK event:', event);
+            
+            // Only process events if component is still mounted
+            if (!isMountedRef.current) return;
+            
+            if (event.type === 'exit') {
+              console.log('User exited the flow');
+              onExit();
+            } else if (event.type === 'success') {
+              console.log('Connection successful:', event.data);
+              
+              if (event.data && event.data.connection_id) {
+                onSuccess(event.data.connection_id);
+              }
+            }
+          }
+        };
+        
+        // Try connect method first, fallback to link
+        if (typeof window.Lean.connect === 'function') {
+          window.Lean.connect(config);
+        } else if (typeof window.Lean.link === 'function') {
+          window.Lean.link(config);
+        } else {
+          console.error('Neither Lean.connect nor Lean.link methods are available');
+        }
+      } catch (error) {
+        console.error('Error initializing Lean SDK:', error);
+      }
+    };
+    
+    // Initialize with a small delay to ensure it's outside React's rendering cycle
+    const timeoutId = setTimeout(initializeLeanSDK, 100);
+    
+    // Cleanup function
+    return () => {
+      // Mark component as unmounted
+      isMountedRef.current = false;
+      clearTimeout(timeoutId);
+      
+      // Attempt to clean up any Lean SDK UI elements
+      try {
+        // Some SDKs provide a close or destroy method
+        if (window.Lean && typeof window.Lean.close === 'function') {
+          window.Lean.close();
+        }
+      } catch (e) {
+        console.error('Error cleaning up Lean SDK:', e);
+      }
+    };
+  }, [authToken, customerId, selectedBank, onSuccess, onExit]);
+  
+  // This component doesn't render anything
+  return null;
+};
+
 export function BankIntegrationsPage() {
   const toast = useToast()
   const { isOpen, onOpen, onClose } = useDisclosure()
@@ -171,7 +262,6 @@ export function BankIntegrationsPage() {
   const [appName, setAppName] = React.useState('')
   const [selectedCountry, setSelectedCountry] = React.useState<'UAE' | 'SAU'>('UAE')
   const [step, setStep] = React.useState<'setup' | 'info' | 'banks' | 'connect'>('setup')
-  const [sdkLoaded, setSdkLoaded] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
 
   // Theme colors
@@ -369,19 +459,16 @@ export function BankIntegrationsPage() {
       // Check for different possible names
       if (window.Lean) {
         console.log('Lean is available in window')
-        setSdkLoaded(true)
       } else {
         console.error('No Lean SDK object found in window after script load')
         console.log('All window properties:', Object.keys(window))
         setError('Failed to initialize the bank connection SDK')
-        setSdkLoaded(false)
       }
     }
     
     script.onerror = (error) => {
       console.error('Error loading Lean SDK:', error)
       setError('Failed to load the bank connection SDK')
-      setSdkLoaded(false)
     }
     
     // Store the script reference
@@ -472,9 +559,8 @@ export function BankIntegrationsPage() {
 
   // Function to initialize the Lean SDK and open the connection flow
   const initializeAndOpenLeanSDK = React.useCallback(() => {
-    if (!window.Lean || !selectedBank || !authToken || !customerId) {
+    if (!selectedBank || !authToken || !customerId) {
       console.error('Cannot initialize Lean SDK: missing dependencies', {
-        leanAvailable: !!window.Lean,
         bankSelected: !!selectedBank,
         tokenAvailable: !!authToken,
         customerIdAvailable: !!customerId
@@ -482,76 +568,47 @@ export function BankIntegrationsPage() {
       return
     }
     
-    try {
-      console.log('Initializing Lean SDK with:', {
-        bankIdentifier: selectedBank.identifier || selectedBank.id,
-        customerId,
-        sandbox: process.env.NODE_ENV !== 'production'
-      })
-      
-      // Avoid creating DOM elements directly
-      // Instead, use the Lean SDK directly without a container
-      console.log('Connecting to bank using Lean SDK')
-      
-      // Use a simple configuration object without any DOM manipulation
-      const config = {
-        app_token: authToken,
-        customer_id: customerId,
-        permissions: ["identity", "transactions", "balance", "accounts"],
-        sandbox: process.env.NODE_ENV !== 'production',
-        callback: (event: any) => {
-          console.log('Lean SDK event:', event)
-          
-          if (event.type === 'exit') {
-            console.log('User exited the flow')
-            onClose()
-          } else if (event.type === 'success') {
-            console.log('Connection successful:', event.data)
-            
-            // Handle successful connection
-            if (event.data && event.data.connection_id) {
-              const newConnection: BankConnection = {
-                id: event.data.connection_id,
-                bank_id: (selectedBank.identifier || selectedBank.id || '').toString(),
-                status: 'connected',
-                created_at: new Date().toISOString(),
-                bank_name: selectedBank.name,
-                bank_logo: selectedBank.logo,
-                permissions: [
-                  'identity',
-                  'accounts',
-                  'balance',
-                  'transactions'
-                ]
-              }
-              
-              setConnections(prev => [...prev, newConnection])
-              
-              // Fetch data for the new connection
-              fetchConnectionData(event.data.connection_id)
-              
-              // Close the modal
-              onClose()
-            }
-          }
-        }
-      }
-      
-      // Use setTimeout to ensure this runs outside of React's rendering cycle
-      setTimeout(() => {
-        if (window.Lean && window.Lean.connect) {
-          window.Lean.connect(config)
-        } else if (window.Lean && window.Lean.link) {
-          window.Lean.link(config)
-        } else {
-          console.error('Lean SDK methods not available')
-        }
-      }, 0)
-    } catch (error) {
-      console.error('Error initializing Lean SDK:', error)
-      setError('Failed to initialize the bank connection')
+    // Set showLeanSDK to true to render the LeanSDKWrapper component
+    setShowLeanSDK(true);
+  }, [selectedBank, authToken, customerId]);
+  
+  // State to control rendering of the LeanSDKWrapper component
+  const [showLeanSDK, setShowLeanSDK] = React.useState(false);
+  
+  // Handle successful connection
+  const handleLeanSuccess = React.useCallback((connectionId: string) => {
+    if (!selectedBank) return;
+    
+    const newConnection: BankConnection = {
+      id: connectionId,
+      bank_id: (selectedBank.identifier || selectedBank.id || '').toString(),
+      status: 'connected',
+      created_at: new Date().toISOString(),
+      bank_name: selectedBank.name,
+      bank_logo: selectedBank.logo,
+      permissions: [
+        'identity',
+        'accounts',
+        'balance',
+        'transactions'
+      ]
     }
-  }, [selectedBank, authToken, customerId, onClose, fetchConnectionData])
+    
+    setConnections(prev => [...prev, newConnection])
+    
+    // Fetch data for the new connection
+    fetchConnectionData(connectionId)
+    
+    // Close the modal and clean up
+    setShowLeanSDK(false);
+    onClose();
+  }, [selectedBank, fetchConnectionData, onClose]);
+  
+  // Handle exit from Lean SDK
+  const handleLeanExit = React.useCallback(() => {
+    setShowLeanSDK(false);
+    onClose();
+  }, [onClose]);
 
   // Effects
   React.useEffect(() => {
@@ -570,22 +627,9 @@ export function BankIntegrationsPage() {
         document.head.removeChild(scriptRef.current)
         scriptRef.current = null
         window.Lean = undefined
-        setSdkLoaded(false)
       }
     }
   }, [step, loadLeanSDK])
-
-  React.useEffect(() => {
-    // Initialize SDK when it's loaded and we're in the connect step
-    if (sdkLoaded && step === 'connect' && window.Lean) {
-      console.log('SDK loaded and in connect step, initializing')
-      
-      // Short delay to ensure the container is ready
-      setTimeout(() => {
-        initializeAndOpenLeanSDK()
-      }, 100)
-    }
-  }, [sdkLoaded, step, initializeAndOpenLeanSDK])
 
   // Render banks grid
   const renderBanksGrid = React.useCallback(() => (
@@ -1035,6 +1079,17 @@ export function BankIntegrationsPage() {
           </ModalBody>
         </ModalContent>
       </Modal>
+
+      {/* Render the LeanSDKWrapper component when showLeanSDK is true */}
+      {showLeanSDK && authToken && customerId && selectedBank && (
+        <LeanSDKWrapper
+          authToken={authToken}
+          customerId={customerId}
+          selectedBank={selectedBank}
+          onSuccess={handleLeanSuccess}
+          onExit={handleLeanExit}
+        />
+      )}
     </>
   )
 }
