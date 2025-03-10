@@ -138,15 +138,15 @@ interface LeanSDKConfig {
   };
 }
 
-interface LeanLoader {
+interface LeanSDK {
   init: (config: LeanSDKConfig) => void;
   open: () => void;
 }
 
-// Extend Window interface to include LeanLoader
+// Extend Window interface to include Lean
 declare global {
   interface Window {
-    LeanLoader?: LeanLoader;
+    Lean?: LeanSDK;
   }
 }
 
@@ -340,26 +340,49 @@ export function BankIntegrationsPage() {
     if (scriptRef.current) {
       document.head.removeChild(scriptRef.current)
       scriptRef.current = null
-      window.LeanLoader = undefined
+      window.Lean = undefined
     }
     
     // Create a new script element
     const script = document.createElement('script')
-    script.src = 'https://cdn.leantech.me/link/loader/prod' // Always use production CDN URL as per memory
+    script.src = 'https://cdn.leantech.me/link/loader/prod/ae/latest/lean-link-loader.min.js' // Correct production CDN URL
     script.async = true
+    script.defer = true // Add defer attribute
+    script.type = 'text/javascript' // Specify script type
+    
+    // Add event listeners
     script.onload = () => {
       console.log('Lean SDK loaded successfully')
-      setSdkLoaded(true)
+      if (window.Lean) {
+        console.log('Lean is available in window')
+        setSdkLoaded(true)
+      } else {
+        console.error('Lean not found in window after script load')
+        setError('Failed to initialize the bank connection SDK')
+        setSdkLoaded(false)
+      }
     }
+    
     script.onerror = (error) => {
       console.error('Error loading Lean SDK:', error)
       setError('Failed to load the bank connection SDK')
       setSdkLoaded(false)
     }
     
+    // Store the script reference
+    scriptRef.current = script
+    
     // Add the script to the document
     document.head.appendChild(script)
-    scriptRef.current = script
+    
+    // Cleanup function
+    return () => {
+      if (scriptRef.current) {
+        document.head.removeChild(scriptRef.current)
+        scriptRef.current = null
+        window.Lean = undefined
+      }
+    }
   }, [])
 
   // Function to fetch data for a bank connection
@@ -434,16 +457,24 @@ export function BankIntegrationsPage() {
 
   // Function to initialize the Lean SDK and open the connection flow
   const initializeAndOpenLeanSDK = React.useCallback(() => {
-    if (!window.LeanLoader || !selectedBank || !authToken || !customerId) {
-      console.error('Cannot initialize Lean SDK: missing dependencies')
-      setError('Failed to initialize the bank connection')
+    if (!window.Lean || !selectedBank || !authToken || !customerId) {
+      console.error('Cannot initialize Lean SDK: missing dependencies', {
+        loaderAvailable: !!window.Lean,
+        bankSelected: !!selectedBank,
+        tokenAvailable: !!authToken,
+        customerIdAvailable: !!customerId
+      })
       return
     }
     
-    console.log('Initializing Lean SDK with bank:', selectedBank.identifier || selectedBank.id)
-    
     try {
-      // Create container for the SDK if it doesn't exist
+      console.log('Initializing Lean SDK with:', {
+        bankIdentifier: selectedBank.identifier || selectedBank.id,
+        customerId,
+        sandbox: process.env.NODE_ENV !== 'production'
+      })
+      
+      // Ensure the container exists
       let container = document.getElementById('lean-connect-container')
       if (!container) {
         container = document.createElement('div')
@@ -451,11 +482,8 @@ export function BankIntegrationsPage() {
         document.body.appendChild(container)
       }
       
-      // Generate customer_id from app name as per memory
-      const appNameForId = 'MuhasabaAI'
-      
       // Initialize the Lean SDK with proper configuration
-      window.LeanLoader.init({
+      window.Lean.init({
         app_token: authToken,
         sandbox: process.env.NODE_ENV !== 'production', // Use sandbox flag for environment handling
         bank_identifier: selectedBank.identifier || selectedBank.id || '',
@@ -524,7 +552,8 @@ export function BankIntegrationsPage() {
       })
       
       // Open the SDK
-      window.LeanLoader.open()
+      console.log('Opening Lean SDK')
+      window.Lean.open()
     } catch (error) {
       console.error('Error initializing Lean SDK:', error)
       setError('Failed to initialize the bank connection')
@@ -533,16 +562,32 @@ export function BankIntegrationsPage() {
 
   // Effects
   React.useEffect(() => {
+    // Load SDK when entering connect step
     if (step === 'connect') {
-      loadLeanSDK()
+      console.log('Step changed to connect, loading Lean SDK')
+      const cleanup = loadLeanSDK()
+      return cleanup
     }
-  }, [step])
+    
+    // Cleanup when leaving connect step
+    return () => {
+      if (scriptRef.current) {
+        console.log('Cleaning up Lean SDK')
+        document.head.removeChild(scriptRef.current)
+        scriptRef.current = null
+        window.Lean = undefined
+        setSdkLoaded(false)
+      }
+    }
+  }, [step, loadLeanSDK])
 
   React.useEffect(() => {
-    if (sdkLoaded && step === 'connect') {
+    // Initialize SDK when it's loaded and we're in the connect step
+    if (sdkLoaded && step === 'connect' && window.Lean) {
+      console.log('SDK loaded and in connect step, initializing')
       initializeAndOpenLeanSDK()
     }
-  }, [sdkLoaded, step])
+  }, [sdkLoaded, step, initializeAndOpenLeanSDK])
 
   // Render banks grid
   const renderBanksGrid = React.useCallback(() => (
