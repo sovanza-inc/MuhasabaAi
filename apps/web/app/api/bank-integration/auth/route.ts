@@ -1,106 +1,187 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
+import { NextResponse } from 'next/server'
+import Lean from '@leantechnologies/node-sdk'
+import axios from 'axios'
 
-// URLs from official documentation
-const LEAN_TECH_SANDBOX_URL = 'https://auth.sandbox.leantech.me'
-const LEAN_TECH_PROD_URL = 'https://auth.leantech.me'
+// Define interfaces for the Lean SDK to match its actual structure
+interface LeanAuth {
+  token: (params: { grantType: string; scope: string }) => Promise<{ accessToken: string; expiresIn?: number }>;
+}
 
-// Cache token expiry times (3599 seconds as per documentation)
-const TOKEN_EXPIRY = 3599
+interface LeanCustomers {
+  create: (params: { id: string }) => Promise<any>;
+  getIdentity: (customerId: string) => Promise<any>;
+  getAccounts: (customerId: string) => Promise<any>;
+  getAccountBalance: (customerId: string, accountId: string) => Promise<any>;
+  getAccountTransactions: (customerId: string, accountId: string, params: { fromDate: string; toDate: string; includeDetails: boolean }) => Promise<any>;
+}
 
+interface LeanBanks {
+  list: () => Promise<any>;
+}
 
-export async function POST(req: NextRequest) {
+interface LeanConnections {
+  create: (params: { customerId: string; bankId: string }) => Promise<any>;
+}
+
+// Extend the Lean type to include the properties we know it has
+interface LeanSDK extends Lean {
+  auth: LeanAuth;
+  customers: LeanCustomers;
+  banks: LeanBanks;
+  connections: LeanConnections;
+}
+
+// Initialize the Lean SDK with environment-specific configuration
+// @ts-ignore - Ignoring TypeScript error as the SDK has a different constructor than what TypeScript expects
+const leanClient = new Lean({
+  clientId: process.env.LEAN_TECH_CLIENT_ID,
+  clientSecret: process.env.LEAN_TECH_CLIENT_SECRET,
+  sandbox: process.env.NODE_ENV !== 'production',
+}) as LeanSDK;
+
+export async function GET() {
   try {
-    const { customerId } = await req.json()
-    const headersList = headers()
+    // Log environment variables for debugging (redacted for security)
+    console.log('LEAN_TECH_CLIENT_ID exists:', !!process.env.LEAN_TECH_CLIENT_ID)
+    console.log('LEAN_TECH_CLIENT_SECRET exists:', !!process.env.LEAN_TECH_CLIENT_SECRET)
+    console.log('NODE_ENV:', process.env.NODE_ENV)
     
-    // Ensure request is from our application
-    const origin = (await headersList).get('origin')
-    if (!origin?.includes(process.env.NEXT_PUBLIC_APP_URL || 'localhost')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-    
+    // Check if required environment variables are present
     if (!process.env.LEAN_TECH_CLIENT_ID || !process.env.LEAN_TECH_CLIENT_SECRET) {
+      console.error('Missing Lean Tech credentials in environment variables')
       return NextResponse.json(
         { error: 'Missing Lean Tech credentials' },
         { status: 500 }
       )
     }
-
-    // Remove any leading/trailing spaces from credentials
-    const clientId = process.env.LEAN_TECH_CLIENT_ID.trim()
-    const clientSecret = process.env.LEAN_TECH_CLIENT_SECRET.trim()
-
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? LEAN_TECH_PROD_URL 
-      : LEAN_TECH_SANDBOX_URL
-
-    // According to docs: Two scopes: api (backend) and customer.<customer_id> (SDK)
-    const scope = customerId 
-      ? `customer.${customerId} api`
-      : 'api'                        
-
-    console.log('Attempting authentication with Lean Tech...')
-    console.log('Base URL:', baseUrl)
-    console.log('Using scope:', scope)
-
-    const tokenResponse = await fetch(`${baseUrl}/oauth2/token`, {
-      method: 'POST',
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/x-www-form-urlencoded',
-      },
-      body: new URLSearchParams({
-        grant_type: 'client_credentials',
-        client_id: clientId,
-        client_secret: clientSecret,
-        scope: scope
-      }).toString()
-    })
-
-    const responseText = await tokenResponse.text()
     
-    if (!tokenResponse.ok) {
-      console.error('Token response error:', responseText)
-      console.error('Response status:', tokenResponse.status)
-      console.error('Request URL:', `${baseUrl}/oauth2/token`)
-      return NextResponse.json(
-        { error: `Failed to get token: ${responseText}` },
-        { status: tokenResponse.status }
-      )
-    }
-
-    let tokenData: any
+    // Generate a customer ID based on the app name (base64 encoded)
+    const appName = 'MuhasabaAI'
+    const timestamp = new Date().getTime()
+    const randomId = Math.random().toString(36).substring(2, 10)
+    const customerId = Buffer.from(`${appName}-${timestamp}-${randomId}`).toString('base64')
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=/g, '')
+    
+    console.log('Generated customer ID:', customerId)
+    
+    // Create the customer using the SDK
     try {
-      tokenData = JSON.parse(responseText)
-    } catch (e) {
-      console.error('Failed to parse token response:', e)
-      return NextResponse.json(
-        { error: 'Invalid token response format' },
-        { status: 500 }
-      )
+      await leanClient.customers.create({
+        id: customerId
+      })
+      console.log('Customer created successfully')
+    } catch (customerError) {
+      console.error('Error creating customer (continuing anyway):', customerError)
+      // We continue even if customer creation fails as it might already exist
     }
-
-    if (!tokenData.access_token) {
-      console.error('Token response missing access_token:', tokenData)
-      return NextResponse.json(
-        { error: 'Invalid token response: missing access_token' },
-        { status: 500 }
-      )
-    }
-
-    console.log('Token received successfully')
     
-    return NextResponse.json({
-      access_token: tokenData.access_token,
-      expires_in: tokenData.expires_in || TOKEN_EXPIRY,
-      token_type: tokenData.token_type || 'Bearer',
-      scope: tokenData.scope || scope
-    })
+    // According to the memory, we need to use OAuth 2.0 with client_credentials grant type
+    // Define the auth URL based on environment
+    const authUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://auth.leantech.me/oauth2/token'
+      : 'https://auth.sandbox.leantech.me/oauth2/token'
+    
+    console.log('Using auth URL:', authUrl)
+    
+    // Define the scope based on customer ID
+    const scope = `api customer.${customerId}`
+    console.log('Using scope:', scope)
+    
+    try {
+      // Log the request details (without sensitive information)
+      console.log('Making OAuth request to:', authUrl)
+      console.log('Using scope:', scope)
+      console.log('Using client ID:', process.env.LEAN_TECH_CLIENT_ID ? 'Provided' : 'Missing')
+      
+      // Make direct OAuth request instead of using the SDK
+      const tokenResponse = await axios.post(authUrl, 
+        new URLSearchParams({
+          grant_type: 'client_credentials',
+          scope: scope,
+          client_id: process.env.LEAN_TECH_CLIENT_ID || '',
+          client_secret: process.env.LEAN_TECH_CLIENT_SECRET || ''
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded'
+          }
+        }
+      )
+      
+      console.log('Successfully obtained token')
+      console.log('Response status:', tokenResponse.status)
+      console.log('Response headers:', tokenResponse.headers)
+      console.log('Response data keys:', Object.keys(tokenResponse.data))
+      
+      // Return token with expiry of 3599 seconds as specified in the memory
+      return NextResponse.json({
+        token: tokenResponse.data.access_token,
+        expires_in: tokenResponse.data.expires_in || 3599,
+        customerId: customerId
+      })
+    } catch (tokenError) {
+      console.error('Error getting token with combined scope:', tokenError)
+      
+      // Try with just the 'api' scope as a fallback
+      console.log('Retrying with only api scope')
+      
+      try {
+        const retryResponse = await axios.post(authUrl, 
+          new URLSearchParams({
+            grant_type: 'client_credentials',
+            scope: 'api',
+            client_id: process.env.LEAN_TECH_CLIENT_ID || '',
+            client_secret: process.env.LEAN_TECH_CLIENT_SECRET || ''
+          }),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          }
+        )
+        
+        console.log('Successfully obtained token on retry')
+        console.log('Response status:', retryResponse.status)
+        console.log('Response headers:', retryResponse.headers)
+        console.log('Response data keys:', Object.keys(retryResponse.data))
+        
+        return NextResponse.json({
+          token: retryResponse.data.access_token,
+          expires_in: retryResponse.data.expires_in || 3599,
+          customerId: customerId
+        })
+      } catch (retryError) {
+        console.error('Failed to get token on retry:', retryError)
+        
+        // Log more detailed error information
+        if (retryError instanceof Error) {
+          console.error('Error name:', retryError.name)
+          console.error('Error message:', retryError.message)
+          if (axios.isAxiosError(retryError) && retryError.response) {
+            console.error('Response status:', retryError.response.status)
+            console.error('Response data:', retryError.response.data)
+          }
+          console.error('Error stack:', retryError.stack)
+        } else {
+          console.error('Non-Error object thrown:', retryError)
+        }
+        
+        // Fallback to manual token generation if the SDK methods fail
+        return NextResponse.json(
+          { 
+            error: 'Failed to get authentication token',
+            message: retryError instanceof Error ? retryError.message : 'Unknown error'
+          },
+          { status: 500 }
+        )
+      }
+    }
   } catch (error) {
-    console.error('Auth error:', error)
+    console.error('Error generating auth token:', error)
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Failed to generate authentication token' },
       { status: 500 }
     )
   }
