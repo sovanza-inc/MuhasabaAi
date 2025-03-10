@@ -146,7 +146,14 @@ interface LeanSDK {
 // Extend Window interface to include Lean
 declare global {
   interface Window {
-    Lean?: LeanSDK;
+    Lean?: {
+      link: (config: any) => void;
+      connect: (config: any) => void;
+      reconnect: (config: any) => void;
+      createPaymentSource: (config: any) => void;
+      updatePaymentSource: (config: any) => void;
+      pay: (config: any) => void;
+    };
   }
 }
 
@@ -194,8 +201,9 @@ export function BankIntegrationsPage() {
       }
 
       const data = await response.json()
+      console.log('Auth response:', data)
       setAuthToken(data.token)
-      setCustomerId(data.customer_id)
+      setCustomerId(data.customerId)
       setStep('info')
     } catch (error) {
       console.error('Error in initial setup:', error)
@@ -310,7 +318,7 @@ export function BankIntegrationsPage() {
           }
           
           setAuthToken(data.token)
-          setCustomerId(data.customer_id)
+          setCustomerId(data.customerId)
           console.log('Auth token received successfully')
         } catch (error) {
           console.error('Error fetching auth token:', error)
@@ -345,19 +353,26 @@ export function BankIntegrationsPage() {
     
     // Create a new script element
     const script = document.createElement('script')
-    script.src = 'https://cdn.leantech.me/link/loader/prod/ae/latest/lean-link-loader.min.js' // Correct production CDN URL
+    script.src = 'https://cdn.leantech.me/link/sdk/web/latest/Lean.min.js'
     script.async = true
-    script.defer = true // Add defer attribute
-    script.type = 'text/javascript' // Specify script type
+    script.defer = true 
+    script.type = 'text/javascript' 
     
     // Add event listeners
     script.onload = () => {
       console.log('Lean SDK loaded successfully')
+      
+      // Debug: Log all properties on window that might be related to Lean
+      console.log('Available global objects:', Object.keys(window).filter(key => 
+        key.toLowerCase().includes('lean')))
+      
+      // Check for different possible names
       if (window.Lean) {
         console.log('Lean is available in window')
         setSdkLoaded(true)
       } else {
-        console.error('Lean not found in window after script load')
+        console.error('No Lean SDK object found in window after script load')
+        console.log('All window properties:', Object.keys(window))
         setError('Failed to initialize the bank connection SDK')
         setSdkLoaded(false)
       }
@@ -459,7 +474,7 @@ export function BankIntegrationsPage() {
   const initializeAndOpenLeanSDK = React.useCallback(() => {
     if (!window.Lean || !selectedBank || !authToken || !customerId) {
       console.error('Cannot initialize Lean SDK: missing dependencies', {
-        loaderAvailable: !!window.Lean,
+        leanAvailable: !!window.Lean,
         bankSelected: !!selectedBank,
         tokenAvailable: !!authToken,
         customerIdAvailable: !!customerId
@@ -474,30 +489,17 @@ export function BankIntegrationsPage() {
         sandbox: process.env.NODE_ENV !== 'production'
       })
       
-      // Ensure the container exists
-      let container = document.getElementById('lean-connect-container')
-      if (!container) {
-        container = document.createElement('div')
-        container.id = 'lean-connect-container'
-        document.body.appendChild(container)
-      }
+      // Avoid creating DOM elements directly
+      // Instead, use the Lean SDK directly without a container
+      console.log('Connecting to bank using Lean SDK')
       
-      // Initialize the Lean SDK with proper configuration
-      window.Lean.init({
+      // Use a simple configuration object without any DOM manipulation
+      const config = {
         app_token: authToken,
-        sandbox: process.env.NODE_ENV !== 'production', // Use sandbox flag for environment handling
-        bank_identifier: selectedBank.identifier || selectedBank.id || '',
         customer_id: customerId,
-        permissions: [
-          'identity',
-          'accounts',
-          'balance',
-          'transactions',
-          'payments',
-          'beneficiaries'
-        ], // Required permissions as per memory
-        container_id: 'lean-connect-container', // Container ID as per memory
-        onEvent: (event: LeanSDKEvent) => {
+        permissions: ["identity", "transactions", "balance", "accounts"],
+        sandbox: process.env.NODE_ENV !== 'production',
+        callback: (event: any) => {
           console.log('Lean SDK event:', event)
           
           if (event.type === 'exit') {
@@ -519,9 +521,7 @@ export function BankIntegrationsPage() {
                   'identity',
                   'accounts',
                   'balance',
-                  'transactions',
-                  'payments',
-                  'beneficiaries'
+                  'transactions'
                 ]
               }
               
@@ -534,26 +534,19 @@ export function BankIntegrationsPage() {
               onClose()
             }
           }
-        },
-        onError: (error: LeanSDKError) => {
-          console.error('Lean SDK error:', error)
-          setError(`Bank connection error: ${error.message || 'Unknown error'}`)
-          onClose()
-        },
-        ui: {
-          theme: {
-            primary_color: '#3182CE' // Chakra blue
-          },
-          text: {
-            connect_title: 'Connect your bank account',
-            connect_subtitle: 'Securely connect your bank account to MuhasabaAI'
-          }
         }
-      })
+      }
       
-      // Open the SDK
-      console.log('Opening Lean SDK')
-      window.Lean.open()
+      // Use setTimeout to ensure this runs outside of React's rendering cycle
+      setTimeout(() => {
+        if (window.Lean && window.Lean.connect) {
+          window.Lean.connect(config)
+        } else if (window.Lean && window.Lean.link) {
+          window.Lean.link(config)
+        } else {
+          console.error('Lean SDK methods not available')
+        }
+      }, 0)
     } catch (error) {
       console.error('Error initializing Lean SDK:', error)
       setError('Failed to initialize the bank connection')
@@ -565,6 +558,7 @@ export function BankIntegrationsPage() {
     // Load SDK when entering connect step
     if (step === 'connect') {
       console.log('Step changed to connect, loading Lean SDK')
+      
       const cleanup = loadLeanSDK()
       return cleanup
     }
@@ -585,7 +579,11 @@ export function BankIntegrationsPage() {
     // Initialize SDK when it's loaded and we're in the connect step
     if (sdkLoaded && step === 'connect' && window.Lean) {
       console.log('SDK loaded and in connect step, initializing')
-      initializeAndOpenLeanSDK()
+      
+      // Short delay to ensure the container is ready
+      setTimeout(() => {
+        initializeAndOpenLeanSDK()
+      }, 100)
     }
   }, [sdkLoaded, step, initializeAndOpenLeanSDK])
 
@@ -704,7 +702,7 @@ export function BankIntegrationsPage() {
                         <Icon as={LuLock} color="green.500" />
                       </Box>
                       <VStack align="start" spacing={1}>
-                        <Text fontWeight="medium">100% Private</Text>
+                        <Text fontSize="sm" fontWeight="medium">100% Private</Text>
                         <Text fontSize="sm" color={textColor}>
                           Your credentials are never accessible to this or any other service
                         </Text>
@@ -718,7 +716,7 @@ export function BankIntegrationsPage() {
                         <Icon as={LuShieldCheck} color="blue.500" />
                       </Box>
                       <VStack align="start" spacing={1}>
-                        <Text fontWeight="medium">Protected data</Text>
+                        <Text fontSize="sm" fontWeight="medium">Protected data</Text>
                         <Text fontSize="sm" color={textColor}>
                           Your data is secured using bank-grade TLS 1.2 technology
                         </Text>
@@ -777,14 +775,45 @@ export function BankIntegrationsPage() {
 
       case 'connect':
         return (
-          <Box 
-            id="lean-connect-container" 
-            minH="500px" 
-            w="100%" 
-            bg={bgColor}
-            borderRadius="md"
-            overflow="hidden"
-          />
+          <Container maxW="xl" py={8}>
+            <VStack spacing={4} align="stretch">
+              <Text fontSize="xl" fontWeight="bold" textAlign="center">
+                Connect to {selectedBank?.name || 'Bank'}
+              </Text>
+              
+              {error && (
+                <Box bg="red.50" color="red.600" p={4} borderRadius="md" mb={4}>
+                  <Text>{error}</Text>
+                </Box>
+              )}
+              
+              {isLoading ? (
+                <Center py={8}>
+                  <Spinner size="xl" color="blue.500" />
+                </Center>
+              ) : (
+                <Box 
+                  minH="500px" 
+                  h="500px"
+                  w="100%" 
+                  bg={bgColor}
+                  borderRadius="md"
+                  border="1px solid"
+                  borderColor={borderColor}
+                  position="relative"
+                  overflow="hidden"
+                  display="flex"
+                  flexDirection="column"
+                  alignItems="center"
+                  justifyContent="center"
+                />
+              )}
+              
+              <Text fontSize="xs" color="gray.500" textAlign="center" mt={4}>
+                Powered by Lean Tech
+              </Text>
+            </VStack>
+          </Container>
         )
     }
   }
