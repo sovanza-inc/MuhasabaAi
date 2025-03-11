@@ -45,6 +45,8 @@ export async function GET() {
     console.log('LEAN_TECH_CLIENT_ID exists:', !!process.env.LEAN_TECH_CLIENT_ID)
     console.log('LEAN_TECH_CLIENT_SECRET exists:', !!process.env.LEAN_TECH_CLIENT_SECRET)
     console.log('NODE_ENV:', process.env.NODE_ENV)
+    console.log('CLIENT_ID length:', process.env.LEAN_TECH_CLIENT_ID ? process.env.LEAN_TECH_CLIENT_ID.trim().length : 0)
+    console.log('CLIENT_SECRET length:', process.env.LEAN_TECH_CLIENT_SECRET ? process.env.LEAN_TECH_CLIENT_SECRET.trim().length : 0)
     
     // Check if required environment variables are present
     if (!process.env.LEAN_TECH_CLIENT_ID || !process.env.LEAN_TECH_CLIENT_SECRET) {
@@ -100,8 +102,8 @@ export async function GET() {
         new URLSearchParams({
           grant_type: 'client_credentials',
           scope: scope,
-          client_id: process.env.LEAN_TECH_CLIENT_ID || '',
-          client_secret: process.env.LEAN_TECH_CLIENT_SECRET || ''
+          client_id: (process.env.LEAN_TECH_CLIENT_ID || '').trim(),
+          client_secret: (process.env.LEAN_TECH_CLIENT_SECRET || '').trim()
         }),
         {
           headers: {
@@ -124,6 +126,20 @@ export async function GET() {
     } catch (tokenError) {
       console.error('Error getting token with combined scope:', tokenError)
       
+      // Log more detailed error information for 401 errors
+      if (axios.isAxiosError(tokenError) && tokenError.response) {
+        console.error('Response status:', tokenError.response.status)
+        console.error('Response data:', tokenError.response.data)
+        console.error('Response headers:', tokenError.response.headers)
+        
+        // If it's a 401 error, log additional context
+        if (tokenError.response.status === 401) {
+          console.error('401 Unauthorized error detected. This typically means invalid credentials.')
+          console.error('Auth URL being used:', authUrl)
+          console.error('Scope being used:', scope)
+        }
+      }
+      
       // Try with just the 'api' scope as a fallback
       console.log('Retrying with only api scope')
       
@@ -132,8 +148,8 @@ export async function GET() {
           new URLSearchParams({
             grant_type: 'client_credentials',
             scope: 'api',
-            client_id: process.env.LEAN_TECH_CLIENT_ID || '',
-            client_secret: process.env.LEAN_TECH_CLIENT_SECRET || ''
+            client_id: (process.env.LEAN_TECH_CLIENT_ID || '').trim(),
+            client_secret: (process.env.LEAN_TECH_CLIENT_SECRET || '').trim()
           }),
           {
             headers: {
