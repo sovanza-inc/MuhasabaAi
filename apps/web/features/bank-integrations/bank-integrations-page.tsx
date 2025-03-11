@@ -124,7 +124,6 @@ interface LeanSDKConfig {
   bank_identifier: string;
   customer_id: string;
   permissions: string[];
-  container_id: string;
   onEvent: (event: LeanSDKEvent) => void;
   onError: (error: LeanSDKError) => void;
   ui?: {
@@ -147,6 +146,7 @@ interface LeanSDK {
 declare global {
   interface Window {
     Lean?: {
+      close: any
       link: (config: any) => void;
       connect: (config: any) => void;
       reconnect: (config: any) => void;
@@ -186,11 +186,13 @@ const LeanSDKWrapper: React.FC<{
           sandbox: process.env.NODE_ENV !== 'production'
         });
         
+        // Create a simple configuration object following the official demo
         const config = {
           app_token: authToken,
           customer_id: customerId,
-          permissions: ["identity", "transactions", "balance", "accounts"],
+          permissions: ["identity", "accounts", "balance", "transactions", "payments", "beneficiaries"],
           sandbox: process.env.NODE_ENV !== 'production',
+          bank_identifier: selectedBank.identifier || selectedBank.id,
           callback: (event: any) => {
             console.log('Lean SDK event:', event);
             
@@ -211,6 +213,7 @@ const LeanSDKWrapper: React.FC<{
         };
         
         // Try connect method first, fallback to link
+        console.log('Calling Lean SDK with config:', JSON.stringify(config, null, 2));
         if (typeof window.Lean.connect === 'function') {
           window.Lean.connect(config);
         } else if (typeof window.Lean.link === 'function') {
