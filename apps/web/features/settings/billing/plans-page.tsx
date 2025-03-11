@@ -1,5 +1,6 @@
 'use client'
 
+import * as React from 'react'
 import { Box, Stack } from '@chakra-ui/react'
 import { BillingPlan, useBilling } from '@saas-ui-pro/billing'
 import { useSnackbar } from '@saas-ui/react'
@@ -31,9 +32,30 @@ export function PlansPage() {
     },
   })
 
+  // Check for success parameter in URL and show success message
+  React.useEffect(() => {
+    const url = new URL(window.location.href)
+    const success = url.searchParams.get('success')
+    
+    if (success === 'true') {
+      // Remove the success parameter from the URL without reloading the page
+      url.searchParams.delete('success')
+      window.history.replaceState({}, '', url.toString())
+      
+      // Refresh workspace data to get updated subscription
+      utils.workspaces.invalidate()
+      
+      // Show success message
+      snackbar.success({
+        title: 'Payment successful',
+        description: 'Your subscription has been updated. It may take a moment to reflect in your account.',
+      })
+    }
+  }, [snackbar, utils.workspaces])
+
   const onUpdatePlan = async (plan: BillingPlan) => {
     try {
-      if (!workspace.subscription.accountId) {
+      if (!workspace.subscription || !workspace.subscription.accountId) {
         const result = await createCheckoutSession.mutateAsync({
           workspaceId: workspace.id,
           planId: plan.id,
@@ -82,6 +104,7 @@ export function PlansPage() {
         plans={plans}
         features={features}
         onUpdatePlan={onUpdatePlan}
+        intervals={[]}
       />
     </SettingsPage>
   )
