@@ -1,4 +1,9 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Adding or modifying API route and procedures
 globs: packages/api/*
 ---

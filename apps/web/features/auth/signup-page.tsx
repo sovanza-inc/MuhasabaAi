@@ -1,6 +1,6 @@
 'use client'
 
-import { Center, Container, Heading, Stack, Text } from '@chakra-ui/react'
+import { Box, Center, Container, Heading, Stack, Text } from '@chakra-ui/react'
 import { useAuth } from '@saas-ui/auth-provider'
 import { FormLayout, SubmitButton, useSnackbar } from '@saas-ui/react'
 import { useMutation } from '@tanstack/react-query'
@@ -53,18 +53,39 @@ export const SignupPage = () => {
         justify="center"
         direction="column"
         spacing="8"
+        bgImage="url('/img/onboarding/DASH.png')"
+        bgSize="cover"
+        bgRepeat="round"
+        position="relative"
+        _before={{
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          right: 0,
+          bottom: 0,
+          left: 0,
+          zIndex: 0,
+        }}
       >
-        <Container maxW="container.sm" py="8">
-          <Logo mb="12" width="120px" />
+        <Container maxW="container.sm" py="8" position="relative" zIndex={1}>
+          <Box display="flex" justifyContent="center" width="100%">
+            <Logo mb="12" width="120px" />
+          </Box>
 
-          <Heading as="h2" size="md" mb="4">
-            Sign up
+          <Heading as="h2" size="md" mb="4" textAlign="center">
+            Signup
           </Heading>
 
           <Form
             schema={schema}
             onSubmit={handleSubmit}
             disabled={isPending || isSuccess}
+            sx={{
+              'input:focus-visible, select:focus-visible': {
+                borderColor: '#1AB294 !important',
+                boxShadow: '0 0 0 1px #1AB294 !important',
+              }
+            }}
           >
             {({ Field }) => (
               <FormLayout>
@@ -93,7 +114,9 @@ export const SignupPage = () => {
                   Forgot your password?
                 </Link>
 
-                <SubmitButton loadingText="Creating account...">
+                <SubmitButton backgroundColor="#1AB294"
+                  _hover={{ backgroundColor: 'green.800' }}
+                  color="white" loadingText="Creating account...">
                   Sign up
                 </SubmitButton>
               </FormLayout>
@@ -101,15 +124,15 @@ export const SignupPage = () => {
           </Form>
         </Container>
 
-        <Text color="muted">
+        <Text color="muted" position="relative" zIndex={1}>
           Already have an account?{' '}
-          <Link href="/login" color="chakra-body-text">
-            Log in
+          <Link href="/login" color="green.500">
+            Login
           </Link>
           .
         </Text>
       </Stack>
-      <Stack flex="1" bg="primary.500">
+      <Stack flex="1" bg="green.600">
         <Center flex="1">
           <Testimonial />
         </Center>
