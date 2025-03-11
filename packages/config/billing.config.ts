@@ -6,13 +6,12 @@ export const plans: BillingPlan[] = [
     active: true,
     name: 'Free',
     description: 'For individuals.',
-    currency: 'EUR',
+    currency: 'AED',
     interval: 'month',
     trialDays: 0,
     features: [
       {
         id: 'users',
-        priceId: 'price_1PLPKhHXr4hWIkAX7bM7NSlG',
         type: 'per_unit',
         price: 0,
         limit: 1,
@@ -31,59 +30,25 @@ export const plans: BillingPlan[] = [
       },
     ],
     metadata: {
-      price: '€0',
+      price: 'AED 0',
       priceLabel: 'per user/month',
     },
   },
   {
-    id: 'free_yearly@1',
-    active: true,
-    name: 'Free',
-    description: 'For individuals.',
-    currency: 'EUR',
-    interval: 'year',
-    trialDays: 0,
-    features: [
-      {
-        id: 'users',
-        priceId: 'price_1PLPKhHXr4hWIkAX7bM7NSlG',
-        type: 'per_unit',
-        price: 0,
-        limit: 1,
-      },
-      {
-        id: 'inbox',
-      },
-      {
-        id: 'contacts',
-      },
-      {
-        id: 'monthly_active_contacts',
-        label: 'Max 1000 MACs',
-        price: 0,
-        limit: 1000,
-      },
-    ],
-    metadata: {
-      price: '€0',
-      priceLabel: 'per user/month',
-    },
-  },
-  {
-    id: 'pro@1',
+    id: 'basic@1',
     active: true,
     name: 'Professional',
     description: 'For small teams.',
-    currency: 'EUR',
+    currency: 'AED',
     interval: 'month',
     trialDays: 14,
     features: [
       {
         id: 'users',
         label: 'Max 3',
-        priceId: 'price_1In2xiHXr4hWIkAX7cm5A7jb',
+        priceId: 'price_1R1ZEKB7S6nOH9halTjxq2Jk',
         type: 'per_unit',
-        price: 10,
+        price: 999,
         limit: 3,
       },
       {
@@ -95,7 +60,6 @@ export const plans: BillingPlan[] = [
       {
         id: 'monthly_active_contacts',
         label: '10000 MACs included',
-        priceId: 'price_1POfKwHXr4hWIkAX4VnSn4nT',
         price: 0,
         tiers: [
           {
@@ -114,74 +78,25 @@ export const plans: BillingPlan[] = [
       },
     ],
     metadata: {
-      price: '€10,-',
+      price: 'AED 999',
       priceLabel: 'per user/month',
+      productId: 'prod_RvQ4JGk6XGfhch',
     },
   },
   {
-    id: 'pro_yearly@1',
-    active: true,
-    name: 'Professional',
-    description: 'For small teams.',
-    currency: 'EUR',
-    interval: 'year',
-    trialDays: 14,
-    features: [
-      {
-        id: 'users',
-        label: 'Max 3',
-        priceId: 'price_1PLLEuHXr4hWIkAXnykzGvll',
-        type: 'per_unit',
-        price: 8 * 12,
-        limit: 3,
-      },
-      {
-        id: 'inbox',
-      },
-      {
-        id: 'contacts',
-      },
-      {
-        id: 'monthly_active_contacts',
-        label: '10000 MACs included',
-        priceId: 'price_1POfKwHXr4hWIkAX4VnSn4nT',
-        price: 0,
-        tiers: [
-          {
-            upTo: 10000,
-            price: 0,
-          },
-          {
-            upTo: 100000,
-            price: 0.0001,
-          },
-          {
-            upTo: 'inf',
-            price: 0.00005,
-          },
-        ],
-      },
-    ],
-    metadata: {
-      price: '€8,-',
-      priceLabel: 'per user/month',
-      discount: '20%',
-    },
-  },
-  {
-    id: 'enterprise@1',
+    id: 'premium@1',
     active: true,
     name: 'Enterprise',
     description: 'For growing teams.',
-    currency: 'EUR',
+    currency: 'AED',
     interval: 'month',
     trialDays: 14,
     features: [
       {
         id: 'users',
-        priceId: 'price_1PLMLoHXr4hWIkAXJj8iYM5G',
+        priceId: 'price_1R1ZGjB7S6nOH9haSPomIis9',
         type: 'per_unit',
-        price: 25,
+        price: 4000,
       },
       {
         id: 'inbox',
@@ -192,7 +107,6 @@ export const plans: BillingPlan[] = [
       {
         id: 'monthly_active_contacts',
         label: '10000 MACs included',
-        priceId: 'price_1POfMAHXr4hWIkAXU2Q43bDZ',
         price: 0,
         tiers: [
           {
@@ -213,68 +127,13 @@ export const plans: BillingPlan[] = [
         id: 'api',
       },
       {
-        id: 'support',
-        label: 'Priority',
+        id: 'automations',
       },
     ],
     metadata: {
-      price: '€25,-',
+      price: 'AED 4000',
       priceLabel: 'per user/month',
-    },
-  },
-  {
-    id: 'enterprise_yearly@1',
-    active: true,
-    name: 'Enterprise',
-    description: 'For growing teams.',
-    currency: 'EUR',
-    interval: 'year',
-    trialDays: 14,
-    features: [
-      {
-        id: 'users',
-        priceId: 'price_1PLMLoHXr4hWIkAXuekAxeP3',
-        type: 'per_unit',
-        price: 20 * 12,
-      },
-      {
-        id: 'inbox',
-      },
-      {
-        id: 'contacts',
-      },
-      {
-        id: 'monthly_active_contacts',
-        label: '10000 MACs included',
-        priceId: 'price_1POfMAHXr4hWIkAXU2Q43bDZ',
-        price: 0,
-        tiers: [
-          {
-            upTo: 10000,
-            price: 0,
-          },
-          {
-            upTo: 100000,
-            price: 0.0001,
-          },
-          {
-            upTo: 'inf',
-            price: 0.00005,
-          },
-        ],
-      },
-      {
-        id: 'api',
-      },
-      {
-        id: 'support',
-        label: 'Priority',
-      },
-    ],
-    metadata: {
-      price: '€20,-',
-      priceLabel: 'per user/month',
-      discount: '20%',
+      productId: 'prod_RvQ6aOWR2I6IzV',
     },
   },
 ]
@@ -283,30 +142,31 @@ export const features = [
   {
     id: 'users',
     label: 'Users',
-    description: 'The amount of active user accounts.',
+    description: 'Number of users.',
   },
   {
     id: 'inbox',
-    label: 'Inbox',
-    description: 'Send and receive messages.',
+    label: 'Shared inbox',
+    description: 'Collaborate with your team.',
   },
   {
     id: 'contacts',
     label: 'Contacts',
-    description: 'Manage people and companies.',
+    description: 'Manage your customers.',
   },
   {
     id: 'monthly_active_contacts',
     label: 'Monthly active contacts',
-    description: 'The amount of unique contacts you interact with.',
+    description: 'The number of contacts that have activity.',
   },
   {
     id: 'api',
-    label: 'Api access',
-    description: 'Access our API',
+    label: 'API access',
+    description: 'Build custom integrations.',
   },
   {
-    id: 'support',
-    label: 'Support',
+    id: 'automations',
+    label: 'Automations',
+    description: 'Automate your workflows.',
   },
 ]

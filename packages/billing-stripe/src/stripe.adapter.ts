@@ -88,47 +88,97 @@ export class StripeAdapter implements BillingAdapter {
     successUrl: string
     cancelUrl: string
   }) {
-    const plan = await billingService.getPlan(params.planId)
+    try {
+      const plan = await billingService.getPlan(params.planId)
 
-    if (!plan || !plan.active) {
-      throw new Error(`Plan ${params.planId} not found`)
-    }
+      if (!plan || !plan.active) {
+        console.log(`Plan ${params.planId} not found in database, checking config...`)
 
-    const lineItems = plan.features
-      ?.filter((feature) => feature.priceId)
-      .map((feature) => {
-        return {
-          price: feature.priceId,
-          quantity:
-            feature.type === 'per_unit'
-              ? (params.counts?.[feature.id] ?? 1)
-              : 1,
+        const { plans } = await import('@acme/config')
+
+        const configPlan = plans.find((p) => p.id === params.planId)
+
+        if (!configPlan || !configPlan.active) {
+          throw new Error(`Plan ${params.planId} not found in config`)
         }
+
+        const lineItems = configPlan.features
+          ?.filter((feature) => feature.priceId)
+          .map((feature) => {
+            return {
+              price: feature.priceId,
+              quantity:
+                feature.type === 'per_unit'
+                  ? (params.counts?.[feature.id] ?? 1)
+                  : 1,
+            }
+          })
+
+        if (!lineItems || lineItems.length === 0) {
+          throw new Error('Invalid pricing plan')
+        }
+
+        const response = await this.stripe.checkout.sessions.create({
+          mode: 'subscription',
+          payment_method_types: ['card'],
+          billing_address_collection: 'required',
+          customer: params.customerId,
+          line_items: lineItems,
+          allow_promotion_codes: true,
+          subscription_data: {
+            metadata: {
+              planId: params.planId,
+            },
+          },
+          success_url: params.successUrl,
+          cancel_url: params.cancelUrl,
+        })
+
+        return {
+          id: response.id,
+          url: response.url ?? undefined,
+        }
+      }
+
+      const lineItems = plan.features
+        ?.filter((feature) => feature.priceId)
+        .map((feature) => {
+          return {
+            price: feature.priceId,
+            quantity:
+              feature.type === 'per_unit'
+                ? (params.counts?.[feature.id] ?? 1)
+                : 1,
+          }
+        })
+
+      if (!lineItems || lineItems.length === 0) {
+        throw new Error('Invalid pricing plan')
+      }
+
+      const response = await this.stripe.checkout.sessions.create({
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        billing_address_collection: 'required',
+        customer: params.customerId,
+        line_items: lineItems,
+        allow_promotion_codes: true,
+        subscription_data: {
+          metadata: {
+            planId: params.planId,
+          },
+        },
+        success_url: params.successUrl,
+        cancel_url: params.cancelUrl,
       })
 
-    if (!lineItems || lineItems.length === 0) {
-      throw new Error('Invalid pricing plan')
-    }
-
-    const response = await this.stripe.checkout.sessions.create({
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      billing_address_collection: 'required',
-      customer: params.customerId,
-      line_items: lineItems,
-      allow_promotion_codes: true,
-      subscription_data: {
-        metadata: {
-          planId: params.planId,
-        },
-      },
-      success_url: params.successUrl,
-      cancel_url: params.cancelUrl,
-    })
-
-    return {
-      id: response.id,
-      url: response.url ?? undefined,
+      return {
+        id: response.id,
+        url: response.url ?? undefined,
+      }
+    } catch (error) {
+      console.error('Error creating checkout session:', error)
+      throw error
     }
   }
 

@@ -26,11 +26,7 @@ import { SegmentedControl } from '@acme/ui/segmented-control'
 const defaultIntervals: PricingPeriod[] = [
   {
     id: 'month',
-    label: 'Pay monthly',
-  },
-  {
-    id: 'year',
-    label: 'Pay yearly',
+    label: 'Monthly',
   },
 ]
 
@@ -141,6 +137,10 @@ export const PricingTable: React.FC<PricingTableProps> = (props) => {
                     {isCurrent ? (
                       <Button variant="secondary" isDisabled>
                         Current plan
+                      </Button>
+                    ) : plan.id.includes('free') ? (
+                      <Button variant="secondary" isDisabled>
+                        Free plan
                       </Button>
                     ) : (
                       <Button

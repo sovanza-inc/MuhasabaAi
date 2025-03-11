@@ -176,42 +176,66 @@ export const billingRouter = createTRPCRouter({
 
       const email = account?.email ?? ctx.session.user.email ?? undefined
 
-      let customerId = await ctx.adapters.billing.findCustomerId?.({
-        id: account?.customerId ?? undefined,
-        accountId: input.workspaceId,
-        email,
-      })
+      // Always create a new customer to avoid issues with non-existent customers
+      let customerId: string | undefined
+      
+      try {
+        // Try to find the customer first, but don't error if not found
+        if (account?.customerId) {
+          try {
+            const foundCustomerId = await ctx.adapters.billing.findCustomerId?.({
+              id: account.customerId,
+              accountId: input.workspaceId,
+              email,
+            });
+            
+            // Convert null to undefined to satisfy TypeScript
+            customerId = foundCustomerId || undefined;
+          } catch (error) {
+            ctx.logger.error('Error finding customer', error)
+            // Continue with creating a new customer
+          }
+        }
 
-      if (!customerId && ctx.adapters.billing.createCustomer) {
-        customerId = await ctx.adapters.billing.createCustomer?.({
+        // If customer not found or error occurred, create a new one
+        if (!customerId && ctx.adapters.billing.createCustomer) {
+          customerId = await ctx.adapters.billing.createCustomer?.({
+            accountId: input.workspaceId,
+            name: ctx.workspace?.name,
+            email,
+          })
+
+          await upsertAccount({
+            id: input.workspaceId,
+            customerId,
+          })
+        } else if (!customerId) {
+          ctx.logger.debug('createCustomer not implemented')
+
+          // if the adapter does not support upserting customers, we don't need to store the reference ID
+          // but instead will use the workspace ID as a reference in checkout.
+          customerId = input.workspaceId
+        }
+
+        const counts = await getFeatureCounts({
           accountId: input.workspaceId,
-          name: ctx.workspace?.name,
-          email,
         })
 
-        await upsertAccount({
-          id: input.workspaceId,
+        return ctx.adapters.billing.createCheckoutSession({
           customerId,
+          planId: input.planId,
+          counts,
+          successUrl: input.successUrl,
+          cancelUrl: input.cancelUrl,
         })
-      } else if (!customerId) {
-        ctx.logger.debug('createCustomer not implemented')
-
-        // if the adapter does not support upserting customers, we don't need to store the reference ID
-        // but instead will use the workspace ID as a reference in checkout.
-        customerId = input.workspaceId
+      } catch (error) {
+        ctx.logger.error('Error creating checkout session', error)
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create checkout session',
+          cause: error,
+        })
       }
-
-      const counts = await getFeatureCounts({
-        accountId: input.workspaceId,
-      })
-
-      return ctx.adapters.billing.createCheckoutSession({
-        customerId,
-        planId: input.planId,
-        counts,
-        successUrl: input.successUrl,
-        cancelUrl: input.cancelUrl,
-      })
     }),
 
   createBillingPortalSession: adminProcedure
