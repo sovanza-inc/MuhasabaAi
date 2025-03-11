@@ -1,8 +1,8 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, VStack } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, VStack } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
-import { LineChart, AreaChart, BarChart } from '@saas-ui/charts'
+import { BarChart, AreaChart } from '@saas-ui/charts'
 import { PageHeader } from '#features/common/components/page-header'
 import { SaasProvider } from '@saas-ui/react'
 import React from 'react'
@@ -44,13 +44,6 @@ export default function TransactionPage() {
       amount: 46889,
       type: 'credit'
     }
-  ]
-
-  const chartData = [
-    { name: 'Category 1', value: 30 },
-    { name: 'Category 2', value: 20 },
-    { name: 'Category 3', value: 15 },
-    { name: 'Category 4', value: 7 }
   ]
 
   return (

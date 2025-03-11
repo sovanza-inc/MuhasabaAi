@@ -1,7 +1,6 @@
 'use client'
 
-import { Box, HStack, Text, Flex, Input, InputGroup, InputLeftElement, Image } from '@chakra-ui/react'
-import { LuArrowLeft, LuSearch, LuBell, LuUser } from 'react-icons/lu'
+import { Box, Flex, Image } from '@chakra-ui/react'
 
 export const PageHeader = () => {
   return (

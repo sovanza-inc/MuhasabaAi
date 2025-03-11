@@ -1,7 +1,6 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Table, Thead, Tbody, Tr, Th, Td, Tabs, TabList, Tab, Select, Progress, TableContainer, Icon } from '@chakra-ui/react'
-import { Card, CardBody } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Table, Thead, Tbody, Tr, Th, Td, Select, Progress, TableContainer, Icon, Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import React from 'react'
 import { LuChevronsUpDown } from 'react-icons/lu'

@@ -35,12 +35,6 @@ export default function CashflowStatementPage() {
     value: Math.floor(Math.random() * (25000 - 10000) + 10000)
   }))
 
-  // Peak value for annotation
-  const peakValue = {
-    day: 'Day 6',
-    value: 64364.77
-  }
-
   // Transaction data
   const transactions = [
     {
@@ -258,4 +252,3 @@ export default function CashflowStatementPage() {
     </Box>
   )
 }
-

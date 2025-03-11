@@ -37,15 +37,9 @@ import {
   SimpleGrid,
   Card,
   CardBody,
+  Stack,
+  Heading,
 } from '@chakra-ui/react'
-
-interface LeanSDKResponse {
-  status: 'success' | 'error'
-  connection_id?: string
-  error_message?: string
-  error_code?: string
-  error_details?: object
-}
 
 interface Bank {
   identifier?: string;
@@ -107,42 +101,6 @@ interface BankConnection {
   account_count?: number
 }
 
-// Define Lean SDK types
-interface LeanSDKEvent {
-  type: string;
-  data?: any;
-}
-
-interface LeanSDKError {
-  message: string;
-  code?: string;
-}
-
-interface LeanSDKConfig {
-  app_token: string;
-  sandbox: boolean;
-  bank_identifier: string;
-  customer_id: string;
-  permissions: string[];
-  onEvent: (event: LeanSDKEvent) => void;
-  onError: (error: LeanSDKError) => void;
-  ui?: {
-    theme?: {
-      primary_color?: string;
-    };
-    text?: {
-      connect_title?: string;
-      connect_subtitle?: string;
-    };
-  };
-}
-
-interface LeanSDK {
-  init: (config: LeanSDKConfig) => void;
-  open: () => void;
-}
-
-// Extend Window interface to include Lean
 declare global {
   interface Window {
     Lean?: {
@@ -157,7 +115,6 @@ declare global {
   }
 }
 
-// LeanSDKWrapper component - isolated from React's rendering cycle
 const LeanSDKWrapper: React.FC<{
   authToken: string;
   customerId: string;
@@ -165,14 +122,11 @@ const LeanSDKWrapper: React.FC<{
   onSuccess: (connectionId: string) => void;
   onExit: () => void;
 }> = ({ authToken, customerId, selectedBank, onSuccess, onExit }) => {
-  // Use ref to track if the component is mounted
   const isMountedRef = React.useRef(true);
   
   React.useEffect(() => {
-    // Set mounted flag
     isMountedRef.current = true;
     
-    // Function to initialize Lean SDK
     const initializeLeanSDK = () => {
       if (!window.Lean) {
         console.error('Lean SDK not available');
@@ -186,7 +140,6 @@ const LeanSDKWrapper: React.FC<{
           sandbox: process.env.NODE_ENV !== 'production'
         });
         
-        // Create a simple configuration object following the official demo
         const config = {
           app_token: authToken,
           customer_id: customerId,
@@ -196,7 +149,6 @@ const LeanSDKWrapper: React.FC<{
           callback: (event: any) => {
             console.log('Lean SDK event:', event);
             
-            // Only process events if component is still mounted
             if (!isMountedRef.current) return;
             
             if (event.type === 'exit') {
@@ -212,8 +164,6 @@ const LeanSDKWrapper: React.FC<{
           }
         };
         
-        // Try connect method first, fallback to link
-        console.log('Calling Lean SDK with config:', JSON.stringify(config, null, 2));
         if (typeof window.Lean.connect === 'function') {
           window.Lean.connect(config);
         } else if (typeof window.Lean.link === 'function') {
@@ -226,18 +176,13 @@ const LeanSDKWrapper: React.FC<{
       }
     };
     
-    // Initialize with a small delay to ensure it's outside React's rendering cycle
     const timeoutId = setTimeout(initializeLeanSDK, 100);
     
-    // Cleanup function
     return () => {
-      // Mark component as unmounted
       isMountedRef.current = false;
       clearTimeout(timeoutId);
       
-      // Attempt to clean up any Lean SDK UI elements
       try {
-        // Some SDKs provide a close or destroy method
         if (window.Lean && typeof window.Lean.close === 'function') {
           window.Lean.close();
         }
@@ -247,7 +192,6 @@ const LeanSDKWrapper: React.FC<{
     };
   }, [authToken, customerId, selectedBank, onSuccess, onExit]);
   
-  // This component doesn't render anything
   return null;
 };
 
@@ -255,7 +199,6 @@ export function BankIntegrationsPage() {
   const toast = useToast()
   const { isOpen, onOpen, onClose } = useDisclosure()
 
-  // State
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
   const [customerId, setCustomerId] = React.useState<string | null>(null)
@@ -266,18 +209,15 @@ export function BankIntegrationsPage() {
   const [selectedCountry, setSelectedCountry] = React.useState<'UAE' | 'SAU'>('UAE')
   const [step, setStep] = React.useState<'setup' | 'info' | 'banks' | 'connect'>('setup')
   const [error, setError] = React.useState<string | null>(null)
+  const [showLeanSDK, setShowLeanSDK] = React.useState(false)
 
-  // Theme colors
   const bgColor = useColorModeValue('white', 'gray.800')
   const borderColor = useColorModeValue('gray.200', 'gray.600')
-  const hoverBg = useColorModeValue('gray.50', 'gray.700')
   const iconBg = useColorModeValue('blue.50', 'blue.900')
   const textColor = useColorModeValue('gray.600', 'gray.300')
 
-  // Refs
   const scriptRef = React.useRef<HTMLScriptElement | null>(null)
 
-  // Event Handlers
   const handleBankSelect = React.useCallback((bank: Bank) => {
     console.log('Bank selected:', bank)
     setSelectedBank(bank)
@@ -325,21 +265,16 @@ export function BankIntegrationsPage() {
       const data = await response.json()
       console.log('Banks data:', data)
       
-      // Handle the response format from the Lean SDK
-      // The API might return an array directly or an object with a data property
       let banksArray = []
       
       if (Array.isArray(data)) {
-        // Direct array response
         banksArray = data
         console.log('Received direct array of banks')
       } else if (data && typeof data === 'object') {
         if (data.data && Array.isArray(data.data)) {
-          // Object with data property
           banksArray = data.data
           console.log('Received banks in data property')
         } else {
-          // Some other object format
           console.log('Unexpected data format:', Object.keys(data))
           banksArray = data // Try to use whatever we got
         }
@@ -347,7 +282,6 @@ export function BankIntegrationsPage() {
       
       console.log('Processed banks array:', banksArray.length, 'banks')
       
-      // Filter banks by country code
       const filteredBanks = banksArray.filter((bank: Bank) => {
         if (selectedCountry === 'UAE') {
           return bank.country_codes?.includes('AE') || bank.country_code === 'ARE'
@@ -359,13 +293,10 @@ export function BankIntegrationsPage() {
       
       console.log('Filtered banks:', filteredBanks.length, 'banks for', selectedCountry)
       
-      // Map the banks to ensure they have all required properties
       const mappedBanks = filteredBanks.map((bank: Bank) => {
         return {
           ...bank,
-          // Ensure the bank has an identifier (use id as fallback if needed)
           identifier: bank.identifier || bank.id || `bank-${Math.random().toString(36).substring(2, 9)}`,
-          // Ensure other required fields have defaults if missing
           name: bank.name || 'Unknown Bank',
           logo: bank.logo || 'https://via.placeholder.com/150',
           country_code: bank.country_code || (selectedCountry === 'UAE' ? 'ARE' : 'SAU'),
@@ -390,76 +321,31 @@ export function BankIntegrationsPage() {
     } finally {
       setIsLoading(false)
     }
-  }, [authToken, selectedCountry, toast])
+  }, [selectedCountry, toast])
 
-  // Fetch auth token when needed
-  React.useEffect(() => {
-    const fetchAuthToken = async () => {
-      if (step === 'banks' && selectedBank && !authToken) {
-        try {
-          setIsLoading(true)
-          const response = await fetch('/api/bank-integration/auth')
-          
-          if (!response.ok) {
-            throw new Error('Failed to get authentication token')
-          }
-          
-          const data = await response.json()
-          
-          if (!data.token) {
-            throw new Error('Invalid token response')
-          }
-          
-          setAuthToken(data.token)
-          setCustomerId(data.customerId)
-          console.log('Auth token received successfully')
-        } catch (error) {
-          console.error('Error fetching auth token:', error)
-          toast({
-            title: 'Authentication Error',
-            description: error instanceof Error ? error.message : 'Failed to authenticate with bank API',
-            status: 'error',
-            duration: 5000,
-            isClosable: true,
-          })
-        } finally {
-          setIsLoading(false)
-        }
-      }
-    }
-    
-    fetchAuthToken()
-  }, [step, selectedBank, authToken, toast])
-
-  // Function to load the Lean SDK
   const loadLeanSDK = React.useCallback(() => {
     if (typeof window === 'undefined') return
     
     console.log('Loading Lean SDK')
     
-    // Remove any existing script to avoid duplicates
     if (scriptRef.current) {
       document.head.removeChild(scriptRef.current)
       scriptRef.current = null
       window.Lean = undefined
     }
     
-    // Create a new script element
     const script = document.createElement('script')
     script.src = 'https://cdn.leantech.me/link/sdk/web/latest/Lean.min.js'
     script.async = true
     script.defer = true 
     script.type = 'text/javascript' 
     
-    // Add event listeners
     script.onload = () => {
       console.log('Lean SDK loaded successfully')
       
-      // Debug: Log all properties on window that might be related to Lean
       console.log('Available global objects:', Object.keys(window).filter(key => 
         key.toLowerCase().includes('lean')))
       
-      // Check for different possible names
       if (window.Lean) {
         console.log('Lean is available in window')
       } else {
@@ -474,13 +360,10 @@ export function BankIntegrationsPage() {
       setError('Failed to load the bank connection SDK')
     }
     
-    // Store the script reference
     scriptRef.current = script
     
-    // Add the script to the document
     document.head.appendChild(script)
     
-    // Cleanup function
     return () => {
       if (scriptRef.current) {
         document.head.removeChild(scriptRef.current)
@@ -490,7 +373,6 @@ export function BankIntegrationsPage() {
     }
   }, [])
 
-  // Function to fetch data for a bank connection
   const fetchConnectionData = React.useCallback(async (connectionId: string) => {
     if (!customerId) {
       console.error('Cannot fetch connection data: missing customer ID')
@@ -518,7 +400,6 @@ export function BankIntegrationsPage() {
       const data = await response.json()
       console.log('Bank data received:', data)
       
-      // Update the connection with additional data
       setConnections(prev => 
         prev.map(conn => 
           conn.id === connectionId
@@ -531,7 +412,6 @@ export function BankIntegrationsPage() {
         )
       )
       
-      // Store the data for persistence
       try {
         localStorage.setItem(`bank_data_${connectionId}`, JSON.stringify(data))
       } catch (storageError) {
@@ -560,25 +440,6 @@ export function BankIntegrationsPage() {
     }
   }, [customerId, toast, setIsLoading, setConnections])
 
-  // Function to initialize the Lean SDK and open the connection flow
-  const initializeAndOpenLeanSDK = React.useCallback(() => {
-    if (!selectedBank || !authToken || !customerId) {
-      console.error('Cannot initialize Lean SDK: missing dependencies', {
-        bankSelected: !!selectedBank,
-        tokenAvailable: !!authToken,
-        customerIdAvailable: !!customerId
-      })
-      return
-    }
-    
-    // Set showLeanSDK to true to render the LeanSDKWrapper component
-    setShowLeanSDK(true);
-  }, [selectedBank, authToken, customerId]);
-  
-  // State to control rendering of the LeanSDKWrapper component
-  const [showLeanSDK, setShowLeanSDK] = React.useState(false);
-  
-  // Handle successful connection
   const handleLeanSuccess = React.useCallback((connectionId: string) => {
     if (!selectedBank) return;
     
@@ -599,23 +460,18 @@ export function BankIntegrationsPage() {
     
     setConnections(prev => [...prev, newConnection])
     
-    // Fetch data for the new connection
     fetchConnectionData(connectionId)
     
-    // Close the modal and clean up
     setShowLeanSDK(false);
     onClose();
-  }, [selectedBank, fetchConnectionData, onClose]);
-  
-  // Handle exit from Lean SDK
+  }, [selectedBank, fetchConnectionData, onClose, setConnections])
+
   const handleLeanExit = React.useCallback(() => {
     setShowLeanSDK(false);
     onClose();
-  }, [onClose]);
+  }, [onClose])
 
-  // Effects
   React.useEffect(() => {
-    // Load SDK when entering connect step
     if (step === 'connect') {
       console.log('Step changed to connect, loading Lean SDK')
       
@@ -623,7 +479,6 @@ export function BankIntegrationsPage() {
       return cleanup
     }
     
-    // Cleanup when leaving connect step
     return () => {
       if (scriptRef.current) {
         console.log('Cleaning up Lean SDK')
@@ -634,7 +489,6 @@ export function BankIntegrationsPage() {
     }
   }, [step, loadLeanSDK])
 
-  // Render banks grid
   const renderBanksGrid = React.useCallback(() => (
     <SimpleGrid columns={2} spacing={4}>
       {banks.map(bank => (
@@ -882,35 +736,37 @@ export function BankIntegrationsPage() {
   )
 
   const BankCard = React.useCallback(({ bank }: { bank: Bank }) => {
-    const bankLogo = useColorModeValue(bank.logo, bank.logo_alt || bank.logo)
+    const bankLogo = bank.logo
     
     return (
       <Card
-        key={bank.identifier || bank.id}
+        direction="row"
+        overflow="hidden"
         variant="outline"
         cursor="pointer"
         onClick={() => handleBankSelect(bank)}
-        _hover={{
-          transform: 'translateY(-2px)',
-          shadow: 'md',
-          borderColor: 'blue.500',
-        }}
-        transition="all 0.2s"
+        _hover={{ borderColor: 'blue.500', shadow: 'md' }}
+        mb={2}
       >
-        <CardBody>
-          <VStack spacing={4}>
-            <Image
-              src={bankLogo}
-              alt={bank.name}
-              height="40px"
-              objectFit="contain"
-            />
-            <Text fontWeight="medium">{bank.name}</Text>
-          </VStack>
-        </CardBody>
+        <Image
+          objectFit="contain"
+          maxW={{ base: '80px', sm: '100px' }}
+          maxH="60px"
+          m={4}
+          src={bankLogo}
+          alt={bank.name}
+        />
+        <Stack flex={1}>
+          <CardBody py={4}>
+            <Heading size="sm">{bank.name}</Heading>
+            <Text py="2" fontSize="sm" color={textColor}>
+              {bank.mock ? 'Demo Bank (Test Mode)' : 'Connect your account securely'}
+            </Text>
+          </CardBody>
+        </Stack>
       </Card>
     )
-  }, [handleBankSelect])
+  }, [handleBankSelect, textColor])
 
   return (
     <>
@@ -924,7 +780,6 @@ export function BankIntegrationsPage() {
           {connections.length > 0 ? (
             <SimpleGrid columns={3} spacing={6} p={4}>
               {connections.map((connection) => {
-                // Try to get bank data from local storage
                 let bankData: any = null;
                 try {
                   const storedData = localStorage.getItem(`bank_connection_${connection.id}`);
@@ -935,7 +790,6 @@ export function BankIntegrationsPage() {
                   console.error('Error retrieving bank data:', error);
                 }
                 
-                // Find the bank info from our banks list if available
                 const bankInfo = banks.find(bank => bank.identifier === connection.bank_id);
                 
                 return (
@@ -945,7 +799,7 @@ export function BankIntegrationsPage() {
                         <HStack justifyContent="space-between" alignItems="center">
                           {bankInfo?.logo && (
                             <Image
-                              src={useColorModeValue(bankInfo.logo, bankInfo.logo_alt)}
+                              src={bankInfo.logo}
                               alt={bankInfo.name}
                               height="30px"
                               objectFit="contain"
@@ -1004,9 +858,7 @@ export function BankIntegrationsPage() {
                               colorScheme="blue" 
                               variant="outline"
                               onClick={() => {
-                                // Here you would implement a function to view detailed bank data
                                 console.log('View bank data:', bankData);
-                                // For now, just show a toast
                                 toast({
                                   title: 'Bank Data',
                                   description: 'Viewing bank data functionality coming soon',
@@ -1017,6 +869,32 @@ export function BankIntegrationsPage() {
                               }}
                             >
                               View Details
+                            </Button>
+                            <Button
+                              size="sm"
+                              colorScheme="blue"
+                              variant="outline"
+                              onClick={() => {
+                                // Extract bank info for reconnection
+                                const bankForReconnect = banks.find(b => 
+                                  b.identifier === connection.bank_id || b.id === connection.bank_id
+                                )
+                                
+                                if (bankForReconnect) {
+                                  handleBankSelect(bankForReconnect)
+                                } else {
+                                  // Create a minimal bank object if the original bank is not found
+                                  const minimalBank: Bank = {
+                                    identifier: connection.bank_id,
+                                    name: connection.bank_name || 'Your Bank',
+                                    logo: connection.bank_logo || 'https://via.placeholder.com/150',
+                                    country_code: selectedCountry === 'UAE' ? 'ARE' : 'SAU'
+                                  }
+                                  handleBankSelect(minimalBank)
+                                }
+                              }}
+                            >
+                              Reconnect
                             </Button>
                           </>
                         )}
@@ -1083,7 +961,6 @@ export function BankIntegrationsPage() {
         </ModalContent>
       </Modal>
 
-      {/* Render the LeanSDKWrapper component when showLeanSDK is true */}
       {showLeanSDK && authToken && customerId && selectedBank && (
         <LeanSDKWrapper
           authToken={authToken}

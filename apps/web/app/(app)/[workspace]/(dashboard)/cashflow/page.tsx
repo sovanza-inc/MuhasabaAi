@@ -2,7 +2,7 @@
 
 import { Box, Heading, Text, VStack, HStack, Flex } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
-import { AreaChart, BarChart } from '@saas-ui/charts'
+import { BarChart } from '@saas-ui/charts'
 import { LuShoppingCart, LuBus, LuHeart, LuTv } from 'react-icons/lu'
 import { PageHeader } from 'features/common/components/page-header'
 import { useState } from 'react'

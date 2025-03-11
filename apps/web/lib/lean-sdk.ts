@@ -1,4 +1,3 @@
-import axios from 'axios'
 import Lean from '@leantechnologies/node-sdk'
 
 // Define interfaces for the Lean SDK to match its actual structure
@@ -235,12 +234,16 @@ declare global {
 }
 
 // Export the SDK functions
-export default {
+const leanSdk = {
   getSupportedBanks,
-  createCustomer,
   getIdentity,
   getAccounts,
   getBalance,
   getTransactions,
-  connectBank
+  createCustomer,
+  connectBank,
+  getAccessToken,
+  mockBanks
 }
+
+export default leanSdk

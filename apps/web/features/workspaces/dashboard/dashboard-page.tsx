@@ -5,13 +5,6 @@ import { useState } from 'react'
 import {
   Card,
   CardBody,
-  Grid,
-  GridItem,
-  Tab,
-  TabList,
-  TabPanel,
-  TabPanels,
-  Tabs,
   Box,
   Heading,
   Text,
@@ -30,9 +23,8 @@ import {
   ToolbarButton,
 } from '@saas-ui-pro/react'
 import { LoadingOverlay, LoadingSpinner } from '@saas-ui/react'
-import { FaDiscord, FaGithub, FaTwitter, FaLinkedin } from 'react-icons/fa'
 import { FaXTwitter } from 'react-icons/fa6'
-import { AreaChart, BarChart } from '@saas-ui/charts'
+import { FaLinkedin } from 'react-icons/fa'
 import { LuChevronRight } from 'react-icons/lu'
 
 import {
@@ -47,11 +39,7 @@ import { SegmentedControl } from '@acme/ui/segmented-control'
 import { WorkspacePageProps } from '#lib/create-page'
 import { api } from '#lib/trpc/react'
 
-import { IntroTour } from './intro-tour'
-import { Activity } from './metrics/activity'
-import { Metric } from './metrics/metric'
-import { RevenueChart } from './metrics/revenue-chart'
-import { SalesByCountry } from './metrics/sales-by-country'
+import { AreaChart, BarChart } from '@saas-ui/charts'
 
 export function DashboardPage(props: WorkspacePageProps) {
   const [range, setRange] = useState('30d')
@@ -94,22 +82,6 @@ export function DashboardPage(props: WorkspacePageProps) {
       />
     )
   }
-
-  // Progress card data
-  const progressData = [
-    {
-      title: 'Revenues',
-      projectCost: '13000$',
-      totalSpending: '6000$',
-      thisMonth: '75%'
-    },
-    {
-      title: 'Expenses',
-      projectCost: '13000$',
-      totalSpending: '6000$',
-      thisMonth: '100%'
-    }
-  ]
 
   // Transaction cards data
   const transactions = [

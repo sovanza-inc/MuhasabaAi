@@ -138,11 +138,11 @@ export const DataBoard = forwardRef(
         }
       })
       return items
-    }, [groupBy, rows])
+    }, [groupBy, instance])
 
     React.useEffect(() => {
       setItems(mapItems())
-    }, [groupBy, rows])
+    }, [groupBy, rows, mapItems])
 
     const [items, setItems] = React.useState<KanbanItems>({})
 

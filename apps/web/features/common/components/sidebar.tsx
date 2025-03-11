@@ -35,10 +35,8 @@ import { useRouter } from 'next/navigation'
 import {
   LuCircleHelp,
   LuHouse,
-  LuInbox,
   LuPlus,
   LuSearch,
-  LuSquareUser,
   LuWallet,
   LuChartArea,
   LuReceipt,

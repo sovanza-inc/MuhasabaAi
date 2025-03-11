@@ -1,43 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import Lean from '@leantechnologies/node-sdk'
 import axios from 'axios'
-
-// Define interfaces for the Lean SDK to match its actual structure
-interface LeanAuth {
-  token: (params: { grantType: string; scope: string }) => Promise<{ accessToken: string; expiresIn?: number }>;
-}
-
-interface LeanCustomers {
-  create: (params: { id: string }) => Promise<any>;
-  getIdentity: (customerId: string) => Promise<any>;
-  getAccounts: (customerId: string) => Promise<any>;
-  getAccountBalance: (customerId: string, accountId: string) => Promise<any>;
-  getAccountTransactions: (customerId: string, accountId: string, params: { fromDate: string; toDate: string; includeDetails: boolean }) => Promise<any>;
-}
-
-interface LeanBanks {
-  list: () => Promise<any>;
-}
-
-interface LeanConnections {
-  create: (params: { customerId: string; bankId: string }) => Promise<any>;
-}
-
-// Extend the Lean type to include the properties we know it has
-interface LeanSDK extends Lean {
-  auth: LeanAuth;
-  customers: LeanCustomers;
-  banks: LeanBanks;
-  connections: LeanConnections;
-}
-
-// Initialize the Lean SDK with environment-specific configuration
-// @ts-ignore - Ignoring TypeScript error as the SDK has a different constructor than what TypeScript expects
-const leanClient = new Lean({
-  clientId: process.env.LEAN_TECH_CLIENT_ID,
-  clientSecret: process.env.LEAN_TECH_CLIENT_SECRET,
-  sandbox: process.env.NODE_ENV !== 'production'
-}) as LeanSDK;
 
 export async function POST(req: NextRequest) {
   try {
