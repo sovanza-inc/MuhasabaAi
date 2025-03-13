@@ -9,7 +9,7 @@ import {
 } from '@saas-ui-pro/react'
 import { EmptyState } from '@saas-ui/react'
 import { LuWallet } from 'react-icons/lu'
-import { 
+import {
   Button,
   useToast,
   Modal,
@@ -61,7 +61,6 @@ export function BankIntegrationsPage() {
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
   const [customerId, setCustomerId] = React.useState<string | null>(null)
-  const [appUserId, setAppUserId] = React.useState<string | null>(null)
   const [customerToken, setCustomerToken] = React.useState<string | null>(null)
   const [showAppUserIdPopup, setShowAppUserIdPopup] = React.useState(false)
   const [appUserInput, setAppUserInput] = React.useState('')
@@ -263,9 +262,8 @@ export function BankIntegrationsPage() {
 
       const customerData = await customerResponse.json();
       
-      // Set customer ID and app user ID from the response
+      // Set customer ID
       setCustomerId(customerData.customer_id);
-      setAppUserId(customerData.app_user_id);
 
       // Immediately get customer access token
       const tokenResponse = await fetch('/api/bank-integration/customer-token', {
