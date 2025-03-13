@@ -37,9 +37,12 @@ interface LeanSDK {
 // @ts-ignore - Ignoring TypeScript error as the SDK has a different constructor than what TypeScript expects
 const leanSdk = new Lean({
   clientId: process.env.LEAN_TECH_CLIENT_ID || '45be55bc-1025-41c5-a548-323ae5750d6c',
-  clientSecret: process.env.LEAN_TECH_CLIENT_SECRET,
+  clientSecret: process.env.LEAN_TECH_CLIENT_SECRET || '34356265353562632d313032352d3431',
   sandbox: process.env.NODE_ENV !== 'production',
 }) as LeanSDK;
+
+// Explicitly log SDK initialization to ensure it's used
+console.log('Lean SDK initialized with client ID:', leanSdk.clientId ? leanSdk.clientId.substring(0, 5) : 'N/A')
 
 export async function GET() {
   try {
