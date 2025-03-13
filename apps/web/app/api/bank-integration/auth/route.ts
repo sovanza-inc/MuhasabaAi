@@ -35,7 +35,7 @@ interface LeanSDK {
 
 // Initialize the Lean SDK with environment-specific configuration
 // @ts-ignore - Ignoring TypeScript error as the SDK has a different constructor than what TypeScript expects
-const leanClient = new Lean({
+const leanSdk = new Lean({
   clientId: process.env.LEAN_TECH_CLIENT_ID || '45be55bc-1025-41c5-a548-323ae5750d6c',
   clientSecret: process.env.LEAN_TECH_CLIENT_SECRET,
   sandbox: process.env.NODE_ENV !== 'production',
@@ -94,10 +94,22 @@ export async function GET() {
     // Skip customer creation since it's failing and not critical
     // We'll focus on getting the token
     
+    // If we want to create a customer, we can use the SDK
+    try {
+      await leanSdk.customers.create({
+        id: customerId
+      })
+      console.log('Customer created successfully')
+    } catch (customerError) {
+      console.error('Error creating customer (continuing anyway):', customerError)
+      // We continue even if customer creation fails as it might already exist
+    }
+    
     // Define the scope based on customer ID
     // From memory: Two scopes: api (backend) and customer.<customer_id> (SDK)
     const apiScope = 'api';
-    const customerScope = `customer.${customerId}`;
+    // We'll only use the api scope for now as it's more reliable
+    // const customerScope = `customer.${customerId}`;
     
     try {
       // Try first with just the 'api' scope as it might be more reliable
