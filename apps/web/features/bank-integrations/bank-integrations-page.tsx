@@ -227,6 +227,8 @@ export function BankIntegrationsPage() {
   const handleInitialSetup = React.useCallback(async () => {
     try {
       setIsLoading(true)
+      console.log("Client ID:", process.env.LEAN_TECH_CLIENT_ID ? "Exists" : "Not found");
+      console.log("Client Secret:", process.env.LEAN_TECH_CLIENT_SECRET ? "Exists" : "Not found");
       const response = await fetch('/api/bank-integration/auth')
 
       if (!response.ok) {
