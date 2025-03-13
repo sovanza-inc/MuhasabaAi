@@ -34,8 +34,8 @@ interface LeanSDK extends Lean {
 // Initialize the Lean SDK with environment-specific configuration
 // @ts-ignore - Ignoring TypeScript error as the SDK has a different constructor than what TypeScript expects
 const leanClient = new Lean({
-  clientId: process.env.LEAN_TECH_CLIENT_ID,
-  clientSecret: process.env.LEAN_TECH_CLIENT_SECRET,
+  clientId: process.env.LEAN_TECH_CLIENT_ID || '45be55bc-1025-41c5-a548-323ae5750d6c',
+  clientSecret: process.env.LEAN_TECH_CLIENT_SECRET || '34356265353562632d313032352d3431',
   sandbox: process.env.NODE_ENV !== 'production',
 }) as LeanSDK;
 
@@ -45,12 +45,15 @@ export async function GET() {
     console.log('LEAN_TECH_CLIENT_ID exists:', !!process.env.LEAN_TECH_CLIENT_ID)
     console.log('LEAN_TECH_CLIENT_SECRET exists:', !!process.env.LEAN_TECH_CLIENT_SECRET)
     console.log('NODE_ENV:', process.env.NODE_ENV)
-    console.log('CLIENT_ID length:', process.env.LEAN_TECH_CLIENT_ID ? process.env.LEAN_TECH_CLIENT_ID.trim().length : 0)
-    console.log('CLIENT_SECRET length:', process.env.LEAN_TECH_CLIENT_SECRET ? process.env.LEAN_TECH_CLIENT_SECRET.trim().length : 0)
+    console.log('Using hardcoded credentials as fallback if env variables are not available')
     
-    // Check if required environment variables are present
-    if (!process.env.LEAN_TECH_CLIENT_ID || !process.env.LEAN_TECH_CLIENT_SECRET) {
-      console.error('Missing Lean Tech credentials in environment variables')
+    // Hardcoded credentials as fallback
+    const clientId = process.env.LEAN_TECH_CLIENT_ID || '45be55bc-1025-41c5-a548-323ae5750d6c';
+    const clientSecret = process.env.LEAN_TECH_CLIENT_SECRET || '34356265353562632d313032352d3431';
+    
+    // Check if required credentials are present (either from env or hardcoded)
+    if (!clientId || !clientSecret) {
+      console.error('Missing Lean Tech credentials in environment variables or hardcoded values')
       return NextResponse.json(
         { error: 'Missing Lean Tech credentials' },
         { status: 500 }
@@ -95,15 +98,15 @@ export async function GET() {
       // Log the request details (without sensitive information)
       console.log('Making OAuth request to:', authUrl)
       console.log('Using scope:', scope)
-      console.log('Using client ID:', process.env.LEAN_TECH_CLIENT_ID ? 'Provided' : 'Missing')
+      console.log('Using client ID:', clientId ? 'Provided' : 'Missing')
       
       // Make direct OAuth request instead of using the SDK
       const tokenResponse = await axios.post(authUrl, 
         new URLSearchParams({
           grant_type: 'client_credentials',
           scope: scope,
-          client_id: (process.env.LEAN_TECH_CLIENT_ID || '').trim(),
-          client_secret: (process.env.LEAN_TECH_CLIENT_SECRET || '').trim()
+          client_id: clientId.trim(),
+          client_secret: clientSecret.trim()
         }),
         {
           headers: {
@@ -148,8 +151,8 @@ export async function GET() {
           new URLSearchParams({
             grant_type: 'client_credentials',
             scope: 'api',
-            client_id: (process.env.LEAN_TECH_CLIENT_ID || '').trim(),
-            client_secret: (process.env.LEAN_TECH_CLIENT_SECRET || '').trim()
+            client_id: clientId.trim(),
+            client_secret: clientSecret.trim()
           }),
           {
             headers: {
