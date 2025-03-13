@@ -18,9 +18,6 @@ import {
   ModalHeader,
   ModalBody,
   ModalCloseButton,
-  useDisclosure,
-  Spinner,
-  Center,
   VStack,
   FormControl,
   FormLabel,
@@ -28,11 +25,7 @@ import {
   HStack,
   Box,
   Text,
-  ButtonGroup,
-  useColorModeValue,
-  Container,
   Icon,
-  Divider,
 } from '@chakra-ui/react'
 
 const NEXT_PUBLIC_LEAN_TECH_CLIENT_ID = '45be55bc-1025-41c5-a548-323ae5750d6c';
@@ -54,6 +47,14 @@ declare global {
   }
 }
 
+interface BankDetails {
+  bankIdentifier: string;
+  isSupported: boolean;
+  connectedDate: string;
+  status: string;
+  message: string;
+}
+
 export function BankIntegrationsPage() {
   const toast = useToast()
 
@@ -64,6 +65,7 @@ export function BankIntegrationsPage() {
   const [customerToken, setCustomerToken] = React.useState<string | null>(null)
   const [showAppUserIdPopup, setShowAppUserIdPopup] = React.useState(false)
   const [appUserInput, setAppUserInput] = React.useState('')
+  const [connectedBank, setConnectedBank] = React.useState<BankDetails | null>(null)
 
   // Initialize Lean SDK
   React.useEffect(() => {
@@ -99,37 +101,43 @@ export function BankIntegrationsPage() {
           container: 'lean-connect-container',
           callback: (event) => {
             console.log('Lean event:', event);
-            switch(event.type) {
-              case 'success':
-                toast({
-                  title: 'Bank Connected',
-                  description: 'Successfully connected your bank account',
-                  status: 'success',
-                  duration: 3000,
-                  isClosable: true,
+            // Check for success based on status and exit_point
+            if (event.status === 'SUCCESS' && event.exit_point === 'SUCCESS') {
+              // Store bank details when connection is successful
+              if (event.bank) {
+                setConnectedBank({
+                  bankIdentifier: event.bank.bank_identifier,
+                  isSupported: event.bank.is_supported,
+                  connectedDate: new Date().toLocaleDateString(),
+                  status: 'Connected',
+                  message: event.message
                 });
-                break;
-              case 'exit':
-                toast({
-                  title: 'Connection Cancelled',
-                  description: 'Bank connection process was cancelled',
-                  status: 'info',
-                  duration: 3000,
-                  isClosable: true,
-                });
-                break;
-              case 'error':
-                console.error('Lean SDK error:', event);
-                toast({
-                  title: 'Connection Error',
-                  description: 'Failed to connect bank account',
-                  status: 'error',
-                  duration: 5000,
-                  isClosable: true,
-                });
-                break;
-              default:
-                console.log('Lean SDK event:', event);
+              }
+              toast({
+                title: 'Bank Connected',
+                description: event.message || 'Successfully connected your bank account',
+                status: 'success',
+                duration: 3000,
+                isClosable: true,
+              });
+            } else if (event.exit_point === 'ERROR' || event.status === 'ERROR') {
+              console.error('Lean SDK error:', event);
+              toast({
+                title: 'Connection Error',
+                description: event.message || 'Failed to connect bank account',
+                status: 'error',
+                duration: 5000,
+                isClosable: true,
+              });
+            } else if (event.exit_point) {
+              // Handle any other exit points
+              toast({
+                title: 'Connection Cancelled',
+                description: event.message || 'Bank connection process was cancelled',
+                status: 'info',
+                duration: 3000,
+                isClosable: true,
+              });
             }
           }
         });
@@ -374,34 +382,65 @@ export function BankIntegrationsPage() {
           display="none" // Initially hidden, SDK will control visibility
         />
 
-        {authToken ? (
-          <Button 
-            colorScheme="primary"
-            size="lg"
-            leftIcon={<LuWallet />}
-            onClick={handleConnectBank}
-            isLoading={isLoading}
-          >
-            Connect Bank
-          </Button>
-        ) : (
-          <EmptyState
-            title="No bank integrations yet"
-            description="Connect your bank account to get started with financial management."
-            icon={LuWallet}
-            actions={
-              <Button
-                colorScheme="primary"
-                size="lg"
-                leftIcon={<LuWallet />}
-                onClick={handleAddBankIntegration}
-                isLoading={isLoading}
-              >
-                Add Bank Integration
-              </Button>
-            }
-          />
-        )}
+        <VStack spacing={6} align="stretch" w="full">
+          {authToken && (
+            <Button 
+              colorScheme="primary"
+              size="lg"
+              leftIcon={<LuWallet />}
+              onClick={handleConnectBank}
+              isLoading={isLoading}
+            >
+              Connect Bank
+            </Button>
+          )}
+
+          {connectedBank && (
+            <Box
+              bg="gray.100"
+              p={4}
+              borderRadius="lg"
+              maxWidth="50%"
+            >
+              <HStack spacing={4}>
+                <Box
+                  bg="gray.200"
+                  p={3}
+                  borderRadius="md"
+                >
+                  <Icon as={LuWallet} boxSize={6} />
+                </Box>
+                <VStack align="start" spacing={1} flex={1}>
+                  <Text fontWeight="medium" color="gray.800">
+                    {connectedBank.bankIdentifier}
+                  </Text>
+                  <Text fontSize="sm" color="gray.600">
+                    {connectedBank.status} • {connectedBank.connectedDate}
+                  </Text>
+                </VStack>
+              </HStack>
+            </Box>
+          )}
+
+          {!authToken && !connectedBank && (
+            <EmptyState
+              title="No bank integrations yet"
+              description="Connect your bank account to get started with financial management."
+              icon={LuWallet}
+              actions={
+                <Button
+                  colorScheme="primary"
+                  size="lg"
+                  leftIcon={<LuWallet />}
+                  onClick={handleAddBankIntegration}
+                  isLoading={isLoading}
+                >
+                  Add Bank Integration
+                </Button>
+              }
+            />
+          )}
+        </VStack>
         {AppUserIdModal}
       </PageBody>
     </Page>
