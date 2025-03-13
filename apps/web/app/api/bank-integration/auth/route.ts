@@ -42,7 +42,7 @@ const leanSdk = new Lean({
 }) as LeanSDK;
 
 // Explicitly log SDK initialization to ensure it's used
-console.log('Lean SDK initialized with client ID:', leanSdk.clientId ? leanSdk.clientId.substring(0, 5) : 'N/A')
+console.log('Lean SDK initialized with full client ID:', leanSdk.clientId || 'N/A')
 
 export async function GET() {
   try {
@@ -59,46 +59,25 @@ export async function GET() {
     console.log('Using auth URL:', authUrl)
     
     // Hardcoded credentials as fallback
-    const clientId = process.env.LEAN_TECH_CLIENT_ID || '45be55bc-1025-41c5-a548-323ae5750d6c';
-    const clientSecret = process.env.LEAN_TECH_CLIENT_SECRET || '34356265353562632d313032352d3431';
+    const clientId = (process.env.LEAN_TECH_CLIENT_ID || '45be55bc-1025-41c5-a548-323ae5750d6c').trim();
+    const clientSecret = (process.env.LEAN_TECH_CLIENT_SECRET || '34356265353562632d313032352d3431').trim();
     
-    console.log('Client ID being used (first 5 chars):', clientId.substring(0, 5));
-    console.log('Client Secret length:', clientSecret ? clientSecret.length : 0);
-    console.log('Full client ID:', clientId);
+    // Ensure client ID is not truncated or modified
+    const fullClientId = clientId;
+    const fullClientSecret = clientSecret;
     
-    // Check if required credentials are present
-    if (!clientId || !clientSecret) {
-      console.error('Missing Lean Tech credentials in environment variables or hardcoded values')
-      return NextResponse.json(
-        { error: 'Missing Lean Tech credentials' },
-        { status: 500 }
-      )
-    }
-    
-    // Generate a customer ID based on the app name (base64 encoded)
-    const appName = 'MuhasabaAI'
-    const timestamp = new Date().getTime()
-    const randomId = Math.random().toString(36).substring(2, 10)
-    const customerId = Buffer.from(`${appName}-${timestamp}-${randomId}`).toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '')
-    
-    console.log('Generated customer ID:', customerId)
-    
-    // Define the scope based on customer ID
-    // From memory: Two scopes: api (backend) and customer.<customer_id> (SDK)
-    const apiScope = 'api';
+    console.log('Client ID being used (full):', fullClientId);
+    console.log('Client Secret length:', fullClientSecret.length);
     
     // Try multiple variations of client credentials
     const credentialVariations = [
       { 
-        id: clientId, 
-        secret: clientSecret 
+        id: fullClientId, 
+        secret: fullClientSecret 
       },
       { 
-        id: clientId.replace(/-/g, ''), 
-        secret: clientSecret.replace(/-/g, '') 
+        id: fullClientId.replace(/-/g, ''), 
+        secret: fullClientSecret.replace(/-/g, '') 
       },
       { 
         id: '45be55bc1025415a548323ae5750d6c', 
@@ -108,14 +87,14 @@ export async function GET() {
     
     for (const cred of credentialVariations) {
       try {
-        console.log(`Attempting authentication with client ID: ${cred.id.substring(0, 5)}...`);
+        console.log(`Attempting authentication with full client ID: ${cred.id}`);
         
         const tokenResponse = await axios.post(authUrl, 
           new URLSearchParams({
             grant_type: 'client_credentials',
-            scope: apiScope,
-            client_id: cred.id.trim(),
-            client_secret: cred.secret.trim()
+            scope: 'api',
+            client_id: cred.id,  // Remove .trim() to preserve exact ID
+            client_secret: cred.secret  // Remove .trim() to preserve exact secret
           }),
           {
             headers: {
@@ -129,11 +108,10 @@ export async function GET() {
         
         return NextResponse.json({
           token: tokenResponse.data.access_token,
-          expires_in: tokenResponse.data.expires_in || 3599,
-          customerId: customerId
+          expires_in: tokenResponse.data.expires_in || 3599
         })
       } catch (tokenError) {
-        console.error(`Authentication failed with client ID: ${cred.id.substring(0, 5)}`, 
+        console.error(`Authentication failed with full client ID: ${cred.id}`, 
           axios.isAxiosError(tokenError) ? tokenError.response?.data : tokenError)
       }
     }
