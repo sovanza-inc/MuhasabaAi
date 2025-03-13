@@ -51,6 +51,9 @@ export async function GET() {
     const clientId = process.env.LEAN_TECH_CLIENT_ID || '45be55bc-1025-41c5-a548-323ae5750d6c';
     const clientSecret = process.env.LEAN_TECH_CLIENT_SECRET || '34356265353562632d313032352d3431';
     
+    console.log('Client ID being used (first 5 chars):', clientId.substring(0, 5));
+    console.log('Client Secret length:', clientSecret.length);
+    
     // Check if required credentials are present (either from env or hardcoded)
     if (!clientId || !clientSecret) {
       console.error('Missing Lean Tech credentials in environment variables or hardcoded values')
@@ -100,7 +103,46 @@ export async function GET() {
       console.log('Using scope:', scope)
       console.log('Using client ID:', clientId ? 'Provided' : 'Missing')
       
-      // Make direct OAuth request instead of using the SDK
+      // Try first with just the 'api' scope as it might be more reliable
+      console.log('Trying with api scope only first')
+      
+      try {
+        const apiScopeResponse = await axios.post(authUrl, 
+          new URLSearchParams({
+            grant_type: 'client_credentials',
+            scope: 'api',
+            client_id: clientId.trim(),
+            client_secret: clientSecret.trim()
+          }),
+          {
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded'
+            }
+          }
+        )
+        
+        console.log('Successfully obtained token with api scope')
+        console.log('Response status:', apiScopeResponse.status)
+        console.log('Response data keys:', Object.keys(apiScopeResponse.data))
+        
+        return NextResponse.json({
+          token: apiScopeResponse.data.access_token,
+          expires_in: apiScopeResponse.data.expires_in || 3599,
+          customerId: customerId
+        })
+      } catch (apiScopeError) {
+        console.error('Error getting token with api scope:', apiScopeError)
+        
+        if (axios.isAxiosError(apiScopeError) && apiScopeError.response) {
+          console.error('API scope error - Response status:', apiScopeError.response.status)
+          console.error('API scope error - Response data:', apiScopeError.response.data)
+        }
+        
+        // If api scope failed, try with combined scope
+        console.log('Trying with combined scope next')
+      }
+      
+      // Make direct OAuth request with combined scope
       const tokenResponse = await axios.post(authUrl, 
         new URLSearchParams({
           grant_type: 'client_credentials',
@@ -115,12 +157,11 @@ export async function GET() {
         }
       )
       
-      console.log('Successfully obtained token')
+      console.log('Successfully obtained token with combined scope')
       console.log('Response status:', tokenResponse.status)
       console.log('Response headers:', tokenResponse.headers)
       console.log('Response data keys:', Object.keys(tokenResponse.data))
       
-      // Return token with expiry of 3599 seconds as specified in the memory
       return NextResponse.json({
         token: tokenResponse.data.access_token,
         expires_in: tokenResponse.data.expires_in || 3599,
@@ -143,59 +184,14 @@ export async function GET() {
         }
       }
       
-      // Try with just the 'api' scope as a fallback
-      console.log('Retrying with only api scope')
-      
-      try {
-        const retryResponse = await axios.post(authUrl, 
-          new URLSearchParams({
-            grant_type: 'client_credentials',
-            scope: 'api',
-            client_id: clientId.trim(),
-            client_secret: clientSecret.trim()
-          }),
-          {
-            headers: {
-              'Content-Type': 'application/x-www-form-urlencoded'
-            }
-          }
-        )
-        
-        console.log('Successfully obtained token on retry')
-        console.log('Response status:', retryResponse.status)
-        console.log('Response headers:', retryResponse.headers)
-        console.log('Response data keys:', Object.keys(retryResponse.data))
-        
-        return NextResponse.json({
-          token: retryResponse.data.access_token,
-          expires_in: retryResponse.data.expires_in || 3599,
-          customerId: customerId
-        })
-      } catch (retryError) {
-        console.error('Failed to get token on retry:', retryError)
-        
-        // Log more detailed error information
-        if (retryError instanceof Error) {
-          console.error('Error name:', retryError.name)
-          console.error('Error message:', retryError.message)
-          if (axios.isAxiosError(retryError) && retryError.response) {
-            console.error('Response status:', retryError.response.status)
-            console.error('Response data:', retryError.response.data)
-          }
-          console.error('Error stack:', retryError.stack)
-        } else {
-          console.error('Non-Error object thrown:', retryError)
-        }
-        
-        // Fallback to manual token generation if the SDK methods fail
-        return NextResponse.json(
-          { 
-            error: 'Failed to get authentication token',
-            message: retryError instanceof Error ? retryError.message : 'Unknown error'
-          },
-          { status: 500 }
-        )
-      }
+      // Fallback to manual token generation if the SDK methods fail
+      return NextResponse.json(
+        { 
+          error: 'Failed to get authentication token',
+          message: tokenError instanceof Error ? tokenError.message : 'Unknown error'
+        },
+        { status: 500 }
+      )
     }
   } catch (error) {
     console.error('Error generating auth token:', error)
