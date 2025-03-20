@@ -20,6 +20,13 @@ import {
   Image,
   SimpleGrid,
   Badge,
+  Spinner,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
@@ -77,11 +84,23 @@ interface ConnectedEntity {
   created_at: string;
 }
 
+interface BankBalance {
+  id: string;
+  account_id: string;
+  balance: number;
+  currency: string;
+  updated_at: string;
+  type: string;
+}
+
 export function BankIntegrationsPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
   const [connectedAccounts, setConnectedAccounts] = React.useState<ConnectedAccount[]>([])
   const [connectedEntities, setConnectedEntities] = React.useState<ConnectedEntity[]>([])
+  const [selectedBank, setSelectedBank] = React.useState<ConnectedEntity | null>(null);
+  const [isBalanceLoading, setIsBalanceLoading] = React.useState(false);
+  const [bankBalance, setBankBalance] = React.useState<BankBalance | null>(null);
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -309,6 +328,45 @@ export function BankIntegrationsPage() {
     }
   }, [customerId, authToken, fetchConnectedBanks]);
 
+  const handleBankSelect = React.useCallback(async (bank: ConnectedEntity) => {
+    setSelectedBank(bank);
+    setIsBalanceLoading(true);
+    setBankBalance(null);
+
+    try {
+      const response = await fetch(`/api/bank-integration/balance?account_id=${bank.id}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const data = await response.json();
+      if (response.ok) {
+        setBankBalance(data);
+      } else {
+        toast({
+          title: 'Error',
+          description: data.details || 'Failed to fetch bank balance',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching bank balance:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch bank balance',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  }, [authToken, toast]);
+
   return (
     <Page>
       <PageHeader 
@@ -368,6 +426,9 @@ export function BankIntegrationsPage() {
                     boxShadow="sm"
                     border="1px"
                     borderColor="gray.200"
+                    cursor="pointer"
+                    onClick={() => handleBankSelect(entity)}
+                    _hover={{ borderColor: 'blue.500' }}
                   >
                     <VStack align="start" spacing={2}>
                       <HStack justify="space-between" width="100%">
@@ -463,6 +524,75 @@ export function BankIntegrationsPage() {
             />
           )}
         </VStack>
+
+        {/* Bank Balance Drawer */}
+        <Drawer
+          isOpen={!!selectedBank}
+          onClose={() => setSelectedBank(null)}
+          placement="right"
+          size="md"
+        >
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader>
+              Bank Balance - {selectedBank?.bank_identifier}
+            </DrawerHeader>
+            <DrawerBody>
+              <VStack spacing={4} align="stretch">
+                {isBalanceLoading ? (
+                  <Box textAlign="center" py={8}>
+                    <Spinner size="xl" />
+                    <Text mt={4}>Loading balance...</Text>
+                  </Box>
+                ) : bankBalance ? (
+                  <>
+                    <Box
+                      p={6}
+                      bg="white"
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor="gray.200"
+                    >
+                      <VStack spacing={3} align="start">
+                        <Text color="gray.600">Account Balance</Text>
+                        <Text fontSize="3xl" fontWeight="bold">
+                          {bankBalance.balance.toLocaleString()} {bankBalance.currency}
+                        </Text>
+                        <HStack spacing={2}>
+                          <Badge colorScheme="blue">{bankBalance.type}</Badge>
+                          <Text fontSize="sm" color="gray.500">
+                            Last updated: {new Date(bankBalance.updated_at).toLocaleString()}
+                          </Text>
+                        </HStack>
+                      </VStack>
+                    </Box>
+                    <Box>
+                      <Text fontSize="sm" color="gray.600">Account Details</Text>
+                      <SimpleGrid columns={2} spacing={4} mt={2}>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Account ID</Text>
+                          <Text fontSize="sm">{bankBalance.account_id}</Text>
+                        </Box>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Balance ID</Text>
+                          <Text fontSize="sm">{bankBalance.id}</Text>
+                        </Box>
+                      </SimpleGrid>
+                    </Box>
+                  </>
+                ) : (
+                  <EmptyState
+                    title="No balance information"
+                    description="Unable to fetch balance information for this account."
+                    icon={LuWallet}
+                  />
+                )}
+              </VStack>
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
       </PageBody>
     </Page>
   )
