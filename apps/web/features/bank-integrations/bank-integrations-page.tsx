@@ -94,7 +94,6 @@ export function BankIntegrationsPage() {
   const [authToken, setAuthToken] = React.useState<string | null>(null)
   const [customerId, setCustomerId] = React.useState<string | null>(null)
   const [customerToken, setCustomerToken] = React.useState<string | null>(null)
-  const [connectedBank, setConnectedBank] = React.useState<BankDetails | null>(null)
 
   // Initialize Lean SDK
   React.useEffect(() => {
@@ -115,7 +114,7 @@ export function BankIntegrationsPage() {
   }, [])
 
   const initializeLeanConnect = React.useCallback(() => {
-    if (customerId && customerToken && NEXT_PUBLIC_LEAN_TECH_CLIENT_ID && window.Lean?.connect) {
+    if (customerId && customerToken && window.Lean?.connect) {
       try {
         window.Lean.connect({
           app_token: NEXT_PUBLIC_LEAN_TECH_CLIENT_ID,
@@ -132,16 +131,6 @@ export function BankIntegrationsPage() {
             console.log('Lean event:', event);
             // Check for success based on status and exit_point
             if (event.status === 'SUCCESS' && event.exit_point === 'SUCCESS') {
-              // Store bank details when connection is successful
-              if (event.bank) {
-                setConnectedBank({
-                  bankIdentifier: event.bank.bank_identifier,
-                  isSupported: event.bank.is_supported,
-                  connectedDate: new Date().toLocaleDateString(),
-                  status: 'Connected',
-                  message: event.message
-                });
-              }
               toast({
                 title: 'Bank Connected',
                 description: event.message || 'Successfully connected your bank account',
@@ -184,7 +173,6 @@ export function BankIntegrationsPage() {
       console.error('Missing required configuration for Lean connect:', {
         hasCustomerId: !!customerId,
         hasCustomerToken: !!customerToken,
-        hasAppToken: !!NEXT_PUBLIC_LEAN_TECH_CLIENT_ID,
         hasLeanSDK: !!window.Lean?.connect
       });
     }
