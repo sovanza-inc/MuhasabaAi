@@ -3,20 +3,8 @@ import axios from 'axios';
 
 export async function POST(request: NextRequest) {
   try {
-    // Parse request body
-    const requestBody = await request.json();
-    const { app_user_id } = requestBody;
-
-    // Validate app_user_id
-    if (!app_user_id) {
-      return NextResponse.json(
-        { 
-          error: 'Missing required parameter',
-          details: 'app_user_id is required'
-        },
-        { status: 400 }
-      );
-    }
+    // Get workspace ID from request body
+    const { workspaceId } = await request.json();
 
     // Extract authorization token from headers
     const authToken = request.headers.get('authorization')?.replace('Bearer ', '') || 
@@ -34,10 +22,10 @@ export async function POST(request: NextRequest) {
     }
 
     try {
-      // Call Lean Tech customer creation endpoint
+      // Use workspace ID as the app_user_id
       const customerResponse = await axios.post(
         'https://sandbox.leantech.me/customers/v1',
-        { app_user_id: app_user_id.trim() },
+        { app_user_id: workspaceId },
         {
           headers: {
             'Authorization': `Bearer ${authToken}`,
@@ -46,10 +34,10 @@ export async function POST(request: NextRequest) {
         }
       );
 
-      // Return customer ID and app_user_id
+      // Return customer ID and workspace ID
       return NextResponse.json({
         customer_id: customerResponse.data.customer_id,
-        app_user_id: customerResponse.data.app_user_id
+        app_user_id: workspaceId
       }, { status: 201 });
 
     } catch (apiError) {
