@@ -23,8 +23,6 @@ import {
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
-const NEXT_PUBLIC_LEAN_TECH_CLIENT_ID = '45be55bc-1025-41c5-a548-323ae5750d6c';
-
 // Define Lean SDK types
 declare global {
   interface Window {
@@ -40,14 +38,6 @@ declare global {
       }) => void;
     };
   }
-}
-
-interface BankDetails {
-  bankIdentifier: string;
-  isSupported: boolean;
-  connectedDate: string;
-  status: string;
-  message: string;
 }
 
 interface ConnectedAccount {
@@ -84,6 +74,9 @@ interface ConnectedEntity {
   created_at: string;
 }
 
+// Lean Tech client ID for bank integration
+const LEAN_TECH_CLIENT_ID = '45be55bc-1025-41c5-a548-323ae5750d6c';
+
 export function BankIntegrationsPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
@@ -117,7 +110,7 @@ export function BankIntegrationsPage() {
     if (customerId && customerToken && window.Lean?.connect) {
       try {
         window.Lean.connect({
-          app_token: NEXT_PUBLIC_LEAN_TECH_CLIENT_ID,
+          app_token: LEAN_TECH_CLIENT_ID,
           permissions: [
             "accounts",
             "balance", 
