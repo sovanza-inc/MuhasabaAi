@@ -12,21 +12,13 @@ import { LuWallet } from 'react-icons/lu'
 import {
   Button,
   useToast,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalCloseButton,
   VStack,
-  FormControl,
-  FormLabel,
-  Input,
   HStack,
   Box,
   Text,
   Icon,
 } from '@chakra-ui/react'
+import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
 const NEXT_PUBLIC_LEAN_TECH_CLIENT_ID = '45be55bc-1025-41c5-a548-323ae5750d6c';
 
@@ -57,13 +49,12 @@ interface BankDetails {
 
 export function BankIntegrationsPage() {
   const toast = useToast()
+  const [workspace] = useCurrentWorkspace()
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
   const [customerId, setCustomerId] = React.useState<string | null>(null)
   const [customerToken, setCustomerToken] = React.useState<string | null>(null)
-  const [showAppUserIdPopup, setShowAppUserIdPopup] = React.useState(false)
-  const [appUserInput, setAppUserInput] = React.useState('')
   const [connectedBank, setConnectedBank] = React.useState<BankDetails | null>(null)
 
   // Initialize Lean SDK
@@ -169,7 +160,7 @@ export function BankIntegrationsPage() {
     setIsLoading(true)
     
     try {
-      // Call the Lean Tech authentication API
+      // Step 1: Authentication
       const authResponse = await fetch('/api/bank-integration/auth', {
         method: 'GET',
         headers: {
@@ -177,95 +168,51 @@ export function BankIntegrationsPage() {
         }
       });
       
-      // Check if authentication was successful
       if (!authResponse.ok) {
         const errorData = await authResponse.json();
         throw new Error(errorData.error || 'Authentication failed');
       }
       
       const authData = await authResponse.json();
-      
-      // Set the authentication token
       setAuthToken(authData.access_token);
-      
-      // Show app user ID popup
-      setShowAppUserIdPopup(true);
-      
-      toast({
-        title: 'Authentication Successful',
-        description: 'Please enter your App User ID',
-        status: 'success',
-        duration: 3000,
-        isClosable: true
-      });
-    } catch (error) {
-      console.error('Bank Integration Setup Error:', error);
-      
-      toast({
-        title: 'Authentication Failed',
-        description: error instanceof Error ? error.message : 'Unable to authenticate',
-        status: 'error',
-        duration: 5000,
-        isClosable: true
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
 
-  // Customer Creation Handler
-  const handleCreateCustomer = React.useCallback(async () => {
-    // Validate input
-    if (!appUserInput.trim()) {
-      toast({
-        title: 'Invalid Input',
-        description: 'Please enter a valid App User ID',
-        status: 'error',
-        duration: 3000,
-        isClosable: true
-      });
-      return;
-    }
-
-    // Ensure we have an auth token
-    if (!authToken) {
-      toast({
-        title: 'Authentication Error',
-        description: 'Please authenticate first',
-        status: 'error',
-        duration: 3000,
-        isClosable: true
-      });
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-
-      // Call customer creation API through backend route
-      const customerResponse = await fetch('/api/bank-integration/customer', {
-        method: 'POST',
+      // Step 2: Check if customer exists
+      const customerCheckResponse = await fetch(`/api/bank-integration/get-customer?app_user_id=${workspace.id}`, {
+        method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          app_user_id: appUserInput.trim()
-        })
+          'Authorization': `Bearer ${authData.access_token}`
+        }
       });
 
-      // Check if customer creation was successful
-      if (!customerResponse.ok) {
-        const errorData = await customerResponse.json();
-        throw new Error(errorData.details || 'Failed to create customer');
+      let customerData;
+      
+      if (customerCheckResponse.ok) {
+        // Customer exists, use existing customer data
+        customerData = await customerCheckResponse.json();
+        setCustomerId(customerData.customer_id);
+      } else {
+        // Customer doesn't exist, create new customer
+        const customerResponse = await fetch('/api/bank-integration/customer', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authData.access_token}`
+          },
+          body: JSON.stringify({
+            workspaceId: workspace.id
+          })
+        });
+
+        if (!customerResponse.ok) {
+          const errorData = await customerResponse.json();
+          throw new Error(errorData.details || 'Failed to create customer');
+        }
+
+        customerData = await customerResponse.json();
+        setCustomerId(customerData.customer_id);
       }
 
-      const customerData = await customerResponse.json();
-      
-      // Set customer ID
-      setCustomerId(customerData.customer_id);
-
-      // Immediately get customer access token
+      // Step 3: Get customer token (needed in both cases)
       const tokenResponse = await fetch('/api/bank-integration/customer-token', {
         method: 'POST',
         headers: {
@@ -284,10 +231,6 @@ export function BankIntegrationsPage() {
       const tokenData = await tokenResponse.json();
       setCustomerToken(tokenData.access_token);
 
-      // Close the popup
-      setShowAppUserIdPopup(false);
-
-      // Show success toast
       toast({
         title: 'Setup Complete',
         description: 'Initializing bank connection...',
@@ -297,11 +240,11 @@ export function BankIntegrationsPage() {
       });
 
     } catch (error) {
-      console.error('Setup Error:', error);
+      console.error('Bank Integration Setup Error:', error);
       
       toast({
         title: 'Setup Failed',
-        description: error instanceof Error ? error.message : 'Unable to complete setup',
+        description: error instanceof Error ? error.message : 'Unable to setup bank integration',
         status: 'error',
         duration: 5000,
         isClosable: true
@@ -309,44 +252,7 @@ export function BankIntegrationsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [authToken, appUserInput, toast]);
-
-  // App User ID Modal
-  const AppUserIdModal = React.useMemo(() => (
-    <Modal 
-      isOpen={showAppUserIdPopup} 
-      onClose={() => setShowAppUserIdPopup(false)}
-      size="sm"
-    >
-      <ModalOverlay backdropFilter="blur(4px)" />
-      <ModalContent>
-        <ModalHeader>Enter App User ID</ModalHeader>
-        <ModalCloseButton />
-        <ModalBody>
-          <VStack spacing={4}>
-            <FormControl>
-              <FormLabel>App User ID</FormLabel>
-              <Input 
-                value={appUserInput}
-                onChange={(e) => setAppUserInput(e.target.value)}
-                placeholder="Enter your unique app user ID"
-                size="lg"
-              />
-            </FormControl>
-            <Button 
-              colorScheme="blue" 
-              size="lg" 
-              width="full"
-              onClick={handleCreateCustomer}
-              isLoading={isLoading}
-            >
-              Confirm
-            </Button>
-          </VStack>
-        </ModalBody>
-      </ModalContent>
-    </Modal>
-  ), [showAppUserIdPopup, appUserInput, isLoading, handleCreateCustomer]);
+  }, [workspace.id, toast]);
 
   return (
     <Page>
@@ -368,7 +274,7 @@ export function BankIntegrationsPage() {
         description="Connect and manage your bank accounts securely"
       />
       <PageBody>
-        {/* Container for Lean SDK - positioned absolutely to handle modal overlay */}
+        {/* Container for Lean SDK */}
         <Box 
           id="lean-connect-container" 
           position="fixed"
@@ -377,10 +283,10 @@ export function BankIntegrationsPage() {
           width="100%"
           height="100%"
           zIndex="modal"
-          display="none" // Initially hidden, SDK will control visibility
+          display="none"
         />
 
-        <VStack spacing={6} align="stretch" w="full">
+        <VStack spacing={4} align="stretch">
           {authToken && (
             <Button 
               colorScheme="primary"
@@ -439,7 +345,6 @@ export function BankIntegrationsPage() {
             />
           )}
         </VStack>
-        {AppUserIdModal}
       </PageBody>
     </Page>
   )
