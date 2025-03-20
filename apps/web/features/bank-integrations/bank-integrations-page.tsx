@@ -17,6 +17,9 @@ import {
   Box,
   Text,
   Icon,
+  Image,
+  SimpleGrid,
+  Badge,
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
@@ -47,9 +50,45 @@ interface BankDetails {
   message: string;
 }
 
+interface ConnectedAccount {
+  id: string;
+  name: string;
+  type: string;
+  balance: number;
+  currency: string;
+  status: string;
+  bank: {
+    name: string;
+    logo: string;
+  };
+}
+
+interface BankPermissions {
+  identity: boolean;
+  accounts: boolean;
+  balance: boolean;
+  transactions: boolean;
+  identities: boolean;
+  scheduled_payments: boolean;
+  standing_orders: boolean;
+  direct_debits: boolean;
+  beneficiaries: boolean;
+}
+
+interface ConnectedEntity {
+  id: string;
+  customer_id: string;
+  bank_identifier: string;
+  permissions: BankPermissions;
+  bank_type: string;
+  created_at: string;
+}
+
 export function BankIntegrationsPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
+  const [connectedAccounts, setConnectedAccounts] = React.useState<ConnectedAccount[]>([])
+  const [connectedEntities, setConnectedEntities] = React.useState<ConnectedEntity[]>([])
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -254,6 +293,41 @@ export function BankIntegrationsPage() {
     }
   }, [workspace.id, toast]);
 
+  // Fetch connected banks
+  const fetchConnectedBanks = React.useCallback(async () => {
+    if (!customerId || !authToken) return;
+
+    try {
+      const response = await fetch(`/api/bank-integration/accounts?entity_id=${customerId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const data = await response.json();
+      setConnectedEntities(data || []);
+      setConnectedAccounts(data.data || []);
+    } catch (error) {
+      console.error('Error fetching connected banks:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch connected banks',
+        status: 'error',
+        duration: 5000,
+        isClosable: true
+      });
+    }
+  }, [customerId, authToken, toast]);
+
+  // Fetch connected banks when customerId changes
+  React.useEffect(() => {
+    if (customerId && authToken) {
+      fetchConnectedBanks();
+    }
+  }, [customerId, authToken, fetchConnectedBanks]);
+
   return (
     <Page>
       <PageHeader 
@@ -299,34 +373,97 @@ export function BankIntegrationsPage() {
             </Button>
           )}
 
-          {connectedBank && (
-            <Box
-              bg="gray.100"
-              p={4}
-              borderRadius="lg"
-              maxWidth="50%"
-            >
-              <HStack spacing={4}>
-                <Box
-                  bg="gray.200"
-                  p={3}
-                  borderRadius="md"
-                >
-                  <Icon as={LuWallet} boxSize={6} />
-                </Box>
-                <VStack align="start" spacing={1} flex={1}>
-                  <Text fontWeight="medium" color="gray.800">
-                    {connectedBank.bankIdentifier}
-                  </Text>
-                  <Text fontSize="sm" color="gray.600">
-                    {connectedBank.status} • {connectedBank.connectedDate}
-                  </Text>
-                </VStack>
-              </HStack>
+          {/* Display Connected Entities */}
+          {connectedEntities.length > 0 && (
+            <Box>
+              <Text fontSize="xl" fontWeight="bold" mb={4}>Connected Bank Entities</Text>
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                {connectedEntities.map((entity) => (
+                  <Box
+                    key={entity.id}
+                    bg="white"
+                    p={4}
+                    borderRadius="lg"
+                    boxShadow="sm"
+                    border="1px"
+                    borderColor="gray.200"
+                  >
+                    <VStack align="start" spacing={2}>
+                      <HStack justify="space-between" width="100%">
+                        <Badge colorScheme="blue">{entity.bank_type}</Badge>
+                        <Text fontSize="sm" color="gray.500">
+                          {new Date(entity.created_at).toLocaleDateString()}
+                        </Text>
+                      </HStack>
+                      <Text fontWeight="medium">{entity.bank_identifier}</Text>
+                      <Box>
+                        <Text fontSize="sm" fontWeight="medium" mb={1}>Permissions:</Text>
+                        <SimpleGrid columns={2} spacing={2}>
+                          {Object.entries(entity.permissions).map(([key, value]) => (
+                            <HStack key={key} spacing={1}>
+                              <Icon
+                                as={value ? LuWallet : LuWallet}
+                                color={value ? "green.500" : "red.500"}
+                              />
+                              <Text fontSize="xs" color="gray.600">
+                                {key.replace(/_/g, ' ')}
+                              </Text>
+                            </HStack>
+                          ))}
+                        </SimpleGrid>
+                      </Box>
+                    </VStack>
+                  </Box>
+                ))}
+              </SimpleGrid>
             </Box>
           )}
 
-          {!authToken && !connectedBank && (
+          {/* Keep existing Connected Banks display */}
+          {connectedAccounts.length > 0 && (
+            <Box>
+              <Text fontSize="xl" fontWeight="bold" mb={4}>Connected Banks</Text>
+              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
+                {connectedAccounts.map((account) => (
+                  <Box
+                    key={account.id}
+                    bg="white"
+                    p={4}
+                    borderRadius="lg"
+                    boxShadow="sm"
+                    border="1px"
+                    borderColor="gray.200"
+                  >
+                    <HStack spacing={4}>
+                      {account.bank.logo && (
+                        <Image
+                          src={account.bank.logo}
+                          alt={account.bank.name}
+                          width={40}
+                          height={40}
+                          borderRadius="md"
+                        />
+                      )}
+                      <VStack align="start" spacing={1}>
+                        <Text fontWeight="medium">{account.bank.name}</Text>
+                        <Text fontSize="sm" color="gray.600">{account.name}</Text>
+                        <Text fontSize="sm" color="gray.500">
+                          Balance: {account.balance} {account.currency}
+                        </Text>
+                        <Badge
+                          colorScheme={account.status === 'active' ? 'green' : 'yellow'}
+                        >
+                          {account.status}
+                        </Badge>
+                      </VStack>
+                    </HStack>
+                  </Box>
+                ))}
+              </SimpleGrid>
+            </Box>
+          )}
+
+          {!authToken && !connectedAccounts.length && !connectedEntities.length && (
             <EmptyState
               title="No bank integrations yet"
               description="Connect your bank account to get started with financial management."
