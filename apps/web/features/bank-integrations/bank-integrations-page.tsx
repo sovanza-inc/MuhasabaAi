@@ -23,6 +23,9 @@ import {
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
+// Lean Tech client ID for bank integration
+const LEAN_TECH_CLIENT_ID = '45be55bc-1025-41c5-a548-323ae5750d6c';
+
 // Define Lean SDK types
 declare global {
   interface Window {
@@ -73,9 +76,6 @@ interface ConnectedEntity {
   bank_type: string;
   created_at: string;
 }
-
-// Lean Tech client ID for bank integration
-const LEAN_TECH_CLIENT_ID = '45be55bc-1025-41c5-a548-323ae5750d6c';
 
 export function BankIntegrationsPage() {
   const toast = useToast()
