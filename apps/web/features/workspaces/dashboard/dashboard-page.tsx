@@ -108,7 +108,7 @@ export function DashboardPage(props: WorkspacePageProps) {
 
   const toolbar = (
     <Toolbar className="overview-toolbar" variant="ghost">
-      <ToolbarButton
+      {/* <ToolbarButton
         as="a"
         href="https://twitter.com/intent/tweet?text=Check%20out%20%40saas_js"
         icon={<FaXTwitter />}
@@ -119,7 +119,7 @@ export function DashboardPage(props: WorkspacePageProps) {
         href="https://linkedin.com/share"
         icon={<FaLinkedin />}
         label="Share on LinkedIn"
-      />
+      /> */}
       <ToolbarButton
         as="a"
         href="https://saas-ui.lemonsqueezy.com/checkout/buy/5c76854f-738a-46b8-b32d-932a97d477f5"
