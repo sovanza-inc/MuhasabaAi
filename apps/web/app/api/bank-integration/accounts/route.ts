@@ -19,13 +19,13 @@ export async function GET(request: NextRequest) {
 
         // Get entity_id from URL params
         const { searchParams } = new URL(request.url);
-        const entityId = searchParams.get('entity_id');
+        const customerId = searchParams.get('customer_id');
 
-        if (!entityId) {
+        if (!customerId) {
             return NextResponse.json(
                 { 
                     error: 'Failed to fetch accounts',
-                    details: 'Entity ID is required'
+                    details: 'Customer ID is required'
                 },
                 { status: 400 }
             );
@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
 
         try {
             const response = await axios.get(
-                `https://sandbox.leantech.me/customers/v1/${entityId}/entities`,
+                `https://sandbox.leantech.me/customers/v1/${customerId}/entities`,
                 {
                     headers: {
                         'Authorization': `Bearer ${authToken}`,

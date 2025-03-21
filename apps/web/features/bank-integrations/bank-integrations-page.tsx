@@ -17,9 +17,15 @@ import {
   Box,
   Text,
   Icon,
-  Image,
   SimpleGrid,
   Badge,
+  Spinner,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
@@ -43,19 +49,6 @@ declare global {
   }
 }
 
-interface ConnectedAccount {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
-  currency: string;
-  status: string;
-  bank: {
-    name: string;
-    logo: string;
-  };
-}
-
 interface BankPermissions {
   identity: boolean;
   accounts: boolean;
@@ -77,11 +70,44 @@ interface ConnectedEntity {
   created_at: string;
 }
 
+interface BankBalance {
+  account_id: string;
+  balance: number;
+  currency: string;
+  type: string;
+  credit_debit_indicator?: string;
+  updated_at: string;
+}
+
+interface BankAccount {
+  id?: string;
+  account_id: string;
+  status: string;
+  status_update_date_time: string | null;
+  currency: string;
+  account_type?: string;
+  account_sub_type?: string;
+  nickname?: string;
+  opening_date?: string | null;
+  account?: Array<{
+    scheme_name: string;
+    identification: string;
+    name: string | null;
+  }>;
+  servicer?: any;
+  description?: string;
+  maturity_date?: string | null;
+  regional_data?: any;
+}
+
 export function BankIntegrationsPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
-  const [connectedAccounts, setConnectedAccounts] = React.useState<ConnectedAccount[]>([])
   const [connectedEntities, setConnectedEntities] = React.useState<ConnectedEntity[]>([])
+  const [selectedBank, setSelectedBank] = React.useState<ConnectedEntity | null>(null);
+  const [isBalanceLoading, setIsBalanceLoading] = React.useState(false);
+  const [bankBalance, setBankBalance] = React.useState<BankBalance | null>(null);
+  const [selectedAccount, setSelectedAccount] = React.useState<BankAccount | null>(null);
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -279,7 +305,7 @@ export function BankIntegrationsPage() {
     if (!customerId || !authToken) return;
 
     try {
-      const response = await fetch(`/api/bank-integration/accounts?entity_id=${customerId}`, {
+      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
         method: 'GET',
         headers: {
           'Accept': 'application/json',
@@ -289,7 +315,6 @@ export function BankIntegrationsPage() {
 
       const data = await response.json();
       setConnectedEntities(data || []);
-      setConnectedAccounts(data.data || []);
     } catch (error) {
       console.error('Error fetching connected banks:', error);
       toast({
@@ -308,6 +333,120 @@ export function BankIntegrationsPage() {
       fetchConnectedBanks();
     }
   }, [customerId, authToken, fetchConnectedBanks]);
+
+  const handleBankSelect = React.useCallback(async (bank: ConnectedEntity) => {
+    setSelectedBank(bank);
+    setIsBalanceLoading(true);
+    setBankBalance(null);
+    setSelectedAccount(null);
+
+    try {
+      console.log(`Fetching accounts for entity: ${bank.id}`);
+      const accountsResponse = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${bank.id}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const accountsData = await accountsResponse.json();
+      console.log('Accounts API response:', accountsData);
+      
+      if (accountsResponse.ok) {
+        // Check if the data is an array, otherwise look for a data property that might contain the array
+        const accounts = Array.isArray(accountsData) ? accountsData : 
+                        (accountsData.data && Array.isArray(accountsData.data) ? accountsData.data : 
+                        (accountsData.accounts && Array.isArray(accountsData.accounts) ? accountsData.accounts : []));
+        
+        console.log('Processed accounts:', accounts);
+        
+        // If accounts are found, select the first one and fetch its balance
+        if (accounts.length > 0) {
+          const firstAccount = accounts[0];
+          setSelectedAccount(firstAccount);
+          
+          // Use account_id if available, otherwise use id
+          const accountId = firstAccount.account_id || firstAccount.id;
+          
+          // Now fetch the balance using both account_id and entity_id
+          await fetchBalanceForAccount(accountId, bank.id);
+        } else {
+          toast({
+            title: 'No Accounts Found',
+            description: 'No bank accounts were found for this entity',
+            status: 'info',
+            duration: 5000,
+            isClosable: true,
+          });
+          setIsBalanceLoading(false);
+        }
+      } else {
+        console.error('Error fetching accounts:', accountsData);
+        toast({
+          title: 'Error',
+          description: accountsData.details?.message || accountsData.details || 'Failed to fetch bank accounts',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsBalanceLoading(false);
+      }
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch bank accounts',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      setIsBalanceLoading(false);
+    }
+  }, [authToken, toast]);
+
+  const fetchBalanceForAccount = React.useCallback(async (accountId: string, entityId: string) => {
+    if (!accountId || !entityId) {
+      console.error('Missing required parameters for balance fetch', { accountId, entityId });
+      setIsBalanceLoading(false);
+      return;
+    }
+    
+    try {
+      console.log(`Fetching balance for account: ${accountId} with entity: ${entityId}`);
+      const response = await fetch(`/api/bank-integration/balance?account_id=${accountId}&entity_id=${entityId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const data = await response.json();
+      console.log('Balance API response:', data);
+      
+      if (response.ok) {
+        setBankBalance(data);
+      } else {
+        toast({
+          title: 'Error',
+          description: data.details || 'Failed to fetch bank balance',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching bank balance:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch bank balance',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsBalanceLoading(false);
+    }
+  }, [authToken, toast]);
 
   return (
     <Page>
@@ -368,6 +507,9 @@ export function BankIntegrationsPage() {
                     boxShadow="sm"
                     border="1px"
                     borderColor="gray.200"
+                    cursor="pointer"
+                    onClick={() => handleBankSelect(entity)}
+                    _hover={{ borderColor: 'blue.500' }}
                   >
                     <VStack align="start" spacing={2}>
                       <HStack justify="space-between" width="100%">
@@ -400,51 +542,7 @@ export function BankIntegrationsPage() {
             </Box>
           )}
 
-          {/* Keep existing Connected Banks display */}
-          {connectedAccounts.length > 0 && (
-            <Box>
-              <Text fontSize="xl" fontWeight="bold" mb={4}>Connected Banks</Text>
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                {connectedAccounts.map((account) => (
-                  <Box
-                    key={account.id}
-                    bg="white"
-                    p={4}
-                    borderRadius="lg"
-                    boxShadow="sm"
-                    border="1px"
-                    borderColor="gray.200"
-                  >
-                    <HStack spacing={4}>
-                      {account.bank.logo && (
-                        <Image
-                          src={account.bank.logo}
-                          alt={account.bank.name}
-                          width={40}
-                          height={40}
-                          borderRadius="md"
-                        />
-                      )}
-                      <VStack align="start" spacing={1}>
-                        <Text fontWeight="medium">{account.bank.name}</Text>
-                        <Text fontSize="sm" color="gray.600">{account.name}</Text>
-                        <Text fontSize="sm" color="gray.500">
-                          Balance: {account.balance} {account.currency}
-                        </Text>
-                        <Badge
-                          colorScheme={account.status === 'active' ? 'green' : 'yellow'}
-                        >
-                          {account.status}
-                        </Badge>
-                      </VStack>
-                    </HStack>
-                  </Box>
-                ))}
-              </SimpleGrid>
-            </Box>
-          )}
-
-          {!authToken && !connectedAccounts.length && !connectedEntities.length && (
+          {!authToken && !connectedEntities.length && (
             <EmptyState
               title="No bank integrations yet"
               description="Connect your bank account to get started with financial management."
@@ -463,6 +561,164 @@ export function BankIntegrationsPage() {
             />
           )}
         </VStack>
+
+        {/* Bank Balance Drawer */}
+        <Drawer
+          isOpen={!!selectedBank}
+          onClose={() => setSelectedBank(null)}
+          placement="right"
+          size="md"
+        >
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader>
+              Bank Details - {selectedBank?.bank_identifier}
+            </DrawerHeader>
+            <DrawerBody>
+              <VStack spacing={4} align="stretch">
+                {/* Balance Information Section */}
+                <Box>
+                  <Text fontSize="lg" fontWeight="medium" mb={3}>Balance Information</Text>
+                  {isBalanceLoading ? (
+                    <Box textAlign="center" py={4}>
+                      <Spinner size="md" />
+                      <Text mt={2}>Loading balance...</Text>
+                    </Box>
+                  ) : bankBalance ? (
+                    <Box
+                      p={5}
+                      bg="white"
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor="gray.200"
+                    >
+                      <VStack spacing={4} align="start">
+                        <Text fontSize="sm" color="gray.600">Account Balance</Text>
+                        <HStack spacing={2} align="center">
+                          <Icon as={LuWallet} boxSize={6} color="blue.500" />
+                          <Text fontSize="2xl" fontWeight="bold">
+                            {typeof bankBalance.balance === 'number' 
+                              ? bankBalance.balance.toLocaleString(undefined, {
+                                  minimumFractionDigits: 2,
+                                  maximumFractionDigits: 2
+                                }) 
+                              : bankBalance.balance} {bankBalance.currency}
+                          </Text>
+                        </HStack>
+                        <Box width="100%">
+                          <Text fontSize="xs" color="gray.500">
+                            Last updated: {new Date(bankBalance.updated_at).toLocaleString()}
+                          </Text>
+                        </Box>
+                      </VStack>
+                    </Box>
+                  ) : (
+                    <EmptyState
+                      title="No balance information"
+                      description="Unable to fetch balance information for this account."
+                      icon={LuWallet}
+                    />
+                  )}
+                </Box>
+
+                {/* Account Details Section */}
+                {selectedAccount && (
+                  <Box mt={4}>
+                    <Text fontSize="lg" fontWeight="medium" mb={3}>Account Details</Text>
+                    <Box
+                      p={4}
+                      bg="white"
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor="gray.200"
+                    >
+                      <SimpleGrid columns={2} spacing={4}>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Account ID</Text>
+                          <Text fontSize="sm" fontFamily="mono">
+                            {selectedAccount.account_id}
+                          </Text>
+                        </Box>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Currency</Text>
+                          <Text fontSize="sm">
+                            {selectedAccount.currency}
+                          </Text>
+                        </Box>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Status</Text>
+                          <Badge colorScheme={selectedAccount.status === "ENABLED" ? "green" : "yellow"}>
+                            {selectedAccount.status}
+                          </Badge>
+                        </Box>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Account Type</Text>
+                          <Text fontSize="sm">
+                            {selectedAccount.account_type || "N/A"}
+                          </Text>
+                        </Box>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Account Sub Type</Text>
+                          <Text fontSize="sm">
+                            {selectedAccount.account_sub_type || "N/A"}
+                          </Text>
+                        </Box>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Nickname</Text>
+                          <Text fontSize="sm">
+                            {selectedAccount.nickname || "N/A"}
+                          </Text>
+                        </Box>
+                        <Box>
+                          <Text fontSize="xs" color="gray.500">Description</Text>
+                          <Text fontSize="sm">
+                            {selectedAccount.description || "N/A"}
+                          </Text>
+                        </Box>
+                      </SimpleGrid>
+                      
+                      {/* Account Numbers */}
+                      {selectedAccount.account && selectedAccount.account.length > 0 && (
+                        <Box mt={4}>
+                          <Text fontSize="sm" fontWeight="medium" mb={2}>Account Numbers</Text>
+                          <VStack align="start" spacing={2}>
+                            {selectedAccount.account.map((acc, index) => {
+                              if (acc.scheme_name === "IBAN") {
+                                return (
+                                  <Box key={index} width="100%">
+                                    <Text fontSize="xs" color="gray.500">IBAN</Text>
+                                    <Text fontSize="sm" fontFamily="mono">{acc.identification}</Text>
+                                  </Box>
+                                );
+                              }
+                              if (acc.scheme_name === "BBAN") {
+                                return (
+                                  <Box key={index} width="100%">
+                                    <Text fontSize="xs" color="gray.500">BBAN</Text>
+                                    <Text fontSize="sm" fontFamily="mono">{acc.identification}</Text>
+                                  </Box>
+                                );
+                              }
+                              return (
+                                <Box key={index} width="100%">
+                                  <Text fontSize="xs" color="gray.500">{acc.scheme_name}</Text>
+                                  <Text fontSize="sm" fontFamily="mono">{acc.identification}</Text>
+                                </Box>
+                              );
+                            })}
+                          </VStack>
+                        </Box>
+                      )}
+                    </Box>
+                  </Box>
+                )}
+              </VStack>
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
       </PageBody>
     </Page>
   )
