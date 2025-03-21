@@ -100,6 +100,21 @@ interface BankAccount {
   regional_data?: any;
 }
 
+interface BankTransaction {
+  transaction_id: string;
+  account_id: string;
+  transaction_information: string;
+  transaction_reference: string | null;
+  amount: {
+    amount: number;
+    currency: string;
+  };
+  credit_debit_indicator: string;
+  status: string;
+  booking_date_time: string;
+  value_date_time: string;
+}
+
 export function BankIntegrationsPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
@@ -108,6 +123,8 @@ export function BankIntegrationsPage() {
   const [isBalanceLoading, setIsBalanceLoading] = React.useState(false);
   const [bankBalance, setBankBalance] = React.useState<BankBalance | null>(null);
   const [selectedAccount, setSelectedAccount] = React.useState<BankAccount | null>(null);
+  const [transactions, setTransactions] = React.useState<BankTransaction[]>([]);
+  const [isTransactionsLoading, setIsTransactionsLoading] = React.useState(false);
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -334,76 +351,6 @@ export function BankIntegrationsPage() {
     }
   }, [customerId, authToken, fetchConnectedBanks]);
 
-  const handleBankSelect = React.useCallback(async (bank: ConnectedEntity) => {
-    setSelectedBank(bank);
-    setIsBalanceLoading(true);
-    setBankBalance(null);
-    setSelectedAccount(null);
-
-    try {
-      console.log(`Fetching accounts for entity: ${bank.id}`);
-      const accountsResponse = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${bank.id}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
-
-      const accountsData = await accountsResponse.json();
-      console.log('Accounts API response:', accountsData);
-      
-      if (accountsResponse.ok) {
-        // Check if the data is an array, otherwise look for a data property that might contain the array
-        const accounts = Array.isArray(accountsData) ? accountsData : 
-                        (accountsData.data && Array.isArray(accountsData.data) ? accountsData.data : 
-                        (accountsData.accounts && Array.isArray(accountsData.accounts) ? accountsData.accounts : []));
-        
-        console.log('Processed accounts:', accounts);
-        
-        // If accounts are found, select the first one and fetch its balance
-        if (accounts.length > 0) {
-          const firstAccount = accounts[0];
-          setSelectedAccount(firstAccount);
-          
-          // Use account_id if available, otherwise use id
-          const accountId = firstAccount.account_id || firstAccount.id;
-          
-          // Now fetch the balance using both account_id and entity_id
-          await fetchBalanceForAccount(accountId, bank.id);
-        } else {
-          toast({
-            title: 'No Accounts Found',
-            description: 'No bank accounts were found for this entity',
-            status: 'info',
-            duration: 5000,
-            isClosable: true,
-          });
-          setIsBalanceLoading(false);
-        }
-      } else {
-        console.error('Error fetching accounts:', accountsData);
-        toast({
-          title: 'Error',
-          description: accountsData.details?.message || accountsData.details || 'Failed to fetch bank accounts',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-        setIsBalanceLoading(false);
-      }
-    } catch (error) {
-      console.error('Error fetching bank accounts:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch bank accounts',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      setIsBalanceLoading(false);
-    }
-  }, [authToken, toast]);
-
   const fetchBalanceForAccount = React.useCallback(async (accountId: string, entityId: string) => {
     if (!accountId || !entityId) {
       console.error('Missing required parameters for balance fetch', { accountId, entityId });
@@ -447,6 +394,124 @@ export function BankIntegrationsPage() {
       setIsBalanceLoading(false);
     }
   }, [authToken, toast]);
+
+  const fetchTransactionsForAccount = React.useCallback(async (accountId: string, entityId: string) => {
+    if (!accountId || !entityId) {
+      console.error('Missing required parameters for transactions fetch', { accountId, entityId });
+      return;
+    }
+    
+    setIsTransactionsLoading(true);
+    
+    try {
+      console.log(`Fetching transactions for account: ${accountId} with entity: ${entityId}`);
+      const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const data = await response.json();
+      
+      if (response.ok && data.transactions) {
+        setTransactions(data.transactions);
+      } else {
+        toast({
+          title: 'Error',
+          description: data.details || 'Failed to fetch transactions',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching bank transactions:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch transactions',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    } finally {
+      setIsTransactionsLoading(false);
+    }
+  }, [authToken, toast]);
+
+  const handleBankSelect = React.useCallback(async (bank: ConnectedEntity) => {
+    setSelectedBank(bank);
+    setIsBalanceLoading(true);
+    setBankBalance(null);
+    setSelectedAccount(null);
+    setTransactions([]);
+
+    try {
+      console.log(`Fetching accounts for entity: ${bank.id}`);
+      const accountsResponse = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${bank.id}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const accountsData = await accountsResponse.json();
+      console.log('Accounts API response:', accountsData);
+      
+      if (accountsResponse.ok) {
+        const accounts = Array.isArray(accountsData) ? accountsData : 
+                        (accountsData.data && Array.isArray(accountsData.data) ? accountsData.data : 
+                        (accountsData.accounts && Array.isArray(accountsData.accounts) ? accountsData.accounts : []));
+        
+        console.log('Processed accounts:', accounts);
+        
+        if (accounts.length > 0) {
+          const firstAccount = accounts[0];
+          setSelectedAccount(firstAccount);
+          
+          const accountId = firstAccount.account_id || firstAccount.id;
+          
+          // Fetch both balance and transactions
+          await Promise.all([
+            fetchBalanceForAccount(accountId, bank.id),
+            fetchTransactionsForAccount(accountId, bank.id)
+          ]);
+        } else {
+          toast({
+            title: 'No Accounts Found',
+            description: 'No bank accounts were found for this entity',
+            status: 'info',
+            duration: 5000,
+            isClosable: true,
+          });
+          setIsBalanceLoading(false);
+          setIsTransactionsLoading(false);
+        }
+      } else {
+        console.error('Error fetching accounts:', accountsData);
+        toast({
+          title: 'Error',
+          description: accountsData.details?.message || accountsData.details || 'Failed to fetch bank accounts',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+        setIsBalanceLoading(false);
+        setIsTransactionsLoading(false);
+      }
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch bank accounts',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      setIsBalanceLoading(false);
+      setIsTransactionsLoading(false);
+    }
+  }, [authToken, toast, fetchBalanceForAccount, fetchTransactionsForAccount]);
 
   return (
     <Page>
@@ -715,6 +780,79 @@ export function BankIntegrationsPage() {
                     </Box>
                   </Box>
                 )}
+
+                {/* Transactions Section */}
+                <Box mt={4}>
+                  <Text fontSize="lg" fontWeight="medium" mb={3}>Recent Transactions</Text>
+                  {isTransactionsLoading ? (
+                    <Box textAlign="center" py={4}>
+                      <Spinner size="md" />
+                      <Text mt={2}>Loading transactions...</Text>
+                    </Box>
+                  ) : transactions.length > 0 ? (
+                    <Box
+                      maxH="400px"
+                      overflowY="auto"
+                      bg="white"
+                      borderRadius="lg"
+                      boxShadow="sm"
+                      border="1px"
+                      borderColor="gray.200"
+                    >
+                      <VStack spacing={0} align="stretch">
+                        {transactions.map((transaction, index) => (
+                          <Box
+                            key={transaction.transaction_id}
+                            p={4}
+                            borderBottomWidth={index < transactions.length - 1 ? 1 : 0}
+                            borderColor="gray.100"
+                          >
+                            <HStack justify="space-between" align="start">
+                              <VStack align="start" spacing={1}>
+                                <Text fontSize="sm" fontWeight="medium">
+                                  {transaction.transaction_information}
+                                </Text>
+                                <Text fontSize="xs" color="gray.500">
+                                  {new Date(transaction.booking_date_time).toLocaleString()}
+                                </Text>
+                                {transaction.transaction_reference && (
+                                  <Text fontSize="xs" color="gray.500">
+                                    Ref: {transaction.transaction_reference}
+                                  </Text>
+                                )}
+                              </VStack>
+                              <Box textAlign="right">
+                                <Text
+                                  fontSize="sm"
+                                  fontWeight="medium"
+                                  color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}
+                                >
+                                  {transaction.credit_debit_indicator === 'CREDIT' ? '+' : '-'}
+                                  {transaction.amount.amount.toLocaleString(undefined, {
+                                    minimumFractionDigits: 2,
+                                    maximumFractionDigits: 2
+                                  })} {transaction.amount.currency}
+                                </Text>
+                                <Badge
+                                  size="sm"
+                                  colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
+                                >
+                                  {transaction.status}
+                                </Badge>
+                              </Box>
+                            </HStack>
+                          </Box>
+                        ))}
+                      </VStack>
+                    </Box>
+                  ) : (
+                    <EmptyState
+                      title="No transactions"
+                      description="No recent transactions found for this account."
+                      icon={LuWallet}
+                    />
+                  )}
+                </Box>
               </VStack>
             </DrawerBody>
           </DrawerContent>
