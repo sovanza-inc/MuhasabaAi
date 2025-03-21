@@ -23,8 +23,6 @@ import {
   ToolbarButton,
 } from '@saas-ui-pro/react'
 import { LoadingOverlay, LoadingSpinner } from '@saas-ui/react'
-import { FaXTwitter } from 'react-icons/fa6'
-import { FaLinkedin } from 'react-icons/fa'
 import { LuChevronRight } from 'react-icons/lu'
 
 import {
