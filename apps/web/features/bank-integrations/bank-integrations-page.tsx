@@ -17,7 +17,6 @@ import {
   Box,
   Text,
   Icon,
-  Image,
   SimpleGrid,
   Badge,
   Spinner,
@@ -48,19 +47,6 @@ declare global {
       }) => void;
     };
   }
-}
-
-interface ConnectedAccount {
-  id: string;
-  name: string;
-  type: string;
-  balance: number;
-  currency: string;
-  status: string;
-  bank: {
-    name: string;
-    logo: string;
-  };
 }
 
 interface BankPermissions {
