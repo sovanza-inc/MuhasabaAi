@@ -250,6 +250,16 @@ export default function TransactionPage() {
     }, { income: 0, spent: 0 })
   }, [filteredTransactions])
 
+  // Format value for chart tooltips and axis labels
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`
+    }
+    return `$${value.toFixed(0)}`
+  }
+
   // Prepare chart data from filtered transactions
   const getChartData = () => {
     const monthlyData = filteredTransactions.reduce((acc: any, transaction) => {
@@ -281,24 +291,14 @@ export default function TransactionPage() {
       months.push(monthYear)
     }
     
-    return {
-      area: months.map(month => ({
-        month,
-        income: monthlyData[month].income || 0
-      })),
-      bar: months.map(month => ({
-        month,
-        spending: monthlyData[month].spending || 0
-      }))
-    }
+    return months.map(month => ({
+      month,
+      income: monthlyData[month].income || 0,
+      spending: monthlyData[month].spending || 0
+    }))
   }
 
   const chartData = getChartData()
-
-  // Format value for chart tooltips
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-  }
 
   return (
     <SaasProvider>
@@ -351,41 +351,45 @@ export default function TransactionPage() {
               <>
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="160px">
-                      <Text fontSize="sm" fontWeight="medium" mb={2}>Monthly Income Trend</Text>
-                      <AreaChart
-                        data={chartData.area}
-                        categories={['income']}
-                        index="month"
-                        height="130px"
-                        valueFormatter={formatCurrency}
-                        showLegend={false}
-                        showGrid={true}
-                        showYAxis={true}
-                        colors={['#4299E1']}
-                      />
+                    <CardBody height="240px" p={4}>
+                      <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Trends</Text>
+                      <Box height="195px">
+                        <AreaChart
+                          data={chartData}
+                          categories={['income', 'spending']}
+                          index="month"
+                          height="195px"
+                          valueFormatter={formatCurrency}
+                          showLegend={true}
+                          showGrid={true}
+                          showYAxis={true}
+                          colors={['#4299E1', '#F56565']}
+                        />
+                      </Box>
                     </CardBody>
                   </Card>
 
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="160px">
-                      <Text fontSize="sm" fontWeight="medium" mb={2}>Monthly Spending</Text>
-                      <BarChart
-                        data={chartData.bar}
-                        categories={['spending']}
-                        index="month"
-                        height="130px"
-                        valueFormatter={formatCurrency}
-                        showLegend={false}
-                        showGrid={true}
-                        showYAxis={true}
-                        colors={['#48BB78']}
-                      />
+                    <CardBody height="240px" p={4}>
+                      <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Comparison</Text>
+                      <Box height="195px">
+                        <BarChart
+                          data={chartData}
+                          categories={['income', 'spending']}
+                          index="month"
+                          height="195px"
+                          valueFormatter={formatCurrency}
+                          showLegend={true}
+                          showGrid={true}
+                          showYAxis={true}
+                          colors={['#48BB78', '#F56565']}
+                        />
+                      </Box>
                     </CardBody>
                   </Card>
 
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="160px" display="flex" alignItems="center">
+                    <CardBody height="240px" p={4} display="flex" alignItems="center">
                       <Box width="100%">
                         <Text fontSize="md" fontWeight="medium" mb={3}>
                           Total Spent: <Text as="span" color="gray.600">
