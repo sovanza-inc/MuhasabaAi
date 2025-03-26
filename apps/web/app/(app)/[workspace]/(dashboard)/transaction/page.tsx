@@ -250,6 +250,16 @@ export default function TransactionPage() {
     }, { income: 0, spent: 0 })
   }, [filteredTransactions])
 
+  // Format value for chart tooltips and axis labels
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`
+    }
+    return `$${value.toFixed(0)}`
+  }
+
   // Prepare chart data from filtered transactions
   const getChartData = () => {
     const monthlyData = filteredTransactions.reduce((acc: any, transaction) => {
@@ -289,11 +299,6 @@ export default function TransactionPage() {
   }
 
   const chartData = getChartData()
-
-  // Format value for chart tooltips
-  const formatCurrency = (value: number) => {
-    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
-  }
 
   return (
     <SaasProvider>
@@ -346,51 +351,45 @@ export default function TransactionPage() {
               <>
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="200px" p={4}>
+                    <CardBody height="240px" p={4}>
                       <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Trends</Text>
-                      <Box height="155px" pl={4}>
+                      <Box height="195px">
                         <AreaChart
                           data={chartData}
                           categories={['income', 'spending']}
                           index="month"
-                          height="155px"
+                          height="195px"
                           valueFormatter={formatCurrency}
                           showLegend={true}
                           showGrid={true}
                           showYAxis={true}
                           colors={['#4299E1', '#F56565']}
-                          minValue={0}
-                          yAxisWidth={75}
-                          margin={{ top: 20, right: 10, bottom: 20, left: 10 }}
                         />
                       </Box>
                     </CardBody>
                   </Card>
 
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="200px" p={4}>
+                    <CardBody height="240px" p={4}>
                       <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Comparison</Text>
-                      <Box height="155px" pl={4}>
+                      <Box height="195px">
                         <BarChart
                           data={chartData}
                           categories={['income', 'spending']}
                           index="month"
-                          height="155px"
+                          height="195px"
                           valueFormatter={formatCurrency}
                           showLegend={true}
                           showGrid={true}
                           showYAxis={true}
                           colors={['#48BB78', '#F56565']}
-                          minValue={0}
-                          yAxisWidth={75}
-                          margin={{ top: 20, right: 10, bottom: 20, left: 10 }}
                         />
                       </Box>
                     </CardBody>
                   </Card>
 
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="200px" p={4} display="flex" alignItems="center">
+                    <CardBody height="240px" p={4} display="flex" alignItems="center">
                       <Box width="100%">
                         <Text fontSize="md" fontWeight="medium" mb={3}>
                           Total Spent: <Text as="span" color="gray.600">
