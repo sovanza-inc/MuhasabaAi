@@ -281,16 +281,11 @@ export default function TransactionPage() {
       months.push(monthYear)
     }
     
-    return {
-      area: months.map(month => ({
-        month,
-        income: monthlyData[month].income || 0
-      })),
-      bar: months.map(month => ({
-        month,
-        spending: monthlyData[month].spending || 0
-      }))
-    }
+    return months.map(month => ({
+      month,
+      income: monthlyData[month].income || 0,
+      spending: monthlyData[month].spending || 0
+    }))
   }
 
   const chartData = getChartData()
@@ -351,41 +346,51 @@ export default function TransactionPage() {
               <>
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="160px">
-                      <Text fontSize="sm" fontWeight="medium" mb={2}>Monthly Income Trend</Text>
-                      <AreaChart
-                        data={chartData.area}
-                        categories={['income']}
-                        index="month"
-                        height="130px"
-                        valueFormatter={formatCurrency}
-                        showLegend={false}
-                        showGrid={true}
-                        showYAxis={true}
-                        colors={['#4299E1']}
-                      />
+                    <CardBody height="200px" p={4}>
+                      <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Trends</Text>
+                      <Box height="155px" pl={4}>
+                        <AreaChart
+                          data={chartData}
+                          categories={['income', 'spending']}
+                          index="month"
+                          height="155px"
+                          valueFormatter={formatCurrency}
+                          showLegend={true}
+                          showGrid={true}
+                          showYAxis={true}
+                          colors={['#4299E1', '#F56565']}
+                          minValue={0}
+                          yAxisWidth={75}
+                          margin={{ top: 20, right: 10, bottom: 20, left: 10 }}
+                        />
+                      </Box>
                     </CardBody>
                   </Card>
 
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="160px">
-                      <Text fontSize="sm" fontWeight="medium" mb={2}>Monthly Spending</Text>
-                      <BarChart
-                        data={chartData.bar}
-                        categories={['spending']}
-                        index="month"
-                        height="130px"
-                        valueFormatter={formatCurrency}
-                        showLegend={false}
-                        showGrid={true}
-                        showYAxis={true}
-                        colors={['#48BB78']}
-                      />
+                    <CardBody height="200px" p={4}>
+                      <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Comparison</Text>
+                      <Box height="155px" pl={4}>
+                        <BarChart
+                          data={chartData}
+                          categories={['income', 'spending']}
+                          index="month"
+                          height="155px"
+                          valueFormatter={formatCurrency}
+                          showLegend={true}
+                          showGrid={true}
+                          showYAxis={true}
+                          colors={['#48BB78', '#F56565']}
+                          minValue={0}
+                          yAxisWidth={75}
+                          margin={{ top: 20, right: 10, bottom: 20, left: 10 }}
+                        />
+                      </Box>
                     </CardBody>
                   </Card>
 
                   <Card variant="unstyled" bg="white">
-                    <CardBody height="160px" display="flex" alignItems="center">
+                    <CardBody height="200px" p={4} display="flex" alignItems="center">
                       <Box width="100%">
                         <Text fontSize="md" fontWeight="medium" mb={3}>
                           Total Spent: <Text as="span" color="gray.600">
