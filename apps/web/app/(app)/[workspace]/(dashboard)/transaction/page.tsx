@@ -26,14 +26,6 @@ interface BankTransaction {
   value_date_time: string;
 }
 
-interface BankAccount {
-  id?: string;
-  account_id: string;
-  status: string;
-  bank_id?: string;
-  bank_name?: string;
-}
-
 interface Bank {
   id: string;
   bank_identifier: string;
@@ -53,8 +45,6 @@ export default function TransactionPage() {
   const [transactions, setTransactions] = React.useState<TransactionWithBank[]>([])
   const [authToken, setAuthToken] = React.useState<string | null>(null)
   const [customerId, setCustomerId] = React.useState<string | null>(null)
-  const [totalSpent, setTotalSpent] = React.useState(0)
-  const [totalIncome, setTotalIncome] = React.useState(0)
   const [connectedBanks, setConnectedBanks] = React.useState<Bank[]>([])
   const [selectedBankId, setSelectedBankId] = React.useState<string>('all')
 
@@ -194,8 +184,6 @@ export default function TransactionPage() {
       try {
         const connectedBanks = await fetchConnectedBanks()
         let allTransactions: TransactionWithBank[] = []
-        let totalIncome = 0
-        let totalSpent = 0
         
         for (const bank of connectedBanks) {
           const accounts = await fetchAccountsForBank(bank.id)
@@ -208,15 +196,6 @@ export default function TransactionPage() {
               bank_id: bank.id
             }))
             
-            // Calculate totals
-            transactionsWithBank.forEach((transaction: TransactionWithBank) => {
-              if (transaction.credit_debit_indicator === 'CREDIT') {
-                totalIncome += transaction.amount.amount
-              } else {
-                totalSpent += transaction.amount.amount
-              }
-            })
-            
             allTransactions = [...allTransactions, ...transactionsWithBank]
           }
         }
@@ -227,8 +206,6 @@ export default function TransactionPage() {
         )
 
         setTransactions(allTransactions)
-        setTotalIncome(totalIncome)
-        setTotalSpent(totalSpent)
       } catch (error) {
         console.error('Error fetching all transactions:', error)
         toast({
@@ -292,21 +269,36 @@ export default function TransactionPage() {
       return acc
     }, {})
 
-    const months = Object.keys(monthlyData).slice(-6) // Last 6 months
+    // Ensure we have at least 6 months of data points
+    const now = new Date()
+    const months = []
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
+      const monthYear = date.toLocaleString('default', { month: 'short' }) + ' ' + date.getFullYear()
+      if (!monthlyData[monthYear]) {
+        monthlyData[monthYear] = { income: 0, spending: 0 }
+      }
+      months.push(monthYear)
+    }
     
     return {
       area: months.map(month => ({
         month,
-        value: monthlyData[month].income
+        income: monthlyData[month].income || 0
       })),
       bar: months.map(month => ({
         month,
-        amount: monthlyData[month].spending
+        spending: monthlyData[month].spending || 0
       }))
     }
   }
 
   const chartData = getChartData()
+
+  // Format value for chart tooltips
+  const formatCurrency = (value: number) => {
+    return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+  }
 
   return (
     <SaasProvider>
@@ -360,22 +352,33 @@ export default function TransactionPage() {
                 <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
                   <Card variant="unstyled" bg="white">
                     <CardBody height="160px">
+                      <Text fontSize="sm" fontWeight="medium" mb={2}>Monthly Income Trend</Text>
                       <AreaChart
                         data={chartData.area}
-                        categories={['value']}
+                        categories={['income']}
                         index="month"
-                        height="150px"
+                        height="130px"
+                        valueFormatter={formatCurrency}
+                        showLegend={false}
+                        showGrid={true}
+                        showYAxis={true}
+                        colors={['#4299E1']}
                       />
                     </CardBody>
                   </Card>
 
                   <Card variant="unstyled" bg="white">
                     <CardBody height="160px">
+                      <Text fontSize="sm" fontWeight="medium" mb={2}>Monthly Spending</Text>
                       <BarChart
                         data={chartData.bar}
-                        categories={['amount']}
+                        categories={['spending']}
                         index="month"
-                        height="150px"
+                        height="130px"
+                        valueFormatter={formatCurrency}
+                        showLegend={false}
+                        showGrid={true}
+                        showYAxis={true}
                         colors={['#48BB78']}
                       />
                     </CardBody>
