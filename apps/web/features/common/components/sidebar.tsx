@@ -47,6 +47,7 @@ import {
   LuTrendingUp,
   LuClipboardList,
   LuChartPie,
+  LuInbox,
 } from 'react-icons/lu'
 import { FaChevronDown, FaChevronUp } from 'react-icons/fa' // Import arrow icons
 
@@ -150,7 +151,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 icon={<LuHouse />}
                 hotkey="navigation.dashboard"
               />
-              {/* <AppSidebarLink
+              <AppSidebarLink
                 href={usePath('inbox')}
                 isActive={useActivePath('inbox', { end: false })}
                 label="Inbox"
@@ -158,13 +159,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 icon={<LuInbox />}
                 hotkey="navigation.inbox"
               />
-              <AppSidebarLink
-                href={usePath('contacts')}
-                isActive={useActivePath('contacts', { end: false })}
-                label="Contacts"
-                icon={<LuSquareUser />}
-                hotkey="navigation.contacts"
-              /> */}
+
               <AppSidebarLink
                 href={usePath('bank-integrations')}
                 isActive={useActivePath('bank-integrations', { end: false })}

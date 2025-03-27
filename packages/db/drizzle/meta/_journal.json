@@ -8,6 +8,13 @@
       "when": 1735855349181,
       "tag": "0000_certain_daimon_hellstrom",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1743094325249,
+      "tag": "0001_familiar_guardian",
+      "breakpoints": true
     }
   ]
 }
