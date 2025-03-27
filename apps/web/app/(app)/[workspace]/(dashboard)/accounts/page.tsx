@@ -280,46 +280,46 @@ export default function AccountsPage() {
             {bankAccounts.map((bank) => (
               <Box key={bank.id}>
                 <Heading size="md" mb={4} color="gray.700">{bank.name}</Heading>
-                <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
+        <SimpleGrid columns={{ base: 1, lg: 2 }} spacing={4}>
                   {bank.accounts.map((account) => (
-                    <Card 
+            <Card 
                       key={account.account_id}
-                      borderRadius="lg"
-                      border="1px solid"
-                      borderColor="gray.100"
-                      boxShadow="sm"
-                      position="relative"
-                      overflow="hidden"
-                      _after={{
-                        content: '""',
-                        position: 'absolute',
-                        bottom: 0,
-                        left: 0,
-                        right: 0,
-                        height: '2px',
-                        bgColor: 'green.400'
-                      }}
-                    >
-                      <CardBody py={4} px={6}>
+              borderRadius="lg"
+              border="1px solid"
+              borderColor="gray.100"
+              boxShadow="sm"
+              position="relative"
+              overflow="hidden"
+              _after={{
+                content: '""',
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: '2px',
+                bgColor: 'green.400'
+              }}
+            >
+              <CardBody py={4} px={6}>
                         <Text fontSize="md" fontWeight="medium" mb={3} color="gray.900">
                           {account.nickname || account.account_type || 'Bank Account'}
                         </Text>
-                        <Box display="flex" justifyContent="space-between" alignItems="center">
-                          <Box>
+                <Box display="flex" justifyContent="space-between" alignItems="center">
+                  <Box>
                             <Text fontSize="md" color="gray.600">Type: {account.account_type || 'N/A'}</Text>
                             <Text fontSize="md" color="gray.600">Account ID: {account.account_id}</Text>
-                          </Box>
-                          <Box textAlign="right">
-                            <Text fontSize="xl" fontWeight="bold" color="gray.900">
+                  </Box>
+                  <Box textAlign="right">
+                    <Text fontSize="xl" fontWeight="bold" color="gray.900">
                               {account.balance?.balance.toLocaleString('en-US', { minimumFractionDigits: 2 }) || '0.00'}
-                            </Text>
-                            <Text fontSize="md" color="gray.600">{account.currency}</Text>
-                          </Box>
-                        </Box>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </SimpleGrid>
+                    </Text>
+                    <Text fontSize="md" color="gray.600">{account.currency}</Text>
+                  </Box>
+                </Box>
+              </CardBody>
+            </Card>
+          ))}
+        </SimpleGrid>
               </Box>
             ))}
           </VStack>

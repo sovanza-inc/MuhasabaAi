@@ -157,7 +157,8 @@ export function BankIntegrationsPage() {
           permissions: [
             "accounts",
             "balance", 
-            "transactions"
+            "transactions",
+            "identity"
           ],
           customer_id: customerId,
           sandbox: true,
