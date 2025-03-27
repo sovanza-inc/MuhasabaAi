@@ -320,10 +320,10 @@ export default function TransactionPage() {
           <Box mb={6}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
               <Box>
-                <Heading size="lg" mb={2}>Transactions</Heading>
+            <Heading size="lg" mb={2}>Transactions</Heading>
                 <Text color="gray.600" fontSize="md">
-                  Effortlessly view and manage your accounts in one place with real-time balance updates.
-                </Text>
+              Effortlessly view and manage your accounts in one place with real-time balance updates.
+            </Text>
               </Box>
               {connectedBanks.length > 0 && (
                 <Select
@@ -349,15 +349,15 @@ export default function TransactionPage() {
               </Box>
             ) : transactions.length > 0 ? (
               <>
-                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
-                  <Card variant="unstyled" bg="white">
+            <SimpleGrid columns={{ base: 1, md: 3 }} spacing={4}>
+              <Card variant="unstyled" bg="white">
                     <CardBody height="240px" p={4}>
                       <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Trends</Text>
                       <Box height="195px">
-                        <AreaChart
+                  <AreaChart
                           data={chartData}
                           categories={['income', 'spending']}
-                          index="month"
+                    index="month"
                           height="195px"
                           valueFormatter={formatCurrency}
                           showLegend={true}
@@ -366,17 +366,17 @@ export default function TransactionPage() {
                           colors={['#4299E1', '#F56565']}
                         />
                       </Box>
-                    </CardBody>
-                  </Card>
+                </CardBody>
+              </Card>
 
-                  <Card variant="unstyled" bg="white">
+              <Card variant="unstyled" bg="white">
                     <CardBody height="240px" p={4}>
                       <Text fontSize="sm" fontWeight="medium" mb={3}>Monthly Comparison</Text>
                       <Box height="195px">
-                        <BarChart
+                  <BarChart
                           data={chartData}
                           categories={['income', 'spending']}
-                          index="month"
+                    index="month"
                           height="195px"
                           valueFormatter={formatCurrency}
                           showLegend={true}
@@ -385,12 +385,12 @@ export default function TransactionPage() {
                           colors={['#48BB78', '#F56565']}
                         />
                       </Box>
-                    </CardBody>
-                  </Card>
+                </CardBody>
+              </Card>
 
-                  <Card variant="unstyled" bg="white">
+              <Card variant="unstyled" bg="white">
                     <CardBody height="240px" p={4} display="flex" alignItems="center">
-                      <Box width="100%">
+                  <Box width="100%">
                         <Text fontSize="md" fontWeight="medium" mb={3}>
                           Total Spent: <Text as="span" color="gray.600">
                             ${filteredTotals.spent.toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -406,30 +406,30 @@ export default function TransactionPage() {
                             ${(filteredTotals.income - filteredTotals.spent).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                           </Text>
                         </Text>
-                      </Box>
-                    </CardBody>
-                  </Card>
-                </SimpleGrid>
+                  </Box>
+                </CardBody>
+              </Card>
+            </SimpleGrid>
 
-                {/* Transactions Section */}
+          {/* Transactions Section */}
                 <Box mt={8}>
-                  <Heading size="md" mb={2}>Recent Transactions</Heading>
-                  <Text color="gray.600" mb={4} fontSize="md">
+            <Heading size="md" mb={2}>Recent Transactions</Heading>
+            <Text color="gray.600" mb={4} fontSize="md">
                     View your recent transaction history {selectedBankId !== 'all' ? 'for the selected bank' : 'across all connected bank accounts'}.
-                  </Text>
+            </Text>
 
-                  <VStack spacing={4} align="stretch">
+            <VStack spacing={4} align="stretch">
                     {filteredTransactions.map((transaction) => (
-                      <Card 
+                <Card 
                         key={transaction.transaction_id}
-                        position="relative"
-                        borderLeftWidth="4px"
+                  position="relative"
+                  borderLeftWidth="4px"
                         borderLeftColor={transaction.credit_debit_indicator === 'CREDIT' ? 'green.400' : 'gray.400'}
-                        overflow="hidden"
-                      >
-                        <CardBody py={3}>
-                          <Box display="flex" justifyContent="space-between" alignItems="center">
-                            <Box>
+                  overflow="hidden"
+                >
+                  <CardBody py={3}>
+                    <Box display="flex" justifyContent="space-between" alignItems="center">
+                      <Box>
                               <Text fontSize="md" fontWeight="medium">{transaction.bank_name}</Text>
                               <Text fontSize="sm" color="gray.600">
                                 {new Date(transaction.booking_date_time).toLocaleString()}
@@ -440,20 +440,20 @@ export default function TransactionPage() {
                               <Text fontSize="sm" color="gray.400">
                                 Transaction ID: {transaction.transaction_id}
                               </Text>
-                            </Box>
-                            <Text 
-                              fontSize="md"
-                              fontWeight="bold" 
+                      </Box>
+                      <Text 
+                        fontSize="md"
+                        fontWeight="bold" 
                               color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : undefined}
-                            >
+                      >
                               {transaction.credit_debit_indicator === 'CREDIT' ? '+' : '-'}
                               {transaction.amount.amount.toLocaleString()} {transaction.amount.currency}
-                            </Text>
-                          </Box>
-                        </CardBody>
-                      </Card>
-                    ))}
-                  </VStack>
+                      </Text>
+                    </Box>
+                  </CardBody>
+                </Card>
+              ))}
+            </VStack>
                 </Box>
               </>
             ) : (
