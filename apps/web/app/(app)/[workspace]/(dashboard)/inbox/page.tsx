@@ -3,8 +3,8 @@ import { createPage } from '#lib/create-page'
 
 const { Page, metadata } = createPage({
   title: 'Inbox',
-  params: ['workspace'],
-  component: InboxListPage,
+  params: ['workspace', 'id'],
+  component: (props) => <InboxListPage {...props} />,
 })
 
 export { metadata }
