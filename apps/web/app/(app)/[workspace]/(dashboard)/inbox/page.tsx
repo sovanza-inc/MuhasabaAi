@@ -4,7 +4,7 @@ import { createPage } from '#lib/create-page'
 const { Page, metadata } = createPage({
   title: 'Inbox',
   params: ['workspace', 'id'],
-  component: InboxListPage,
+  component: (props) => <InboxListPage {...props} />,
 })
 
 export { metadata }
