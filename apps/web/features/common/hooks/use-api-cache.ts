@@ -1,4 +1,4 @@
-import { useQueryClient, QueryClient, QueryKey } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import { useCallback } from 'react'
 
 // Define query keys for different data types
@@ -15,8 +15,7 @@ export const useApiCache = () => {
   // Function to prefetch and cache data
   const prefetchData = useCallback(async (
     key: string,
-    fetchFn: () => Promise<any>,
-    options = {}
+    fetchFn: () => Promise<any>
   ) => {
     try {
       // Check if data already exists in cache
