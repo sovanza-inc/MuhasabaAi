@@ -22,10 +22,12 @@ import { useHelpCenter } from '@acme/ui/help-center'
 
 import { useCurrentUser } from '../hooks/use-current-user'
 import { usePath } from '../hooks/use-path'
+import { useApiCache } from '../hooks/use-api-cache'
 
 export const UserMenu = () => {
   const router = useRouter()
   const { logOut } = useAuth()
+  const { clearCache } = useApiCache()
 
   const [currentUser] = useCurrentUser()
 
@@ -33,6 +35,7 @@ export const UserMenu = () => {
 
   const logOutAndClearCache = () => {
     logOut().then(() => {
+      clearCache()
       queryClient.clear()
       router.push('/login')
     })
