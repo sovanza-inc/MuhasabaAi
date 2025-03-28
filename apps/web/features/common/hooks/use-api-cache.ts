@@ -26,16 +26,20 @@ export const useApiCache = () => {
 
       // Fetch and cache the data
       const data = await fetchFn()
-      queryClient.setQueryData([key], data)
+      
+      // Set the data with specific caching options for this query key
+      queryClient.setQueryData([key], data, {
+        updatedAt: Date.now()
+      })
 
-      // Set query options to prevent refetching
-      queryClient.setDefaultOptions({
-        queries: {
-          staleTime: Infinity,
-          gcTime: Infinity, // This replaces cacheTime which is deprecated
-          refetchOnWindowFocus: false,
-          refetchOnReconnect: false
-        }
+      // Set specific options for this query key
+      queryClient.setQueryDefaults([key], {
+        staleTime: Infinity,
+        gcTime: Infinity,
+        refetchOnWindowFocus: false,
+        refetchOnReconnect: false,
+        refetchOnMount: false,
+        retry: false
       })
 
       return data
