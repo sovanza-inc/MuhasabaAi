@@ -87,7 +87,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
   const isAccountsActive = useActivePath('accounts', { end: false })
   const isIdentityActive = useActivePath('identity', { end: false })
   const isTransactionActive = useActivePath('transaction', { end: false })
-  const isCashflowActive = useActivePath('cashflow', { end: false })
+  const isCashflowActive = useActivePath('cashflow', { end: true })
   const isProfitLossActive = useActivePath('profit-loss', { end: false })
   const isBalanceSheetActive = useActivePath('balance-sheet', { end: false })
   const isCashflowStatementActive = useActivePath('cashflow-statement', { end: false })

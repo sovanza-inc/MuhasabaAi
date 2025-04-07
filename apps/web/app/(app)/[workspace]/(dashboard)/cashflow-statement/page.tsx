@@ -17,43 +17,388 @@ import {
   Badge,
   ButtonGroup,
   Button,
+  Spinner,
+  useToast,
 } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { AreaChart } from '@saas-ui/charts'
 import React from 'react'
 import { LuChevronsUpDown } from 'react-icons/lu'
+import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
+import { useApiCache } from '#features/common/hooks/use-api-cache'
+import { useQueryClient } from '@tanstack/react-query'
+
+interface BankTransaction {
+  transaction_id: string;
+  account_id: string;
+  transaction_information: string;
+  transaction_reference: string | null;
+  amount: {
+    amount: number;
+    currency: string;
+  };
+  credit_debit_indicator: string;
+  status: string;
+  booking_date_time: string;
+  value_date_time: string;
+  bank_name?: string;
+  bank_id?: string;
+}
+
+interface Bank {
+  id: string;
+  bank_identifier: string;
+  name: string;
+}
 
 export default function CashflowStatementPage() {
-  const [selectedAccount, setSelectedAccount] = React.useState('ABD Account Selected')
-  const [selectedMonth, setSelectedMonth] = React.useState('October')
+  const toast = useToast()
+  const { CACHE_KEYS, prefetchData } = useApiCache()
+  const [workspace] = useCurrentWorkspace()
+  const queryClient = useQueryClient()
+  const [isLoading, setIsLoading] = React.useState(true)
+  const [transactions, setTransactions] = React.useState<BankTransaction[]>([])
+  const [authToken, setAuthToken] = React.useState<string | null>(null)
+  const [customerId, setCustomerId] = React.useState<string | null>(null)
+  const [connectedBanks, setConnectedBanks] = React.useState<Bank[]>([])
+  const [selectedBankId, setSelectedBankId] = React.useState<string>('all')
+  const [selectedMonth, setSelectedMonth] = React.useState('all')
   const [selectedStatus, setSelectedStatus] = React.useState('All')
+  const [selectedType, setSelectedType] = React.useState('All')
 
-  // Chart data
-  const chartData = Array.from({ length: 30 }, (_, i) => ({
-    day: `Day ${i + 1}`,
-    value: Math.floor(Math.random() * (25000 - 10000) + 10000)
-  }))
+  // Initialize auth token and customer ID
+  React.useEffect(() => {
+    const initializeAuth = async () => {
+      try {
+        // Get auth token
+        const authResponse = await fetch('/api/bank-integration/auth', {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        });
+        
+        if (!authResponse.ok) {
+          throw new Error('Failed to authenticate');
+        }
+        
+        const authData = await authResponse.json();
+        setAuthToken(authData.access_token);
 
-  // Transaction data
-  const transactions = [
-    {
-      refId: '456789356',
-      date: 'Sep 9, 2024, 04:30pm',
-      from: { initial: 'F', email: 'fadel@email.com' },
-      type: 'Income',
-      amount: '+$5,670.00',
-      status: 'Pending'
-    },
-    {
-      refId: '456789356',
-      date: 'Sep 8, 2024, 03:13pm',
-      from: { initial: 'W', name: 'Wise - 5466xxxx' },
-      type: 'Savings',
-      amount: '+$15,000.00',
-      status: 'Completed'
+        // Check if customer exists
+        const customerCheckResponse = await fetch(`/api/bank-integration/get-customer?app_user_id=${workspace.id}`, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${authData.access_token}`
+          }
+        });
+
+        if (customerCheckResponse.ok) {
+          const customerData = await customerCheckResponse.json();
+          setCustomerId(customerData.customer_id);
+        }
+      } catch (error) {
+        console.error('Error initializing auth:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to initialize authentication',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+      }
     }
-  ]
+
+    if (workspace?.id) {
+      initializeAuth()
+    }
+  }, [workspace?.id, toast])
+
+  // Fetch connected banks and their accounts
+  const fetchConnectedBanks = React.useCallback(async () => {
+    if (!customerId || !authToken) return []
+
+    try {
+      // Create a unique cache key that includes the customer ID
+      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}`
+      const cachedData = await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch connected banks')
+          }
+
+          return data
+        }
+      )
+
+      setConnectedBanks(cachedData)
+      return cachedData
+    } catch (error) {
+      console.error('Error fetching connected banks:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch connected banks',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      })
+      return []
+    }
+  }, [customerId, authToken, toast, prefetchData])
+
+  // Fetch accounts for each bank
+  const fetchAccountsForBank = React.useCallback(async (entityId: string) => {
+    try {
+      // Create a unique cache key that includes both customer ID and entity ID
+      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}_${entityId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch bank accounts')
+          }
+
+          return data
+        }
+      )
+    } catch (error) {
+      console.error('Error fetching bank accounts:', error)
+      return []
+    }
+  }, [authToken, customerId, prefetchData])
+
+  // Fetch transactions for an account
+  const fetchTransactionsForAccount = React.useCallback(async (accountId: string, entityId: string) => {
+    try {
+      // Create a unique cache key that includes customer ID, account ID, and entity ID
+      const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_${customerId}_${accountId}_${entityId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch transactions')
+          }
+
+          return data.transactions || []
+        }
+      )
+    } catch (error) {
+      console.error('Error fetching transactions:', error)
+      return []
+    }
+  }, [authToken, customerId, prefetchData])
+
+  // Fetch all transactions
+  React.useEffect(() => {
+    const fetchAllTransactions = async () => {
+      if (!customerId || !authToken) return
+
+      setIsLoading(true)
+      try {
+        // Create a unique cache key for all transactions
+        const allTransactionsCacheKey = `${CACHE_KEYS.TRANSACTIONS}_all_${customerId}`
+        const cachedTransactions = queryClient.getQueryData([allTransactionsCacheKey])
+        if (cachedTransactions && Array.isArray(cachedTransactions)) {
+          setTransactions(cachedTransactions)
+          setIsLoading(false)
+          return
+        }
+
+        const banks = await fetchConnectedBanks()
+        let allTransactions: BankTransaction[] = []
+        
+        for (const bank of banks) {
+          const accounts = await fetchAccountsForBank(bank.id)
+          
+          for (const account of accounts) {
+            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id)
+            const transactionsWithBank = accountTransactions.map((transaction: BankTransaction) => {
+              // Log transaction details for debugging
+              console.log('Transaction:', {
+                id: transaction.transaction_id,
+                indicator: transaction.credit_debit_indicator,
+                amount: transaction.amount,
+                info: transaction.transaction_information
+              });
+              
+              // Determine if this is a credit transaction based on various indicators
+              const isCredit = transaction.credit_debit_indicator === 'CREDIT' || 
+                             transaction.credit_debit_indicator === 'C' ||
+                             transaction.transaction_information?.includes('SALARY') ||
+                             transaction.transaction_information?.includes('CREDIT') ||
+                             transaction.transaction_information?.includes('DEPOSIT');
+
+              return {
+                ...transaction,
+                bank_name: bank.bank_identifier || bank.name,
+                bank_id: bank.id,
+                credit_debit_indicator: isCredit ? 'CREDIT' : 'DEBIT'
+              }
+            })
+            
+            allTransactions = [...allTransactions, ...transactionsWithBank]
+          }
+        }
+
+        // Sort transactions by date (most recent first)
+        allTransactions.sort((a, b) => 
+          new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+        )
+
+        // Cache the combined transactions
+        queryClient.setQueryData([allTransactionsCacheKey], allTransactions)
+        setTransactions(allTransactions)
+      } catch (error) {
+        console.error('Error fetching all transactions:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch transactions',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    if (customerId && authToken) {
+      fetchAllTransactions()
+    }
+  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, toast, queryClient])
+
+  // Filter transactions based on selected bank, month, status, and type
+  const filteredTransactions = React.useMemo(() => {
+    return transactions.filter(transaction => {
+      // Filter by bank
+      if (selectedBankId !== 'all' && transaction.bank_id !== selectedBankId) {
+        return false
+      }
+
+      // Filter by month
+      if (selectedMonth !== 'all') {
+        const transactionMonth = new Date(transaction.booking_date_time).toLocaleString('default', { month: 'long' })
+        if (transactionMonth !== selectedMonth) {
+          return false
+        }
+      }
+
+      // Filter by status
+      if (selectedStatus !== 'All' && transaction.status !== selectedStatus.toUpperCase()) {
+        return false
+      }
+
+      // Filter by type
+      if (selectedType !== 'All') {
+        const isCredit = transaction.credit_debit_indicator === 'CREDIT' || 
+                        transaction.credit_debit_indicator === 'C' ||
+                        transaction.transaction_information?.includes('SALARY') ||
+                        transaction.transaction_information?.includes('CREDIT') ||
+                        transaction.transaction_information?.includes('DEPOSIT');
+
+        if (selectedType === 'Income' && !isCredit) {
+          return false
+        }
+        if (selectedType === 'Expenses' && isCredit) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }, [transactions, selectedBankId, selectedMonth, selectedStatus, selectedType])
+
+  // Calculate daily cash flow data for the chart
+  const chartData = React.useMemo(() => {
+    const dailyData: { [key: string]: { income: number; spending: number } } = {}
+    
+    filteredTransactions.forEach(transaction => {
+      const date = new Date(transaction.booking_date_time).toISOString().split('T')[0]
+      const amount = transaction.amount.amount
+      
+      if (!dailyData[date]) {
+        dailyData[date] = { income: 0, spending: 0 }
+      }
+      
+      const isCredit = transaction.credit_debit_indicator === 'CREDIT' || 
+                      transaction.credit_debit_indicator === 'C' ||
+                      transaction.transaction_information?.includes('SALARY') ||
+                      transaction.transaction_information?.includes('CREDIT') ||
+                      transaction.transaction_information?.includes('DEPOSIT');
+      
+      if (isCredit) {
+        dailyData[date].income += amount
+      } else {
+        dailyData[date].spending += amount
+      }
+    })
+
+    // Convert to array and sort by date
+    return Object.entries(dailyData)
+      .map(([day, values]) => ({
+        day,
+        value: values.income - values.spending // Net value for the day
+      }))
+      .sort((a, b) => a.day.localeCompare(b.day))
+      .slice(-30) // Show last 30 days
+  }, [filteredTransactions])
+
+  // Calculate retained cash
+  const retainedCash = React.useMemo(() => {
+    return filteredTransactions.reduce((total, transaction) => {
+      const amount = transaction.amount.amount;
+      return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
+    }, 0);
+  }, [filteredTransactions])
+
+  // Get available months from transactions
+  const availableMonths = React.useMemo(() => {
+    const months = new Set<string>()
+    transactions.forEach(transaction => {
+      const month = new Date(transaction.booking_date_time).toLocaleString('default', { month: 'long' })
+      months.add(month)
+    })
+    return Array.from(months).sort()
+  }, [transactions])
+
+  // Format currency for display
+  const formatCurrency = (value: number) => {
+    if (value >= 1000000) {
+      return `$${(value / 1000000).toFixed(1)}M`
+    } else if (value >= 1000) {
+      return `$${(value / 1000).toFixed(1)}K`
+    }
+    return `$${value.toFixed(0)}`
+  }
 
   return (
     <Box>
@@ -89,24 +434,36 @@ export default function CashflowStatementPage() {
             <Box display="flex" justifyContent="flex-end" mb={4}>
               <Select 
                 maxW="200px"
-                value={selectedAccount}
-                onChange={(e) => setSelectedAccount(e.target.value)}
+                value={selectedBankId}
+                onChange={(e) => setSelectedBankId(e.target.value)}
                 bg="green.50"
                 color="green.500"
                 borderColor="green.200"
               >
-                <option value="ABD Account Selected">ABD Account Selected</option>
+                <option value="all">All Banks</option>
+                {connectedBanks.map((bank) => (
+                  <option key={bank.id} value={bank.id}>
+                    {bank.bank_identifier || bank.name}
+                  </option>
+                ))}
               </Select>
             </Box>
           </Box>
 
+          {isLoading ? (
+            <Box textAlign="center" py={10}>
+              <Spinner size="xl" color="green.500" />
+              <Text mt={4} color="gray.600">Loading transactions...</Text>
+            </Box>
+          ) : (
+            <>
           {/* Cashflow Chart */}
           <Card mb={8}>
             <CardBody>
               <Box mb={4} display="flex" justifyContent="space-between" alignItems="center">
                 <Box>
                   <Heading size="md">Cash Flow Summary</Heading>
-                  <Text color="gray.600">200+ Transactions this month</Text>
+                      <Text color="gray.600">{filteredTransactions.length} Transactions</Text>
                 </Box>
                 
                 <Select 
@@ -116,9 +473,10 @@ export default function CashflowStatementPage() {
                   onChange={(e) => setSelectedMonth(e.target.value)}
                   borderColor="gray.200"
                 >
-                  <option value="October">October</option>
-                  <option value="September">September</option>
-                  <option value="August">August</option>
+                      <option value="all">All Months</option>
+                      {availableMonths.map((month) => (
+                        <option key={month} value={month}>{month}</option>
+                      ))}
                 </Select>
               </Box>
 
@@ -128,12 +486,19 @@ export default function CashflowStatementPage() {
                   categories={['value']}
                   index="day"
                   colors={['#38B2AC']}
-                  yAxisWidth={50}
-                  valueFormatter={(value) => `${(value/1000).toFixed(1)}K`}
+                  yAxisWidth={65}
+                  valueFormatter={formatCurrency}
                   height="300px"
+                  showLegend={false}
+                  showGrid={true}
+                  showYAxis={true}
+                  variant="gradient"
+                  strokeWidth="2"
+                  minValue={Math.min(...chartData.map(d => d.value)) * 1.1}
+                  maxValue={Math.max(...chartData.map(d => d.value)) * 1.1}
                 />
                 
-                {/* Peak Value Annotation */}
+                {chartData.length > 0 && (
                 <Box 
                   position="absolute" 
                   top="20%" 
@@ -143,9 +508,11 @@ export default function CashflowStatementPage() {
                   px={3} 
                   py={1} 
                   borderRadius="md"
+                    boxShadow="md"
                 >
-                  64,364.77
+                    Peak: {formatCurrency(Math.max(...chartData.map(d => d.value)))}
                 </Box>
+                )}
               </Box>
             </CardBody>
           </Card>
@@ -155,10 +522,24 @@ export default function CashflowStatementPage() {
             {/* Filters */}
             <HStack mb={4} spacing={4}>
               <ButtonGroup size="sm" isAttached variant="outline">
-                <Button isActive>All</Button>
-                <Button>Savings</Button>
-                <Button>Income</Button>
-                <Button>Expenses</Button>
+                    <Button 
+                      isActive={selectedType === 'All'}
+                      onClick={() => setSelectedType('All')}
+                    >
+                      All
+                    </Button>
+                    <Button 
+                      isActive={selectedType === 'Income'}
+                      onClick={() => setSelectedType('Income')}
+                    >
+                      Income
+                    </Button>
+                    <Button 
+                      isActive={selectedType === 'Expenses'}
+                      onClick={() => setSelectedType('Expenses')}
+                    >
+                      Expenses
+                    </Button>
               </ButtonGroup>
 
               <Box flex="1" />
@@ -170,71 +551,161 @@ export default function CashflowStatementPage() {
                 onChange={(e) => setSelectedStatus(e.target.value)}
               >
                 <option value="All">Status: All</option>
-                <option value="Completed">Completed</option>
-                <option value="Pending">Pending</option>
+                    <option value="COMPLETED">Completed</option>
+                    <option value="PENDING">Pending</option>
               </Select>
             </HStack>
 
             {/* Table */}
             <TableContainer>
-              <Table variant="simple">
+                  <Table variant="simple" size="sm">
                 <Thead>
                   <Tr borderBottom="1px" borderColor="gray.200">
-                    <Th>
+                        <Th width="180px">
                       <HStack spacing={1}>
                         <Text>Ref ID</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th>
+                        <Th width="120px">
                       <HStack spacing={1}>
-                        <Text>Transaction Date</Text>
+                            <Text>Date</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th>From</Th>
-                    <Th>Type</Th>
-                    <Th isNumeric>Amount</Th>
-                    <Th>Status</Th>
+                        <Th>Description</Th>
+                        <Th width="100px">Type</Th>
+                        <Th width="100px" isNumeric>Amount</Th>
+                        <Th width="100px">Status</Th>
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {transactions.map((transaction, index) => (
-                    <Tr key={index}>
-                      <Td>{transaction.refId}</Td>
-                      <Td>{transaction.date}</Td>
-                      <Td>
+                      {selectedBankId === 'all' ? (
+                        // Group transactions by bank when showing all banks
+                        connectedBanks.map(bank => {
+                          const bankTransactions = filteredTransactions
+                            .filter(t => t.bank_id === bank.id)
+                            .slice(0, 5); // Show top 5 transactions per bank
+                          
+                          return bankTransactions.length > 0 ? (
+                            <React.Fragment key={bank.id}>
+                              <Tr>
+                                <Td 
+                                  colSpan={6} 
+                                  bg="gray.50" 
+                                  fontWeight="medium"
+                                  py={2}
+                                >
+                                  {bank.bank_identifier || bank.name}
+                                </Td>
+                              </Tr>
+                              {bankTransactions.map((transaction) => (
+                                <Tr key={transaction.transaction_id}>
+                                  <Td>
+                                    <Text noOfLines={1} title={transaction.transaction_id}>
+                                      {transaction.transaction_id.slice(0, 8)}...
+                                    </Text>
+                                  </Td>
+                                  <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
+                                  <Td maxW="400px">
                         <HStack>
                           <Box 
-                            bg={transaction.from.initial === 'F' ? 'blue.500' : 'green.500'} 
+                                        bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
                             color="white" 
                             w="24px" 
                             h="24px" 
+                                        flexShrink={0}
                             borderRadius="full"
                             display="flex"
                             alignItems="center"
                             justifyContent="center"
                           >
-                            {transaction.from.initial}
+                                        {transaction.bank_name?.[0] || 'B'}
                           </Box>
-                          <Text>{transaction.from.email || transaction.from.name}</Text>
+                                      <Text noOfLines={1} title={transaction.transaction_information}>
+                                        {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
+                                          .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
+                                          || 'Bank Transaction'}
+                                      </Text>
                         </HStack>
                       </Td>
-                      <Td>{transaction.type}</Td>
-                      <Td isNumeric color="green.500">{transaction.amount}</Td>
+                                  <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
+                                  <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
+                                    ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
+                                  </Td>
                       <Td>
                         <Badge 
-                          colorScheme={transaction.status === 'Completed' ? 'green' : 'yellow'}
+                                      colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
                         >
                           {transaction.status}
                         </Badge>
                       </Td>
                     </Tr>
                   ))}
+                            </React.Fragment>
+                          ) : null;
+                        })
+                      ) : (
+                        // Show regular transaction list for single bank
+                        filteredTransactions.slice(0, 10).map((transaction) => (
+                          <Tr key={transaction.transaction_id}>
+                            <Td>
+                              <Text noOfLines={1} title={transaction.transaction_id}>
+                                {transaction.transaction_id.slice(0, 8)}...
+                              </Text>
+                            </Td>
+                            <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
+                            <Td maxW="400px">
+                              <HStack>
+                                <Box 
+                                  bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
+                                  color="white" 
+                                  w="24px" 
+                                  h="24px" 
+                                  flexShrink={0}
+                                  borderRadius="full"
+                                  display="flex"
+                                  alignItems="center"
+                                  justifyContent="center"
+                                >
+                                  {transaction.bank_name?.[0] || 'B'}
+                                </Box>
+                                <Text noOfLines={1} title={transaction.transaction_information}>
+                                  {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
+                                    .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
+                                    || 'Bank Transaction'}
+                                </Text>
+                              </HStack>
+                            </Td>
+                            <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
+                            <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
+                              ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
+                            </Td>
+                            <Td>
+                              <Badge 
+                                colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
+                              >
+                                {transaction.status}
+                              </Badge>
+                            </Td>
+                          </Tr>
+                        ))
+                      )}
                 </Tbody>
               </Table>
             </TableContainer>
+                {selectedBankId === 'all' ? (
+                  <Text mt={4} color="gray.600" textAlign="center">
+                    Showing up to 5 recent transactions per bank ({filteredTransactions.length} total transactions)
+                  </Text>
+                ) : filteredTransactions.length > 10 && (
+                  <Text mt={4} color="gray.600" textAlign="center">
+                    Showing 10 of {filteredTransactions.length} transactions
+                  </Text>
+                )}
           </Box>
+            </>
+          )}
         </Box>
 
         {/* Summary Footer */}
@@ -245,7 +716,7 @@ export default function CashflowStatementPage() {
         >
           <HStack justify="space-between">
             <Text>Summary: Retained Cash</Text>
-            <Text>Net Amount: 6000$</Text>
+            <Text>Net Amount: ${retainedCash.toFixed(2)}</Text>
           </HStack>
         </Box>
       </Box>
