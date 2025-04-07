@@ -8,6 +8,7 @@ import { EmptyState } from '@saas-ui/react'
 import { LuWallet } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useRouter } from 'next/navigation'
+import { useApiCache } from '#features/common/hooks/use-api-cache'
 
 interface BankAccount {
   id?: string;
@@ -51,6 +52,7 @@ export default function AccountsPage() {
   const toast = useToast()
   const router = useRouter()
   const [workspace] = useCurrentWorkspace()
+  const { CACHE_KEYS, prefetchData } = useApiCache()
   const [isLoading, setIsLoading] = React.useState(true)
   const [bankAccounts, setBankAccounts] = React.useState<BankWithAccounts[]>([])
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -109,20 +111,29 @@ export default function AccountsPage() {
     if (!customerId || !authToken) return
 
     try {
-      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      // Create a unique cache key that includes the customer ID
+      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}`
+      const cachedData = await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch connected banks')
+          }
+
+          return data
         }
-      })
+      )
 
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch connected banks')
-      }
-
-      return data
+      return cachedData
     } catch (error) {
       console.error('Error fetching connected banks:', error)
       toast({
@@ -134,53 +145,67 @@ export default function AccountsPage() {
       })
       return []
     }
-  }, [customerId, authToken, toast])
+  }, [customerId, authToken, toast, prefetchData])
 
   // Fetch accounts for each bank
   const fetchAccountsForBank = React.useCallback(async (entityId: string) => {
     try {
-      const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      // Create a unique cache key that includes both customer ID and entity ID
+      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}_${entityId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch bank accounts')
+          }
+
+          return data
         }
-      })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch bank accounts')
-      }
-
-      return data
+      )
     } catch (error) {
       console.error('Error fetching bank accounts:', error)
       return []
     }
-  }, [authToken])
+  }, [authToken, customerId, prefetchData])
 
   // Fetch balance for an account
   const fetchBalanceForAccount = React.useCallback(async (accountId: string, entityId: string) => {
     try {
-      const response = await fetch(`/api/bank-integration/balance?account_id=${accountId}&entity_id=${entityId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      // Create a unique cache key that includes customer ID, account ID, and entity ID
+      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_balance_${customerId}_${accountId}_${entityId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/balance?account_id=${accountId}&entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch balance')
+          }
+
+          return data
         }
-      })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch balance')
-      }
-
-      return data
+      )
     } catch (error) {
       console.error('Error fetching balance:', error)
       return null
     }
-  }, [authToken])
+  }, [authToken, customerId, prefetchData])
 
   // Fetch all accounts and their balances
   React.useEffect(() => {

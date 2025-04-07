@@ -4,6 +4,7 @@ import { Box, Heading, Text, VStack, Spinner, useToast, Button } from '@chakra-u
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
+import { useApiCache } from '#features/common/hooks/use-api-cache'
 import React from 'react'
 import { EmptyState } from '@saas-ui/react'
 import { LuWallet, LuRefreshCw } from 'react-icons/lu'
@@ -21,6 +22,7 @@ interface IdentityData {
 export default function IdentityPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
+  const { CACHE_KEYS, prefetchData } = useApiCache()
   const [isLoading, setIsLoading] = React.useState(true)
   const [isRetrying, setIsRetrying] = React.useState(false)
   const [identityData, setIdentityData] = React.useState<IdentityData | null>(null)
@@ -83,21 +85,30 @@ export default function IdentityPage() {
     if (!customerId || !authToken) return []
 
     try {
-      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      // Create a unique cache key that includes the customer ID
+      const cacheKey = `${CACHE_KEYS.IDENTITY}_banks_${customerId}`
+      const cachedData = await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch connected banks')
+          }
+
+          return data
         }
-      })
+      )
 
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch connected banks')
-      }
-
-      setConnectedBanks(data)
-      return data
+      setConnectedBanks(cachedData)
+      return cachedData
     } catch (error) {
       console.error('Error fetching connected banks:', error)
       setError('Failed to fetch connected banks')
@@ -110,7 +121,7 @@ export default function IdentityPage() {
       })
       return []
     }
-  }, [customerId, authToken, toast])
+  }, [customerId, authToken, toast, prefetchData])
 
   // Fetch identity data for a bank
   const fetchIdentityData = React.useCallback(async (entityId: string) => {
@@ -118,24 +129,33 @@ export default function IdentityPage() {
       setError(null);
       console.log('Fetching identity data for entity:', entityId);
       
-      const response = await fetch(`/api/bank-integration/identity?entity_id=${entityId}`, {
-        headers: {
-          'Accept': '*/*',
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
+      // Create a unique cache key that includes both customer ID and entity ID
+      const cacheKey = `${CACHE_KEYS.IDENTITY}_data_${customerId}_${entityId}`
+      const cachedData = await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/identity?entity_id=${entityId}`, {
+            headers: {
+              'Accept': '*/*',
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
 
-      const data = await response.json();
-      console.log('Identity API response:', data);
-      
-      if (!response.ok || data.error) {
-        throw new Error(data.details || data.error || 'Failed to fetch identity data');
-      }
+          const data = await response.json();
+          console.log('Identity API response:', data);
+          
+          if (!response.ok || data.error) {
+            throw new Error(data.details || data.error || 'Failed to fetch identity data');
+          }
+
+          return data;
+        }
+      )
 
       // Extract and format the identity data
-      const identity = data.data?.identities?.[0];
+      const identity = cachedData.data?.identities?.[0];
       if (!identity) {
-        console.log('No identity data in response:', data);
+        console.log('No identity data in response:', cachedData);
         throw new Error('No identity data available');
       }
 
@@ -163,7 +183,7 @@ export default function IdentityPage() {
       });
       setIdentityData(null);
     }
-  }, [authToken, toast]);
+  }, [authToken, toast, customerId, prefetchData]);
 
   // Fetch data when auth is initialized
   const fetchData = React.useCallback(async () => {
