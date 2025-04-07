@@ -24,7 +24,6 @@ import {
 } from '@saas-ui-pro/react'
 import { LuChevronRight } from 'react-icons/lu'
 
-import { WorkspacePageProps } from '#lib/create-page'
 import { AreaChart, BarChart } from '@saas-ui/charts'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
