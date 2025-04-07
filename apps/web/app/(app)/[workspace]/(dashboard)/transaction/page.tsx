@@ -10,6 +10,8 @@ import { LuWallet } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useRouter } from 'next/navigation'
 import React from 'react'
+import { useApiCache } from '#features/common/hooks/use-api-cache'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface BankTransaction {
   transaction_id: string;
@@ -41,6 +43,8 @@ export default function TransactionPage() {
   const toast = useToast()
   const router = useRouter()
   const [workspace] = useCurrentWorkspace()
+  const { CACHE_KEYS, prefetchData } = useApiCache()
+  const queryClient = useQueryClient()
   const [isLoading, setIsLoading] = React.useState(true)
   const [transactions, setTransactions] = React.useState<TransactionWithBank[]>([])
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -101,21 +105,27 @@ export default function TransactionPage() {
     if (!customerId || !authToken) return []
 
     try {
-      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_banks_${customerId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch connected banks')
+          }
+
+          setConnectedBanks(data)
+          return data
         }
-      })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch connected banks')
-      }
-
-      setConnectedBanks(data)
-      return data
+      )
     } catch (error) {
       console.error('Error fetching connected banks:', error)
       toast({
@@ -127,53 +137,65 @@ export default function TransactionPage() {
       })
       return []
     }
-  }, [customerId, authToken, toast])
+  }, [customerId, authToken, toast, prefetchData])
 
   // Fetch accounts for each bank
   const fetchAccountsForBank = React.useCallback(async (entityId: string) => {
     try {
-      const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_accounts_${customerId}_${entityId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch bank accounts')
+          }
+
+          return data
         }
-      })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch bank accounts')
-      }
-
-      return data
+      )
     } catch (error) {
       console.error('Error fetching bank accounts:', error)
       return []
     }
-  }, [authToken])
+  }, [authToken, customerId, prefetchData])
 
   // Fetch transactions for an account
   const fetchTransactionsForAccount = React.useCallback(async (accountId: string, entityId: string) => {
     try {
-      const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_${customerId}_${accountId}_${entityId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch transactions')
+          }
+
+          return data.transactions || []
         }
-      })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch transactions')
-      }
-
-      return data.transactions || []
+      )
     } catch (error) {
       console.error('Error fetching transactions:', error)
       return []
     }
-  }, [authToken])
+  }, [authToken, customerId, prefetchData])
 
   // Fetch all transactions
   React.useEffect(() => {
@@ -182,10 +204,19 @@ export default function TransactionPage() {
 
       setIsLoading(true)
       try {
-        const connectedBanks = await fetchConnectedBanks()
+        // Check if we have cached data
+        const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_all_${customerId}`
+        const cachedData = queryClient.getQueryData([cacheKey])
+        if (cachedData) {
+          setTransactions(cachedData as TransactionWithBank[])
+          setIsLoading(false)
+          return
+        }
+
+        const banks = await fetchConnectedBanks()
         let allTransactions: TransactionWithBank[] = []
         
-        for (const bank of connectedBanks) {
+        for (const bank of banks) {
           const accounts = await fetchAccountsForBank(bank.id)
           
           for (const account of accounts) {
@@ -205,6 +236,8 @@ export default function TransactionPage() {
           new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
         )
 
+        // Cache the combined transactions
+        queryClient.setQueryData([cacheKey], allTransactions)
         setTransactions(allTransactions)
       } catch (error) {
         console.error('Error fetching all transactions:', error)
@@ -223,7 +256,7 @@ export default function TransactionPage() {
     if (customerId && authToken) {
       fetchAllTransactions()
     }
-  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, toast])
+  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, toast, queryClient])
 
   const handleAddBankClick = () => {
     router.push(`/${workspace.slug}/bank-integrations`)

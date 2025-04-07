@@ -7,6 +7,8 @@ import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspac
 import React from 'react'
 import { EmptyState } from '@saas-ui/react'
 import { LuWallet, LuRefreshCw } from 'react-icons/lu'
+import { useApiCache } from '#features/common/hooks/use-api-cache'
+import { useQueryClient } from '@tanstack/react-query'
 
 interface IdentityData {
   customerName: string;
@@ -20,6 +22,8 @@ interface IdentityData {
 
 export default function IdentityPage() {
   const toast = useToast()
+  const { CACHE_KEYS, prefetchData } = useApiCache()
+  const queryClient = useQueryClient()
   const [workspace] = useCurrentWorkspace()
   const [isLoading, setIsLoading] = React.useState(true)
   const [isRetrying, setIsRetrying] = React.useState(false)
@@ -83,21 +87,26 @@ export default function IdentityPage() {
     if (!customerId || !authToken) return []
 
     try {
-      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      const cacheKey = `${CACHE_KEYS.IDENTITY}_banks_${customerId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch connected banks')
+          }
+
+          return data
         }
-      })
-
-      const data = await response.json()
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch connected banks')
-      }
-
-      setConnectedBanks(data)
-      return data
+      )
     } catch (error) {
       console.error('Error fetching connected banks:', error)
       setError('Failed to fetch connected banks')
@@ -110,60 +119,38 @@ export default function IdentityPage() {
       })
       return []
     }
-  }, [customerId, authToken, toast])
+  }, [customerId, authToken, toast, prefetchData])
 
   // Fetch identity data for a bank
   const fetchIdentityData = React.useCallback(async (entityId: string) => {
     try {
-      setError(null);
-      console.log('Fetching identity data for entity:', entityId);
-      
-      const response = await fetch(`/api/bank-integration/identity?entity_id=${entityId}`, {
-        headers: {
-          'Accept': '*/*',
-          'Authorization': `Bearer ${authToken}`
+      const cacheKey = `${CACHE_KEYS.IDENTITY}_${customerId}_${entityId}`
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/identity?entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          })
+
+          const data = await response.json()
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch identity data')
+          }
+
+          setIdentityData(data)
+          return data
         }
-      });
-
-      const data = await response.json();
-      console.log('Identity API response:', data);
-      
-      if (!response.ok || data.error) {
-        throw new Error(data.details || data.error || 'Failed to fetch identity data');
-      }
-
-      // Extract and format the identity data
-      const identity = data.data?.identities?.[0];
-      if (!identity) {
-        console.log('No identity data in response:', data);
-        throw new Error('No identity data available');
-      }
-
-      const regionalData = identity.regional_data?.data;
-      const formattedData: IdentityData = {
-        customerName: regionalData?.full_name || identity.full_legal_name || '',
-        email: regionalData?.email_address || identity.email_address || '',
-        mobileNumber: regionalData?.mobile_number || identity.mobile_number || '',
-        gender: regionalData?.gender || '',
-        dateOfBirth: regionalData?.birth_date || '',
-        nationalId: regionalData?.national_identity_number || '',
-        address: regionalData?.address || identity.address?.address_line || ''
-      };
-
-      setIdentityData(formattedData);
+      )
     } catch (error) {
-      console.error('Error fetching identity data:', error);
-      setError(error instanceof Error ? error.message : 'Failed to fetch identity data');
-      toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to fetch identity data',
-        status: 'error',
-        duration: 5000,
-        isClosable: true,
-      });
-      setIdentityData(null);
+      console.error('Error fetching identity data:', error)
+      setError(error instanceof Error ? error.message : 'Failed to fetch identity data')
+      return null
     }
-  }, [authToken, toast]);
+  }, [authToken, customerId, prefetchData])
 
   // Fetch data when auth is initialized
   const fetchData = React.useCallback(async () => {
@@ -172,9 +159,22 @@ export default function IdentityPage() {
     setIsLoading(true);
     setIsRetrying(false);
     try {
+      // Check if we have cached data
+      const cacheKey = `${CACHE_KEYS.IDENTITY}_all_${customerId}`
+      const cachedData = queryClient.getQueryData([cacheKey])
+      if (cachedData) {
+        setIdentityData(cachedData as IdentityData)
+        setIsLoading(false)
+        return
+      }
+
       const banks = await fetchConnectedBanks();
       if (banks && banks.length > 0) {
-        await fetchIdentityData(banks[0].id);
+        const data = await fetchIdentityData(banks[0].id);
+        if (data) {
+          // Cache the complete identity data
+          queryClient.setQueryData([cacheKey], data)
+        }
       }
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -182,7 +182,7 @@ export default function IdentityPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [customerId, authToken, fetchConnectedBanks, fetchIdentityData]);
+  }, [customerId, authToken, fetchConnectedBanks, fetchIdentityData, queryClient]);
 
   React.useEffect(() => {
     fetchData();
