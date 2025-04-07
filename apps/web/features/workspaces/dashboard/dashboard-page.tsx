@@ -71,7 +71,7 @@ interface BankTransaction {
   account_name?: string;
 }
 
-export function DashboardPage(props: WorkspacePageProps) {
+export function DashboardPage(_props: WorkspacePageProps) {
   const [isLoading, setIsLoading] = useState(true)
   const [transactions, setTransactions] = useState<BankTransaction[]>([])
   const [authToken, setAuthToken] = useState<string | null>(null)
@@ -266,7 +266,7 @@ export function DashboardPage(props: WorkspacePageProps) {
         const result: BankTransaction[] = [];
         
         // Process each bank separately
-        bankTransactionMap.forEach((bankTransactions, bankId) => {
+        bankTransactionMap.forEach((bankTransactions) => {
           // Group transactions by account_type
           const callAccountTxns = bankTransactions.filter(t => 
             t.account_type?.toLowerCase().includes('call') || 
@@ -865,13 +865,6 @@ export function DashboardPage(props: WorkspacePageProps) {
                 height="250px"
                 colors={['#38B2AC', '#2C7A7B']}
               />
-                {chartData.isPlaceholderData.bar && (
-                  <Text position="absolute" top="5" left="0" right="0" textAlign="center" color="gray.500" fontSize="sm">
-                    {transactions.length > 0 ? 
-                      'Showing sample data. Select a bank with more transaction history.' : 
-                      'Showing sample data. Connect a bank to see your actual cash flow.'}
-                  </Text>
-                )}
               </Box>
             </CardBody>
           </Card>
@@ -889,13 +882,6 @@ export function DashboardPage(props: WorkspacePageProps) {
                   yAxisWidth={65}
                   valueFormatter={(value) => `$${value}`}
                 />
-                {chartData.isPlaceholderData.area && (
-                  <Text position="absolute" top="5" left="0" right="0" textAlign="center" color="gray.500" fontSize="sm">
-                    {transactions.length > 0 ? 
-                      'Showing sample data. More transaction history needed.' : 
-                      'Showing sample data. Connect a bank to see your actual monthly comparison.'}
-                  </Text>
-                )}
               </Box>
               <HStack justify="center" spacing={8} mt={4}>
                 <HStack>
@@ -928,10 +914,10 @@ export function DashboardPage(props: WorkspacePageProps) {
       <Box mb={6} position="relative">
         <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
           <Box>
-        <Heading size="lg" mb={2}>Transactions</Heading>
+            <Heading size="lg" mb={2}>Transactions</Heading>
             <Text color="gray.600">
               Real-time transaction updates from all your connected bank accounts.
-        </Text>
+            </Text>
           </Box>
         </Box>
 
@@ -945,45 +931,45 @@ export function DashboardPage(props: WorkspacePageProps) {
             <Text color="gray.600">No transactions found</Text>
           </Box>
         ) : (
-        <SimpleGrid columns={1} spacing={4}>
+          <SimpleGrid columns={1} spacing={4}>
             {transactionsToDisplay.map((transaction) => (
-            <Card 
+              <Card 
                 key={transaction.transaction_id}
-              borderLeftWidth="4px"
+                borderLeftWidth="4px"
                 borderLeftColor={transaction.credit_debit_indicator === 'CREDIT' ? 'green.400' : 'red.400'}
-            >
-              <CardBody py={4} px={6}>
-                <Box display="flex" justifyContent="space-between" alignItems="center">
-                  <Box>
-                    <Text fontSize="md" fontWeight="medium">
+              >
+                <CardBody py={4} px={6}>
+                  <Box display="flex" justifyContent="space-between" alignItems="center">
+                    <Box>
+                      <Text fontSize="md" fontWeight="medium">
                         {transaction.bank_name}
-                    </Text>
-                    <Text fontSize="sm" color="gray.500">
+                      </Text>
+                      <Text fontSize="sm" color="gray.500">
                         {new Date(transaction.booking_date_time).toLocaleString()}
-                    </Text>
+                      </Text>
                       <Text fontSize="sm" color="gray.500" noOfLines={1}>
                         {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
                           .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
                           || 'Bank Transaction'}
-                    </Text>
-                  </Box>
-                  <Text 
-                    fontSize="lg" 
-                    fontWeight="medium"
+                      </Text>
+                    </Box>
+                    <Text 
+                      fontSize="lg" 
+                      fontWeight="medium"
                       color={transaction.credit_debit_indicator === 'CREDIT' ? "green.500" : "red.500"}
-                  >
+                    >
                       {transaction.credit_debit_indicator === 'CREDIT' ? '+' : '-'}
                       {transaction.amount.currency} {Math.abs(transaction.amount.amount).toLocaleString()}
-                  </Text>
-                </Box>
-              </CardBody>
-            </Card>
-          ))}
-        </SimpleGrid>
+                    </Text>
+                  </Box>
+                </CardBody>
+              </Card>
+            ))}
+          </SimpleGrid>
         )}
       </Box>
     </Box>
-  )
+  );
 
   return (
     <Page>
@@ -997,5 +983,5 @@ export function DashboardPage(props: WorkspacePageProps) {
         {body}
       </PageBody>
     </Page>
-  )
+  );
 }

@@ -401,7 +401,7 @@ export default function BalanceSheetPage() {
           });
           
           // Process each account type - select multiple transactions per account type
-          accountTransactionMap.forEach((accountTxns, accountType) => {
+          accountTransactionMap.forEach((accountTxns) => {
             const credits = accountTxns.filter(t => t.credit_debit_indicator === 'CREDIT');
             const debits = accountTxns.filter(t => t.credit_debit_indicator === 'DEBIT');
             
