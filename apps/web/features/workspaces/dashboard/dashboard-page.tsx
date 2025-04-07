@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import React from 'react'
+import Link from 'next/link'
 
 import {
   Card,
@@ -801,8 +802,8 @@ export function DashboardPage() {
             </Text>
           </Box>
           <Button
-            as="a"
-            href="#"
+            as={Link}
+            href={`/${workspace?.slug}/profit-loss`}
             colorScheme="green"
             variant="link"
             rightIcon={<Icon as={LuChevronRight} />}
