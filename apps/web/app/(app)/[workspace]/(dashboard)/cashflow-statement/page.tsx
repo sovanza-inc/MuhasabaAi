@@ -56,16 +56,16 @@ interface Bank {
 
 export default function CashflowStatementPage() {
   const toast = useToast()
+  const queryClient = useQueryClient()
   const { CACHE_KEYS, prefetchData } = useApiCache()
   const [workspace] = useCurrentWorkspace()
-  const queryClient = useQueryClient()
+  const [selectedBankId, setSelectedBankId] = React.useState('all')
+  const [selectedMonth, setSelectedMonth] = React.useState('all')
   const [isLoading, setIsLoading] = React.useState(true)
-  const [transactions, setTransactions] = React.useState<BankTransaction[]>([])
   const [authToken, setAuthToken] = React.useState<string | null>(null)
   const [customerId, setCustomerId] = React.useState<string | null>(null)
   const [connectedBanks, setConnectedBanks] = React.useState<Bank[]>([])
-  const [selectedBankId, setSelectedBankId] = React.useState<string>('all')
-  const [selectedMonth, setSelectedMonth] = React.useState('all')
+  const [transactions, setTransactions] = React.useState<BankTransaction[]>([])
   const [selectedStatus, setSelectedStatus] = React.useState('All')
   const [selectedType, setSelectedType] = React.useState('All')
 
@@ -157,7 +157,7 @@ export default function CashflowStatementPage() {
       })
       return []
     }
-  }, [customerId, authToken, toast, prefetchData])
+  }, [customerId, authToken, toast, prefetchData, CACHE_KEYS.ACCOUNTS])
 
   // Fetch accounts for each bank
   const fetchAccountsForBank = React.useCallback(async (entityId: string) => {
@@ -187,7 +187,7 @@ export default function CashflowStatementPage() {
       console.error('Error fetching bank accounts:', error)
       return []
     }
-  }, [authToken, customerId, prefetchData])
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.ACCOUNTS])
 
   // Fetch transactions for an account
   const fetchTransactionsForAccount = React.useCallback(async (accountId: string, entityId: string) => {
@@ -217,7 +217,7 @@ export default function CashflowStatementPage() {
       console.error('Error fetching transactions:', error)
       return []
     }
-  }, [authToken, customerId, prefetchData])
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.TRANSACTIONS])
 
   // Fetch all transactions
   React.useEffect(() => {

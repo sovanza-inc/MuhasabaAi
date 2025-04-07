@@ -142,7 +142,7 @@ export default function BalanceSheetPage() {
       console.error('Error fetching connected banks:', error)
       return []
     }
-  }, [customerId, authToken, prefetchData])
+  }, [customerId, authToken, prefetchData, CACHE_KEYS.ACCOUNTS])
 
   // Fetch accounts for each bank
   const fetchAccountsForBank = React.useCallback(async (entityId: string) => {
@@ -172,7 +172,7 @@ export default function BalanceSheetPage() {
       console.error('Error fetching bank accounts:', error)
       return []
     }
-  }, [authToken, customerId, prefetchData])
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.ACCOUNTS])
 
   // Fetch balance for an account
   const fetchBalanceForAccount = React.useCallback(async (accountId: string, entityId: string) => {
@@ -202,7 +202,7 @@ export default function BalanceSheetPage() {
       console.error('Error fetching balance:', error)
       return null
     }
-  }, [authToken, customerId, prefetchData])
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.ACCOUNTS])
 
   // Fetch transactions for an account
   const fetchTransactionsForAccount = React.useCallback(async (accountId: string, entityId: string) => {
@@ -232,7 +232,7 @@ export default function BalanceSheetPage() {
       console.error('Error fetching transactions:', error)
       return []
     }
-  }, [authToken, customerId, prefetchData])
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.TRANSACTIONS])
 
   // Fetch all data
   React.useEffect(() => {

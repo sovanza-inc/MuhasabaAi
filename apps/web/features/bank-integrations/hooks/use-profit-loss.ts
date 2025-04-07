@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace';
+import { useApiCache } from '#features/common/hooks/use-api-cache';
 
 interface Transaction {
   transaction_id: string;
@@ -55,6 +56,7 @@ interface ProfitLossData {
 
 export function useProfitLoss() {
   const [workspace] = useCurrentWorkspace();
+  const { prefetchData, CACHE_KEYS } = useApiCache();
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ProfitLossData | null>(null);
@@ -104,71 +106,92 @@ export function useProfitLoss() {
     if (!customerId || !authToken) return [];
 
     try {
-      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      // Create a unique cache key that includes the customer ID
+      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}`;
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch connected banks');
+          }
+
+          return data;
         }
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch connected banks');
-      }
-
-      return data;
+      );
     } catch (err: any) {
       setError('Failed to fetch connected banks: ' + err.message);
       return [];
     }
-  }, [customerId, authToken]);
+  }, [customerId, authToken, prefetchData, CACHE_KEYS.ACCOUNTS]);
 
   // Step 3: Fetch accounts for a bank
   const fetchAccountsForBank = useCallback(async (entityId: string) => {
     try {
-      const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      // Create a unique cache key that includes both customer ID and entity ID
+      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}_${entityId}`;
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch bank accounts');
+          }
+
+          return data;
         }
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch bank accounts');
-      }
-
-      return data;
+      );
     } catch (err: any) {
       console.error('Error fetching bank accounts:', err);
       return [];
     }
-  }, [authToken]);
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.ACCOUNTS]);
 
   // Step 4: Fetch transactions for an account
   const fetchTransactionsForAccount = useCallback(async (accountId: string, entityId: string) => {
     try {
-      const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
+      // Create a unique cache key that includes customer ID, account ID, and entity ID
+      const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_${customerId}_${accountId}_${entityId}`;
+      return await prefetchData(
+        cacheKey,
+        async () => {
+          const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${authToken}`
+            }
+          });
+
+          const data = await response.json();
+          
+          if (!response.ok) {
+            throw new Error(data.details || 'Failed to fetch transactions');
+          }
+
+          return data.transactions || [];
         }
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.details || 'Failed to fetch transactions');
-      }
-
-      return data.transactions || [];
+      );
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
       return [];
     }
-  }, [authToken]);
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.TRANSACTIONS]);
 
   // Main effect to fetch all data
   useEffect(() => {
