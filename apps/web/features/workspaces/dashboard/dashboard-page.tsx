@@ -78,9 +78,8 @@ export function DashboardPage() {
   const [authToken, setAuthToken] = useState<string | null>(null)
   const [customerId, setCustomerId] = useState<string | null>(null)
   const [connectedBanks, setConnectedBanks] = useState<ConnectedBank[]>([])
-  const [accounts, setAccounts] = useState<BankAccount[]>([])
-  const [workspace] = useCurrentWorkspace()
   const [selectedBankId, setSelectedBankId] = useState<string>('all')
+  const [workspace] = useCurrentWorkspace()
   const { CACHE_KEYS, prefetchData } = useApiCache()
   const queryClient = useQueryClient()
 
@@ -236,12 +235,10 @@ export function DashboardPage() {
         const banks = await fetchConnectedBanks();
         setConnectedBanks(banks);
 
-        const allAccounts: BankAccount[] = [];
         let allTransactions: BankTransaction[] = [];
 
         for (const bank of banks) {
           const bankAccounts = await fetchAccountsForBank(bank.id);
-          allAccounts.push(...bankAccounts);
 
           for (const account of bankAccounts) {
             if (!account.account_id) continue;
@@ -264,7 +261,6 @@ export function DashboardPage() {
           new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
         );
 
-        setAccounts(allAccounts);
         // Cache the combined transactions
         queryClient.setQueryData([allTransactionsCacheKey], allTransactions);
         setTransactions(allTransactions);
