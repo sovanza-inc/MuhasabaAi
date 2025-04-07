@@ -44,6 +44,8 @@ interface BankTransaction {
   value_date_time: string;
   bank_name?: string;
   bank_id?: string;
+  account_type?: string;
+  account_name?: string;
 }
 
 interface Bank {
@@ -241,6 +243,9 @@ export default function CashflowStatementPage() {
           
           for (const account of accounts) {
             const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id)
+            const accountType = account.account_type || account.account_sub_type || "";
+            const accountName = account.nickname || accountType || account.account_id;
+            
             const transactionsWithBank = accountTransactions.map((transaction: BankTransaction) => {
               // Log transaction details for debugging
               console.log('Transaction:', {
@@ -261,7 +266,9 @@ export default function CashflowStatementPage() {
                 ...transaction,
                 bank_name: bank.bank_identifier || bank.name,
                 bank_id: bank.id,
-                credit_debit_indicator: isCredit ? 'CREDIT' : 'DEBIT'
+                credit_debit_indicator: isCredit ? 'CREDIT' : 'DEBIT',
+                account_type: accountType,
+                account_name: accountName
               }
             })
             
@@ -583,11 +590,66 @@ export default function CashflowStatementPage() {
                       {selectedBankId === 'all' ? (
                         // Group transactions by bank when showing all banks
                         connectedBanks.map(bank => {
-                          const bankTransactions = filteredTransactions
-                            .filter(t => t.bank_id === bank.id)
-                            .slice(0, 5); // Show top 5 transactions per bank
+                          // Get transactions for this bank
+                          const bankTransactions = filteredTransactions.filter(t => t.bank_id === bank.id);
                           
-                          return bankTransactions.length > 0 ? (
+                          // Skip banks with no transactions
+                          if (bankTransactions.length === 0) return null;
+                          
+                          // For each bank, select a diverse set of transactions
+                          const diverseTransactions = [];
+                          
+                          // Try to get both credit and debit transactions with diverse amounts
+                          const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
+                          const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
+                          
+                          // Take highest amount credit transaction if available
+                          if (credits.length > 0) {
+                            const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                            diverseTransactions.push(highestCredit);
+                            
+                            // If we have more credits, also take a lower amount one
+                            if (credits.length > 1) {
+                              const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                              if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
+                                diverseTransactions.push(lowestCredit);
+                              }
+                            }
+                          }
+                          
+                          // Take highest amount debit transaction if available
+                          if (debits.length > 0) {
+                            const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                            diverseTransactions.push(highestDebit);
+                            
+                            // If we have more debits, also take a lower amount one
+                            if (debits.length > 1) {
+                              const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                              if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
+                                diverseTransactions.push(lowestDebit);
+                              }
+                            }
+                          }
+                          
+                          // If we didn't get enough transactions, add more from the original list
+                          if (diverseTransactions.length < 5) {
+                            const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
+                            const remainingTransactions = bankTransactions
+                              .filter(t => !existingIds.has(t.transaction_id))
+                              .slice(0, 5 - diverseTransactions.length);
+                            
+                            diverseTransactions.push(...remainingTransactions);
+                          }
+                          
+                          // Sort by date (most recent first)
+                          diverseTransactions.sort((a, b) => 
+                            new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+                          );
+                          
+                          // Limit to 5 transactions per bank
+                          const selectedTransactions = diverseTransactions.slice(0, 5);
+                          
+                          return selectedTransactions.length > 0 ? (
                             <React.Fragment key={bank.id}>
                               <Tr>
                                 <Td 
@@ -599,7 +661,7 @@ export default function CashflowStatementPage() {
                                   {bank.bank_identifier || bank.name}
                                 </Td>
                               </Tr>
-                              {bankTransactions.map((transaction) => (
+                              {selectedTransactions.map((transaction) => (
                                 <Tr key={transaction.transaction_id}>
                                   <Td>
                                     <Text noOfLines={1} title={transaction.transaction_id}>
@@ -646,8 +708,63 @@ export default function CashflowStatementPage() {
                           ) : null;
                         })
                       ) : (
-                        // Show regular transaction list for single bank
-                        filteredTransactions.slice(0, 10).map((transaction) => (
+                        // For single bank view, also use diverse transaction selection
+                        (() => {
+                          const bankTransactions = filteredTransactions;
+                          
+                          // Try to get both credit and debit transactions with diverse amounts
+                          const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
+                          const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
+                          
+                          const diverseTransactions = [];
+                          
+                          // Take highest and lowest amount credit transactions if available
+                          if (credits.length > 0) {
+                            // Sort by amount descending and take highest
+                            const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                            diverseTransactions.push(highestCredit);
+                            
+                            // If we have more than one, take lowest amount too
+                            if (credits.length > 1) {
+                              const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                              if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
+                                diverseTransactions.push(lowestCredit);
+                              }
+                            }
+                          }
+                          
+                          // Take highest and lowest amount debit transactions if available
+                          if (debits.length > 0) {
+                            // Sort by amount descending and take highest
+                            const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                            diverseTransactions.push(highestDebit);
+                            
+                            // If we have more than one, take lowest amount too
+                            if (debits.length > 1) {
+                              const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                              if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
+                                diverseTransactions.push(lowestDebit);
+                              }
+                            }
+                          }
+                          
+                          // If we didn't get enough transactions, add more from the original list
+                          if (diverseTransactions.length < 10) {
+                            const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
+                            const remainingTransactions = bankTransactions
+                              .filter(t => !existingIds.has(t.transaction_id))
+                              .slice(0, 10 - diverseTransactions.length);
+                            
+                            diverseTransactions.push(...remainingTransactions);
+                          }
+                          
+                          // Sort by date (most recent first)
+                          diverseTransactions.sort((a, b) => 
+                            new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+                          );
+                          
+                          // Limit to 10 transactions
+                          return diverseTransactions.slice(0, 10).map((transaction) => (
                           <Tr key={transaction.transaction_id}>
                             <Td>
                               <Text noOfLines={1} title={transaction.transaction_id}>
@@ -689,7 +806,8 @@ export default function CashflowStatementPage() {
                               </Badge>
                             </Td>
                           </Tr>
-                        ))
+                          ));
+                        })()
                       )}
                 </Tbody>
               </Table>

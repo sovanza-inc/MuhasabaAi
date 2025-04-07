@@ -356,21 +356,137 @@ export default function BalanceSheetPage() {
 
   // Filter transactions based on selected account
   const filteredTransactions = React.useMemo(() => {
-    const relevantTransactions = selectedAccount === 'all'
-      ? transactions
-      : transactions.filter(t => {
-          const bank = bankAccounts.find(b => b.id === selectedAccount);
-          return bank?.accounts.some(a => a.account_id === t.account_id);
-        });
-
     if (selectedAccount === 'all') {
-      // Shuffle the transactions array and take first 5
-      const shuffled = [...relevantTransactions].sort(() => Math.random() - 0.5);
-      return shuffled.slice(0, 5);
+      // For "All Banks", ensure we show transactions from multiple banks with diverse amounts and account types
+      // First, group transactions by bank
+      const bankTransactionMap = new Map<string, Transaction[]>();
+      
+      // Group transactions by bank ID
+      transactions.forEach(transaction => {
+        const bank = bankAccounts.find(b => b.accounts.some(a => a.account_id === transaction.account_id));
+        if (!bank) return;
+        
+        if (!bankTransactionMap.has(bank.id)) {
+          bankTransactionMap.set(bank.id, []);
+        }
+        
+        bankTransactionMap.get(bank.id)?.push({
+          ...transaction,
+          bank_name: bank.name
+        });
+      });
+      
+      // If we have banks with transactions
+      if (bankTransactionMap.size > 0) {
+        const result: Transaction[] = [];
+        
+        // Process each bank separately
+        bankTransactionMap.forEach((bankTransactions, bankId) => {
+          const bank = bankAccounts.find(b => b.id === bankId);
+          if (!bank) return;
+          
+          // Group transactions by account type
+          const accountTransactionMap = new Map<string, Transaction[]>();
+          
+          bankTransactions.forEach(transaction => {
+            const account = bank.accounts.find(a => a.account_id === transaction.account_id);
+            if (!account) return;
+            
+            const accountType = account.account_type?.toLowerCase() || account.nickname?.toLowerCase() || 'other';
+            if (!accountTransactionMap.has(accountType)) {
+              accountTransactionMap.set(accountType, []);
+            }
+            
+            accountTransactionMap.get(accountType)?.push(transaction);
+          });
+          
+          // Process each account type - select multiple transactions per account type
+          accountTransactionMap.forEach((accountTxns, accountType) => {
+            const credits = accountTxns.filter(t => t.credit_debit_indicator === 'CREDIT');
+            const debits = accountTxns.filter(t => t.credit_debit_indicator === 'DEBIT');
+            
+            // Take multiple credit transactions
+            if (credits.length > 0) {
+              // Sort by amount (highest first)
+              const sortedCredits = [...credits].sort((a, b) => b.amount.amount - a.amount.amount);
+              // Take up to 2 highest credit transactions
+              result.push(...sortedCredits.slice(0, 2));
+            }
+            
+            // Take multiple debit transactions
+            if (debits.length > 0) {
+              // Sort by amount (highest first)
+              const sortedDebits = [...debits].sort((a, b) => b.amount.amount - a.amount.amount);
+              // Take up to 2 highest debit transactions
+              result.push(...sortedDebits.slice(0, 2));
+            }
+          });
+        });
+        
+        // Sort by date (most recent first) and limit to 10 transactions
+        result.sort((a, b) => 
+          new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+        );
+        
+        return result.slice(0, 10);
+      }
+      
+      // Fallback to most recent 10 transactions if grouping fails
+      return transactions.slice(0, 10);
+    } else {
+      // For specific bank selection
+      const bankTransactions = transactions.filter(t => {
+        const bank = bankAccounts.find(b => b.id === selectedAccount);
+        return bank?.accounts.some(a => a.account_id === t.account_id);
+      });
+      
+      // Group by account type
+      const accountTypeGroups = new Map<string, Transaction[]>();
+      
+      bankTransactions.forEach(transaction => {
+        const bank = bankAccounts.find(b => b.id === selectedAccount);
+        const account = bank?.accounts.find(a => a.account_id === transaction.account_id);
+        if (!account) return;
+        
+        const accountType = account.account_type?.toLowerCase() || account.nickname?.toLowerCase() || 'other';
+        if (!accountTypeGroups.has(accountType)) {
+          accountTypeGroups.set(accountType, []);
+        }
+        
+        accountTypeGroups.get(accountType)?.push(transaction);
+      });
+      
+      const result: Transaction[] = [];
+      
+      // Process each account type group - select more transactions per group
+      accountTypeGroups.forEach((groupTxns) => {
+        const credits = groupTxns.filter(t => t.credit_debit_indicator === 'CREDIT');
+        const debits = groupTxns.filter(t => t.credit_debit_indicator === 'DEBIT');
+        
+        // Take multiple credit transactions
+        if (credits.length > 0) {
+          // Sort by amount (highest first)
+          const sortedCredits = [...credits].sort((a, b) => b.amount.amount - a.amount.amount);
+          // Take up to 3 highest credit transactions
+          result.push(...sortedCredits.slice(0, 3));
+        }
+        
+        // Take multiple debit transactions
+        if (debits.length > 0) {
+          // Sort by amount (highest first)
+          const sortedDebits = [...debits].sort((a, b) => b.amount.amount - a.amount.amount);
+          // Take up to 3 highest debit transactions
+          result.push(...sortedDebits.slice(0, 3));
+        }
+      });
+      
+      // Sort by date (most recent first) and limit to 10 transactions
+      result.sort((a, b) => 
+        new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+      );
+      
+      return result.slice(0, 10);
     }
-
-    // For specific bank selection, show most recent 4 transactions
-    return relevantTransactions.slice(0, 4);
   }, [transactions, selectedAccount, bankAccounts])
 
   return (
