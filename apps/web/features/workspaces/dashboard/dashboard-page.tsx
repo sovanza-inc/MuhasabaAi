@@ -71,7 +71,7 @@ interface BankTransaction {
   account_name?: string;
 }
 
-export function DashboardPage(_props: WorkspacePageProps) {
+export function DashboardPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [transactions, setTransactions] = useState<BankTransaction[]>([])
   const [authToken, setAuthToken] = useState<string | null>(null)
@@ -760,42 +760,43 @@ export function DashboardPage(_props: WorkspacePageProps) {
     >
       {/* Receivables Section */}
       <Box mb={8}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
+        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
           <Box>
             <Heading size="lg" mb={2}>Receivables</Heading>
             <Text color="gray.600">
               Effortlessly view and manage your accounts in one place with real-time balance updates.
             </Text>
           </Box>
-          <HStack spacing={4}>
-            <Select 
-              maxW="200px"
-              value={selectedBankId}
-              onChange={(e) => setSelectedBankId(e.target.value)}
-              bg="green.50"
-              color="green.500"
-              borderColor="green.200"
-              _hover={{
-                borderColor: "green.300"
-              }}
-            >
-              <option value="all">All Banks</option>
-              {connectedBanks.map((bank) => (
-                <option key={bank.id} value={bank.id}>
-                  {bank.bank_identifier}
-                </option>
-              ))}
-            </Select>
-            <Button
-              as="a"
-              href="#"
-              colorScheme="green"
-              variant="link"
-              rightIcon={<Icon as={LuChevronRight} />}
-            >
-              View Reports
-            </Button>
-          </HStack>
+          <Button
+            as="a"
+            href="#"
+            colorScheme="green"
+            variant="link"
+            rightIcon={<Icon as={LuChevronRight} />}
+          >
+            View Reports
+          </Button>
+        </Box>
+
+        <Box display="flex" justifyContent="flex-end" mb={4}>
+          <Select 
+            maxW="200px"
+            value={selectedBankId}
+            onChange={(e) => setSelectedBankId(e.target.value)}
+            bg="green.50"
+            color="green.500"
+            borderColor="green.200"
+            _hover={{
+              borderColor: "green.300"
+            }}
+          >
+            <option value="all">All Banks</option>
+            {connectedBanks.map((bank) => (
+              <option key={bank.id} value={bank.id}>
+                {bank.bank_identifier}
+              </option>
+            ))}
+          </Select>
         </Box>
 
         <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6}>
