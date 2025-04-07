@@ -4,8 +4,8 @@ import { createPage } from '#lib/create-page'
 const { Page, metadata } = createPage({
   title: 'Dashboard',
   params: ['workspace'],
-  component: ({ params }) => {
-    return <DashboardPage params={params} />
+  component: () => {
+    return <DashboardPage />
   },
 })
 
