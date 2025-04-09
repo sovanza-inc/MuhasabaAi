@@ -120,7 +120,7 @@ export default function ProfitLossPage() {
   return (
     <Box>
       <PageHeader />
-      <Box p={4} pb={20}>
+      <Box p={4}>
         <Box 
           height="calc(100vh - 65px)"
           position="relative"
@@ -182,17 +182,17 @@ export default function ProfitLossPage() {
                   <SimpleGrid columns={3} gap={4}>
                     <Box>
                       <Text color="gray.600" fontSize="sm">Project cost:</Text>
-                      <Text fontSize="md">{data.revenues.projectCost}</Text>
+                      <Text fontSize="md">${data.revenues.projectCost}</Text>
                     </Box>
                     <Box>
                       <Text color="gray.600" fontSize="sm">Total spending:</Text>
-                      <Text fontSize="md">{data.revenues.totalSpending}</Text>
+                      <Text fontSize="md">${data.revenues.totalSpending}</Text>
                     </Box>
                     <Box>
                       <Text color="gray.600" fontSize="sm">This Month</Text>
-                      <Text fontSize="md" mb={2}>{data.revenues.thisMonth}</Text>
+                      <Text fontSize="md" mb={2}>${data.revenues.thisMonth}</Text>
                       <Progress 
-                        value={parseInt(data.revenues.thisMonth)} 
+                        value={parseFloat(data.revenues.totalSpending) > 0 ? (parseFloat(data.revenues.thisMonth) / parseFloat(data.revenues.totalSpending)) * 100 : 0} 
                         size="sm" 
                         colorScheme="green"
                         borderRadius="full"
@@ -210,17 +210,17 @@ export default function ProfitLossPage() {
                   <SimpleGrid columns={3} gap={4}>
                     <Box>
                       <Text color="gray.600" fontSize="sm">Project cost:</Text>
-                      <Text fontSize="md">{data.expenses.projectCost}</Text>
+                      <Text fontSize="md">${data.expenses.projectCost}</Text>
                     </Box>
                     <Box>
                       <Text color="gray.600" fontSize="sm">Total spending:</Text>
-                      <Text fontSize="md">{data.expenses.totalSpending}</Text>
+                      <Text fontSize="md">${data.expenses.totalSpending}</Text>
                     </Box>
                     <Box>
                       <Text color="gray.600" fontSize="sm">This Month</Text>
-                      <Text fontSize="md" mb={2}>{data.expenses.thisMonth}</Text>
+                      <Text fontSize="md" mb={2}>${data.expenses.thisMonth}</Text>
                       <Progress 
-                        value={parseInt(data.expenses.thisMonth)} 
+                        value={parseFloat(data.expenses.totalSpending) > 0 ? (parseFloat(data.expenses.thisMonth) / parseFloat(data.expenses.totalSpending)) * 100 : 0} 
                         size="sm" 
                         colorScheme="green"
                         borderRadius="full"
@@ -236,29 +236,29 @@ export default function ProfitLossPage() {
           {/* Transactions Records */}
           <Box mb={8}>
             <Heading size="md" mb={4}>Revenues Transactions Record</Heading>
-            <TableContainer>
-              <Table variant="simple">
+            <TableContainer whiteSpace="normal" overflowX="hidden">
+              <Table variant="simple" layout="fixed" width="100%">
                 <Thead>
                   <Tr borderBottom="1px" borderColor="gray.200">
-                    <Th>
+                    <Th width="15%">
                       <HStack spacing={1}>
                         <Text>Date</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th>
+                    <Th width="20%">
                       <HStack spacing={1}>
                         <Text>Account name</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th>
+                    <Th width="50%">
                       <HStack spacing={1}>
                         <Text>Description</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th isNumeric>
+                    <Th width="15%" isNumeric>
                       <HStack spacing={1} justify="flex-end">
                         <Text>Ammount</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
@@ -267,44 +267,49 @@ export default function ProfitLossPage() {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {data?.revenues.transactions.map((transaction, index) => (
+                  {data?.revenues?.transactions?.slice(0, 10).map((transaction, index) => (
                     <Tr key={index}>
                       <Td>{transaction.date}</Td>
                       <Td>{transaction.accountName}</Td>
-                      <Td>{transaction.description}</Td>
+                      <Td noOfLines={1}>{transaction.description}</Td>
                       <Td isNumeric>{transaction.amount}</Td>
                     </Tr>
                   ))}
                 </Tbody>
               </Table>
             </TableContainer>
+            {data?.revenues?.transactions && data.revenues.transactions.length > 10 && (
+              <Text mt={2} color="gray.600" fontSize="sm" textAlign="center">
+                Showing 10 of {data.revenues.transactions.length} transactions
+              </Text>
+            )}
           </Box>
 
           <Box mb={6}>
             <Heading size="md" mb={4}>Expenses Transaction Records</Heading>
-            <TableContainer>
-              <Table variant="simple">
+            <TableContainer whiteSpace="normal" overflowX="hidden">
+              <Table variant="simple" layout="fixed" width="100%">
                 <Thead>
                   <Tr borderBottom="1px" borderColor="gray.200">
-                    <Th>
+                    <Th width="15%">
                       <HStack spacing={1}>
                         <Text>Date</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th>
+                    <Th width="20%">
                       <HStack spacing={1}>
                         <Text>Account name</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th>
+                    <Th width="50%">
                       <HStack spacing={1}>
                         <Text>Description</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
                       </HStack>
                     </Th>
-                    <Th isNumeric>
+                    <Th width="15%" isNumeric>
                       <HStack spacing={1} justify="flex-end">
                         <Text>Ammount</Text>
                         <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
@@ -313,31 +318,35 @@ export default function ProfitLossPage() {
                   </Tr>
                 </Thead>
                 <Tbody>
-                  {data?.expenses.transactions.map((transaction, index) => (
+                  {data?.expenses?.transactions?.slice(0, 10).map((transaction, index) => (
                     <Tr key={index}>
                       <Td>{transaction.date}</Td>
                       <Td>{transaction.accountName}</Td>
-                      <Td>{transaction.description}</Td>
+                      <Td noOfLines={1}>{transaction.description}</Td>
                       <Td isNumeric>{transaction.amount}</Td>
                     </Tr>
                   ))}
                 </Tbody>
               </Table>
             </TableContainer>
+            {data?.expenses?.transactions && data.expenses.transactions.length > 10 && (
+              <Text mt={2} color="gray.600" fontSize="sm" textAlign="center">
+                Showing 10 of {data.expenses.transactions.length} transactions
+              </Text>
+            )}
           </Box>
         </Box>
-
-        {/* Summary Footer */}
-        <Box 
-          bg="teal.700" 
-          color="white" 
-          p={4}
-        >
-          <HStack justify="space-between">
-            <Text>Summary: Revenue-Expenses</Text>
-            <Text>Net Profit: {data?.netProfit || '0$'}</Text>
-          </HStack>
-        </Box>
+      </Box>
+      {/* Summary Footer */}
+      <Box 
+        bg="teal.700" 
+        color="white" 
+        p={4}
+      >
+        <HStack justify="space-between">
+          <Text>Summary: Revenue-Expenses</Text>
+          <Text>Net Profit: {data?.netProfit || '0$'}</Text>
+        </HStack>
       </Box>
     </Box>
   )
