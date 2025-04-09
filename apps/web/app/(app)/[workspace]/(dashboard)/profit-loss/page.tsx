@@ -223,76 +223,60 @@ export default function ProfitLossPage() {
       let pageNum = 1;
       let currentY = contentStartY;
       let remainingHeight = imgHeight;
-      let lastContentY = 0;
 
-      // Make the content splitting process async to handle async header
-      async function generatePages() {
-        while (remainingHeight > 0) {
-          // Add new page if needed
-          if (pageNum > 1) {
-            pdf.addPage();
-            currentY = contentStartY;
-          }
+      while (remainingHeight > 0) {
+        if (pageNum > 1) {
+          pdf.addPage();
+          currentY = contentStartY;
+        }
 
-          // Add header
-          await addHeader(pageNum);
+        await addHeader(pageNum);
 
-          // Calculate how much content can fit on this page
-          const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight;
-          const heightToDraw = Math.min(remainingHeight, availableHeight);
+        // Calculate available height for content on this page
+        const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight;
+        const heightToDraw = Math.min(remainingHeight, availableHeight);
 
-          // Calculate the portion of the image to use
-          const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
-          const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
+        // Calculate the portion of the image to draw
+        const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
+        const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
 
-          // Create a temporary canvas for the portion we want to draw
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = sourceHeight;
-          const tempCtx = tempCanvas.getContext('2d');
+        // Create a temporary canvas for the portion we want to draw
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = sourceHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        
+        if (tempCtx) {
+          tempCtx.drawImage(
+            canvas, 
+            0, sourceY, canvas.width, sourceHeight, 
+            0, 0, canvas.width, sourceHeight
+          );
           
-          if (tempCtx) {
-            tempCtx.drawImage(
-              canvas, 
-              0, 
-              sourceY, 
-              canvas.width, 
-              sourceHeight, 
-              0, 
-              0, 
-              canvas.width, 
-              sourceHeight
-            );
-            
-            // Draw portion of content
-            const portionImgData = tempCanvas.toDataURL('image/png');
-            pdf.addImage(
-              portionImgData,
-              'PNG',
-              marginX,
-              currentY,
-              imgWidth,
-              heightToDraw
-            );
-          }
+          // Draw portion of content
+          const portionImgData = tempCanvas.toDataURL('image/png');
+          pdf.addImage(
+            portionImgData,
+            'PNG',
+            marginX,
+            currentY,
+            imgWidth,
+            heightToDraw
+          );
+        }
 
-          lastContentY = currentY + heightToDraw;
-          remainingHeight -= heightToDraw;
+        remainingHeight -= heightToDraw;
+        if (remainingHeight > 0) {
           pageNum++;
         }
-
-        pageNum--; // Adjust for last increment
-
-        // Add page numbers to all pages
-        for (let i = 1; i <= pageNum; i++) {
-          addFooter(i, pageNum);
-        }
-
-        pdf.save('profit-loss-report.pdf');
       }
 
-      // Start the PDF generation
-      await generatePages();
+      // Add page numbers to all pages
+      for (let i = 1; i <= pageNum; i++) {
+        addFooter(i, pageNum);
+      }
+
+      pdf.save('profit-loss-report.pdf');
 
       toast({
         title: "Export successful",
