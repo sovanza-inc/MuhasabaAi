@@ -171,7 +171,6 @@ export default function ProfitLossPage() {
       
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       const pdf = new jsPDF('p', 'mm', 'a4');
-      const imgData = canvas.toDataURL('image/png');
 
       // Function to add header to each page
       async function addHeader(pageNum: number): Promise<void> {
@@ -218,9 +217,6 @@ export default function ProfitLossPage() {
         pdf.setTextColor(100);
         pdf.text(`Page ${pageNum} of ${totalPages}`, pdf.internal.pageSize.width / 2, pdf.internal.pageSize.height - (footerMargin / 2), { align: 'center' });
       }
-
-      // Calculate content height per page
-      const contentHeight = pageHeight - contentStartY - footerMargin - pageNumberHeight;
 
       // Split content into pages
       let pageNum = 1;
