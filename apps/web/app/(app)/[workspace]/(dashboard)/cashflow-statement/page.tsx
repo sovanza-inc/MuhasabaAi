@@ -19,13 +19,16 @@ import {
   Button,
   Spinner,
   useToast,
+  Image
 } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { AreaChart } from '@saas-ui/charts'
 import React from 'react'
-import { LuChevronsUpDown } from 'react-icons/lu'
+import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface BankTransaction {
   transaction_id: string;
@@ -64,6 +67,8 @@ export default function CashflowStatementPage() {
   const [selectedMonth, setSelectedMonth] = React.useState('all')
   const [selectedStatus, setSelectedStatus] = React.useState('All')
   const [selectedType, setSelectedType] = React.useState('All')
+  const contentRef = React.useRef<HTMLDivElement>(null)
+  const logoRef = React.useRef<HTMLImageElement>(null)
 
   // Initialize auth token and customer ID
   React.useEffect(() => {
@@ -342,20 +347,391 @@ export default function CashflowStatementPage() {
     return `$${value.toFixed(0)}`
   }
 
+  const handleExportPDF = async () => {
+    if (!contentRef.current) return;
+
+    try {
+      // Create a temporary container to hold all content
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '-9999px';
+      tempContainer.style.width = '1400px'; // Increased width for better table scaling
+      tempContainer.style.padding = '40px'; // Increased padding
+      tempContainer.style.backgroundColor = 'white';
+
+      // Add logo image to the container
+      const logoImg = document.createElement('img');
+      logoImg.src = logoRef.current?.src || '';
+      logoImg.style.display = 'none';
+      tempContainer.appendChild(logoImg);
+
+      document.body.appendChild(tempContainer);
+
+      // Clone the content and modify table styles for better PDF rendering
+      const contentClone = contentRef.current.cloneNode(true) as HTMLElement;
+      
+      // Adjust table styles for better rendering
+      const tables = contentClone.getElementsByTagName('table');
+      for (let i = 0; i < tables.length; i++) {
+        const table = tables[i];
+        table.style.width = '100%';
+        table.style.tableLayout = 'fixed';
+        table.style.borderCollapse = 'collapse';
+        table.style.marginBottom = '28px';
+      }
+
+      // Set consistent column widths
+      const headerRow = contentClone.querySelector('thead tr') as HTMLTableRowElement;
+      if (headerRow) {
+        const cells = headerRow.cells;
+        if (cells.length >= 6) {
+          cells[0].style.width = '20%';  // Ref ID
+          cells[1].style.width = '12%';  // Date
+          cells[2].style.width = '38%';  // Description
+          cells[3].style.width = '10%';  // Type
+          cells[4].style.width = '10%';  // Amount
+          cells[5].style.width = '10%';  // Status
+        }
+      }
+
+      // Adjust all table headers
+      const headers = contentClone.getElementsByTagName('th');
+      for (let i = 0; i < headers.length; i++) {
+        const header = headers[i] as HTMLTableCellElement;
+        header.style.padding = '20px 16px';
+        header.style.fontSize = '20px';          // Increased header size
+        header.style.fontWeight = '600';
+        header.style.backgroundColor = '#f7fafc';
+        header.style.borderBottom = '2px solid #e2e8f0';
+        header.style.whiteSpace = 'nowrap';
+        header.style.color = '#2D3748';
+      }
+      
+      // Adjust all table cells
+      const cells = contentClone.getElementsByTagName('td');
+      for (let j = 0; j < cells.length; j++) {
+        const cell = cells[j] as HTMLTableCellElement;
+        cell.style.padding = '20px 16px';       // Increased padding
+        cell.style.fontSize = '18px';           // Increased cell size
+        cell.style.lineHeight = '1.6';
+        cell.style.borderBottom = '1px solid #e2e8f0';
+        cell.style.whiteSpace = 'normal';
+        cell.style.wordBreak = 'break-word';
+        cell.style.verticalAlign = 'middle';
+        cell.style.color = '#2D3748';
+      }
+
+      // Adjust bank header rows
+      const bankHeaders = contentClone.querySelectorAll('td[colspan="6"]');
+      bankHeaders.forEach(header => {
+        const headerElement = header as HTMLTableCellElement;
+        headerElement.style.backgroundColor = '#f7fafc';
+        headerElement.style.padding = '20px 16px';
+        headerElement.style.fontSize = '20px';     // Match regular header size
+        headerElement.style.fontWeight = '600';
+        headerElement.style.color = '#2D3748';
+      });
+
+      // Adjust badge styles for better visibility
+      const badges = contentClone.getElementsByTagName('span');
+      for (let i = 0; i < badges.length; i++) {
+        const badge = badges[i] as HTMLSpanElement;
+        if (badge.classList.contains('chakra-badge')) {
+          badge.style.fontSize = '16px';
+          badge.style.padding = '6px 12px';
+          badge.style.fontWeight = '500';
+          badge.style.borderRadius = '6px';
+          badge.style.display = 'inline-block';    // Ensure consistent display
+          badge.style.minWidth = '90px';          // Set minimum width
+          badge.style.textAlign = 'center';       // Center the text
+        }
+      }
+
+      // Adjust text elements for better readability
+      const texts = contentClone.getElementsByTagName('p');
+      for (let i = 0; i < texts.length; i++) {
+        const text = texts[i] as HTMLParagraphElement;
+        text.style.fontSize = '18px';          // Match cell size
+        text.style.lineHeight = '1.6';
+        text.style.color = '#2D3748';
+      }
+
+      // Adjust heading sizes
+      const headings = contentClone.getElementsByTagName('h2');
+      for (let i = 0; i < headings.length; i++) {
+        const heading = headings[i] as HTMLHeadingElement;
+        heading.style.fontSize = '20px';       // Increased heading size
+        heading.style.marginBottom = '16px';
+        heading.style.color = '#1A202C';
+        heading.style.fontWeight = '600';
+      }
+
+      // Adjust summary text sizes
+      const summaryTexts = contentClone.querySelectorAll('[data-summary-footer] p, [data-summary-footer] span');
+      summaryTexts.forEach(text => {
+        const element = text as HTMLElement;
+        element.style.fontSize = '20px';       // Match header size
+        element.style.fontWeight = '500';
+        element.style.color = 'white';
+      });
+
+      // Adjust amounts and numbers for better visibility
+      const numericCells = contentClone.querySelectorAll('td[isNumeric]');
+      numericCells.forEach(cell => {
+        const numericCell = cell as HTMLTableCellElement;
+        numericCell.style.fontSize = '18px';   // Match regular cell size
+        numericCell.style.fontWeight = '600';  // Make amounts bolder
+        numericCell.style.fontFamily = 'monospace'; // Use monospace for amounts
+      });
+
+      // Ensure consistent font size for transaction IDs
+      const refIdCells = contentClone.querySelectorAll('td:first-child');
+      refIdCells.forEach(cell => {
+        const refCell = cell as HTMLTableCellElement;
+        refCell.style.fontSize = '18px';      // Match regular cell size
+        refCell.style.fontFamily = 'monospace'; // Use monospace for IDs
+      });
+
+      tempContainer.appendChild(contentClone);
+
+      // Clone and append the summary footer
+      const summaryFooter = document.querySelector('[data-summary-footer]')?.cloneNode(true) as HTMLElement;
+      if (summaryFooter) {
+        const footerElement = summaryFooter as HTMLDivElement;
+        footerElement.style.position = 'relative';
+        footerElement.style.bottom = 'auto';
+        footerElement.style.padding = '16px';
+        footerElement.style.fontSize = '14px';
+        tempContainer.appendChild(footerElement);
+      }
+
+      // Generate PDF
+      const canvas = await html2canvas(tempContainer, {
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        width: 1400,
+        height: tempContainer.offsetHeight,
+        windowWidth: 1400,
+        windowHeight: tempContainer.offsetHeight,
+        backgroundColor: '#ffffff'
+      });
+
+      // Clean up
+      document.body.removeChild(tempContainer);
+
+      const imgWidth = 190; // Width for A4
+      const pageHeight = 297; // A4 height in mm
+      const marginX = 10; // Side margins
+      const marginY = 15; // Top margin
+      const footerMargin = 10; // Bottom margin
+      const headerHeight = 15; // Header height
+      const pageNumberHeight = 8; // Page number height
+      const contentStartY = marginY + headerHeight;
+      const contentBuffer = 5; // Reduced buffer between sections (from 15 to 5)
+      const summaryFooterSpace = 4; // Minimal space between content and summary footer
+      
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+
+      // Function to add header to each page
+      async function addHeader(pageNum: number): Promise<void> {
+        pdf.setPage(pageNum);
+
+        try {
+          if (logoImg.complete && logoImg.naturalWidth > 0) {
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = logoImg.naturalWidth;
+            tempCanvas.height = logoImg.naturalHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            if (tempCtx) {
+              tempCtx.drawImage(logoImg, 0, 0);
+              const logoData = tempCanvas.toDataURL('image/png');
+              
+              // Reduced logo size
+              const logoWidth = 25;
+              const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
+              const logoHeight = logoWidth / aspectRatio;
+              const logoX = (pdf.internal.pageSize.width - logoWidth) / 2;
+              pdf.addImage(logoData, 'PNG', logoX, 5, logoWidth, logoHeight);
+            }
+          }
+        } catch (error) {
+          console.error('Error adding logo:', error);
+        }
+
+        // Add title and date with adjusted positioning
+        pdf.setFontSize(14); // Reduced font size
+        pdf.setTextColor(0, 0, 0);
+        pdf.text('Cash Flow Statement', pdf.internal.pageSize.width / 2, marginY + 3, { align: 'center' });
+        
+        pdf.setFontSize(8); // Smaller font for date
+        pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdf.internal.pageSize.width / 2, marginY + 7, { align: 'center' });
+      }
+
+      // Function to add footer to each page
+      function addFooter(pageNum: number, totalPages: number): void {
+        pdf.setPage(pageNum);
+        pdf.setFontSize(8);
+        pdf.setTextColor(100);
+        pdf.text(`Page ${pageNum} of ${totalPages}`, pdf.internal.pageSize.width / 2, pdf.internal.pageSize.height - (footerMargin / 2), { align: 'center' });
+      }
+
+      // Split content into pages with optimized spacing
+      let pageNum = 1;
+      let currentY = contentStartY;
+      let remainingHeight = imgHeight;
+
+      async function generatePages() {
+        // Calculate space needed for the footer
+        const summaryFooterElements = document.querySelectorAll('[data-summary-footer]');
+        let footerImgHeight = 0;
+        let footerCanvas;
+        let footerImgData;
+        
+        if (summaryFooterElements.length > 0) {
+          const footerElement = summaryFooterElements[0];
+          footerCanvas = await html2canvas(footerElement as HTMLElement, {
+            scale: 2,
+            logging: false,
+            useCORS: true,
+            backgroundColor: null
+          });
+          
+          footerImgData = footerCanvas.toDataURL('image/png');
+          const footerImgWidth = 190;
+          footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width;
+        }
+        
+        // Calculate available height on first page, accounting for footer
+        const firstPageAvailableHeight = pageHeight - contentStartY - footerMargin - pageNumberHeight - footerImgHeight - summaryFooterSpace;
+        let isFirstPage = true;
+        let contentEndY = 0; // Track where content ends
+
+        while (remainingHeight > 0) {
+          if (pageNum > 1) {
+            pdf.addPage();
+            currentY = contentStartY;
+            isFirstPage = false;
+          }
+
+          await addHeader(pageNum);
+
+          // Calculate available height considering if it's the first page
+          const availableHeight = isFirstPage ? firstPageAvailableHeight : (pageHeight - currentY - footerMargin - pageNumberHeight - contentBuffer);
+          const heightToDraw = Math.min(remainingHeight, availableHeight);
+
+          const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
+          const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
+
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = sourceHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          
+          if (tempCtx) {
+            tempCtx.drawImage(
+              canvas, 
+              0, 
+              sourceY, 
+              canvas.width, 
+              sourceHeight, 
+              0, 
+              0, 
+              canvas.width, 
+              sourceHeight
+            );
+            
+            const portionImgData = tempCanvas.toDataURL('image/png');
+            pdf.addImage(
+              portionImgData,
+              'PNG',
+              marginX,
+              currentY,
+              imgWidth,
+              heightToDraw
+            );
+
+            currentY += heightToDraw;
+            if (isFirstPage) {
+              contentEndY = currentY; // Track where content ends on first page
+            }
+          }
+
+          remainingHeight -= heightToDraw;
+          
+          if (remainingHeight > 0) {
+            pageNum++;
+          }
+        }
+
+        // Add summary footer right after the content on the first page
+        if (summaryFooterElements.length > 0 && footerCanvas && footerImgData) {
+          pdf.setPage(1);
+          const footerY = contentEndY + summaryFooterSpace; // Position footer right after content with minimal spacing
+          
+          pdf.addImage(
+            footerImgData,
+            'PNG',
+            marginX,
+            footerY,
+            190, // Full width
+            footerImgHeight
+          );
+        }
+
+        // Add page numbers to all pages
+        for (let i = 1; i <= pageNum; i++) {
+          addFooter(i, pageNum);
+        }
+
+        pdf.save('cashflow-statement-report.pdf');
+      }
+
+      await generatePages();
+
+      toast({
+        title: "Export successful",
+        description: "Your cash flow statement report has been downloaded",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your report",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   return (
     <Box>
       <PageHeader />
-      <Box 
-        height="calc(100vh - 65px)"
-        position="relative"
-        display="flex"
-        flexDirection="column"
-      >
-        <Box
-          flex="1"
-          overflow="auto"
-          py={6} 
-          px={8}
+      <Box p={4}>
+        {/* Hidden logo for PDF generation */}
+        <Image
+          ref={logoRef}
+          src="/img/onboarding/muhasaba-logo.png"
+          alt="Muhasaba Logo"
+          style={{ display: 'none' }}
+          crossOrigin="anonymous"
+          width="120px"
+          height="auto"
+        />
+        
+        <Box 
+          height="calc(100vh - 65px)"
+          position="relative"
+          display="flex"
+          flexDirection="column"
+          overflowY="auto"
           sx={{
             '&::-webkit-scrollbar': {
               display: 'none'
@@ -364,13 +740,25 @@ export default function CashflowStatementPage() {
             scrollbarWidth: 'none'
           }}
         >
-          {/* Reports Section */}
+          {/* Header Section */}
           <Box mb={6}>
             <Box mb={4}>
-              <Heading size="lg" mb={2}>Reports</Heading>
-              <Text color="gray.600" mb={4} fontSize="md">
-                Effortlessly view and analyze your financial reports in one place with real-time insights and data updates.
-              </Text>
+              <HStack justify="space-between" align="center">
+                <Box>
+                  <Heading size="lg" mb={2}>Cash Flow Statement</Heading>
+                  <Text color="gray.600" mb={4} fontSize="md">
+                    Track your cash inflows and outflows with detailed transaction history and analysis.
+                  </Text>
+                </Box>
+                <Button
+                  leftIcon={<LuDownload />}
+                  colorScheme="green"
+                  onClick={handleExportPDF}
+                  isLoading={isLoading}
+                >
+                  Export as PDF
+                </Button>
+              </HStack>
             </Box>
 
             <Box display="flex" justifyContent="flex-end" mb={4}>
@@ -381,6 +769,7 @@ export default function CashflowStatementPage() {
                 bg="green.50"
                 color="green.500"
                 borderColor="green.200"
+                _hover={{ borderColor: "green.300" }}
               >
                 <option value="all">All Banks</option>
                 {connectedBanks.map((bank) => (
@@ -392,373 +781,375 @@ export default function CashflowStatementPage() {
             </Box>
           </Box>
 
-          {isLoading ? (
-            <Box textAlign="center" py={10}>
-              <Spinner size="xl" color="green.500" />
-              <Text mt={4} color="gray.600">Loading transactions...</Text>
-            </Box>
-          ) : (
-            <>
-          {/* Cashflow Chart */}
-          <Card mb={8}>
-            <CardBody>
-              <Box mb={4} display="flex" justifyContent="space-between" alignItems="center">
+          {/* Main Content */}
+          <Box ref={contentRef}>
+            {isLoading ? (
+              <Box display="flex" justifyContent="center" p={8}>
+                <Spinner size="xl" />
+              </Box>
+            ) : (
+              <>
+                {/* Cashflow Chart */}
+                <Card mb={8}>
+                  <CardBody>
+                    <Box mb={4} display="flex" justifyContent="space-between" alignItems="center">
+                      <Box>
+                        <Heading size="md">Cash Flow Summary</Heading>
+                        <Text color="gray.600">{filteredTransactions.length} Transactions</Text>
+                      </Box>
+                      
+                      <Select 
+                        size="sm"
+                        maxW="120px"
+                        value={selectedMonth}
+                        onChange={(e) => setSelectedMonth(e.target.value)}
+                        borderColor="gray.200"
+                      >
+                        <option value="all">All Months</option>
+                        {availableMonths.map((month) => (
+                          <option key={month} value={month}>{month}</option>
+                        ))}
+                      </Select>
+                    </Box>
+
+                    <Box position="relative" height="300px">
+                      <AreaChart
+                        data={chartData}
+                        categories={['value']}
+                        index="day"
+                        colors={['#38B2AC']}
+                        yAxisWidth={65}
+                        valueFormatter={formatCurrency}
+                        height="300px"
+                        showLegend={false}
+                        showGrid={true}
+                        showYAxis={true}
+                        variant="gradient"
+                        strokeWidth="2"
+                        minValue={Math.min(...chartData.map(d => d.value)) * 1.1}
+                        maxValue={Math.max(...chartData.map(d => d.value)) * 1.1}
+                      />
+                      
+                      {chartData.length > 0 && (
+                        <Box 
+                          position="absolute" 
+                          top="20%" 
+                          left="30%" 
+                          bg="green.500" 
+                          color="white" 
+                          px={3} 
+                          py={1} 
+                          borderRadius="md"
+                          boxShadow="md"
+                        >
+                          Peak: {formatCurrency(Math.max(...chartData.map(d => d.value)))}
+                        </Box>
+                      )}
+                    </Box>
+                  </CardBody>
+                </Card>
+
+                {/* Transactions Table */}
                 <Box>
-                  <Heading size="md">Cash Flow Summary</Heading>
-                      <Text color="gray.600">{filteredTransactions.length} Transactions</Text>
-                </Box>
-                
-                <Select 
-                  size="sm"
-                  maxW="120px"
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  borderColor="gray.200"
-                >
-                      <option value="all">All Months</option>
-                      {availableMonths.map((month) => (
-                        <option key={month} value={month}>{month}</option>
-                      ))}
-                </Select>
-              </Box>
+                  {/* Filters */}
+                  <HStack mb={4} spacing={4}>
+                    <ButtonGroup size="sm" isAttached variant="outline">
+                      <Button 
+                        isActive={selectedType === 'All'}
+                        onClick={() => setSelectedType('All')}
+                      >
+                        All
+                      </Button>
+                      <Button 
+                        isActive={selectedType === 'Income'}
+                        onClick={() => setSelectedType('Income')}
+                      >
+                        Income
+                      </Button>
+                      <Button 
+                        isActive={selectedType === 'Expenses'}
+                        onClick={() => setSelectedType('Expenses')}
+                      >
+                        Expenses
+                      </Button>
+                    </ButtonGroup>
 
-              <Box position="relative" height="300px">
-                <AreaChart
-                  data={chartData}
-                  categories={['value']}
-                  index="day"
-                  colors={['#38B2AC']}
-                  yAxisWidth={65}
-                  valueFormatter={formatCurrency}
-                  height="300px"
-                  showLegend={false}
-                  showGrid={true}
-                  showYAxis={true}
-                  variant="gradient"
-                  strokeWidth="2"
-                  minValue={Math.min(...chartData.map(d => d.value)) * 1.1}
-                  maxValue={Math.max(...chartData.map(d => d.value)) * 1.1}
-                />
-                
-                {chartData.length > 0 && (
-                <Box 
-                  position="absolute" 
-                  top="20%" 
-                  left="30%" 
-                  bg="green.500" 
-                  color="white" 
-                  px={3} 
-                  py={1} 
-                  borderRadius="md"
-                    boxShadow="md"
-                >
-                    Peak: {formatCurrency(Math.max(...chartData.map(d => d.value)))}
-                </Box>
-                )}
-              </Box>
-            </CardBody>
-          </Card>
+                    <Box flex="1" />
 
-          {/* Transactions Table */}
-          <Box>
-            {/* Filters */}
-            <HStack mb={4} spacing={4}>
-              <ButtonGroup size="sm" isAttached variant="outline">
-                    <Button 
-                      isActive={selectedType === 'All'}
-                      onClick={() => setSelectedType('All')}
+                    <Select 
+                      size="sm" 
+                      maxW="150px"
+                      value={selectedStatus}
+                      onChange={(e) => setSelectedStatus(e.target.value)}
                     >
-                      All
-                    </Button>
-                    <Button 
-                      isActive={selectedType === 'Income'}
-                      onClick={() => setSelectedType('Income')}
-                    >
-                      Income
-                    </Button>
-                    <Button 
-                      isActive={selectedType === 'Expenses'}
-                      onClick={() => setSelectedType('Expenses')}
-                    >
-                      Expenses
-                    </Button>
-              </ButtonGroup>
+                      <option value="All">Status: All</option>
+                      <option value="COMPLETED">Completed</option>
+                      <option value="PENDING">Pending</option>
+                    </Select>
+                  </HStack>
 
-              <Box flex="1" />
-
-              <Select 
-                size="sm" 
-                maxW="150px"
-                value={selectedStatus}
-                onChange={(e) => setSelectedStatus(e.target.value)}
-              >
-                <option value="All">Status: All</option>
-                    <option value="COMPLETED">Completed</option>
-                    <option value="PENDING">Pending</option>
-              </Select>
-            </HStack>
-
-            {/* Table */}
-            <TableContainer>
-                  <Table variant="simple" size="sm">
-                <Thead>
-                  <Tr borderBottom="1px" borderColor="gray.200">
-                        <Th width="180px">
-                      <HStack spacing={1}>
-                        <Text>Ref ID</Text>
-                        <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                      </HStack>
-                    </Th>
-                        <Th width="120px">
-                      <HStack spacing={1}>
-                            <Text>Date</Text>
-                        <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                      </HStack>
-                    </Th>
-                        <Th>Description</Th>
-                        <Th width="100px">Type</Th>
-                        <Th width="100px" isNumeric>Amount</Th>
-                        <Th width="100px">Status</Th>
-                  </Tr>
-                </Thead>
-                <Tbody>
-                      {selectedBankId === 'all' ? (
-                        // Group transactions by bank when showing all banks
-                        connectedBanks.map(bank => {
-                          // Get transactions for this bank
-                          const bankTransactions = filteredTransactions.filter(t => t.bank_id === bank.id);
-                          
-                          // Skip banks with no transactions
-                          if (bankTransactions.length === 0) return null;
-                          
-                          // For each bank, select a diverse set of transactions
-                          const diverseTransactions = [];
-                          
-                          // Try to get both credit and debit transactions with diverse amounts
-                          const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
-                          const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
-                          
-                          // Take highest amount credit transaction if available
-                          if (credits.length > 0) {
-                            const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                            diverseTransactions.push(highestCredit);
+                  {/* Table */}
+                  <TableContainer>
+                    <Table variant="simple" size="sm">
+                      <Thead>
+                        <Tr borderBottom="1px" borderColor="gray.200">
+                          <Th width="180px">
+                            <HStack spacing={1}>
+                              <Text>Ref ID</Text>
+                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
+                            </HStack>
+                          </Th>
+                          <Th width="120px">
+                            <HStack spacing={1}>
+                              <Text>Date</Text>
+                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
+                            </HStack>
+                          </Th>
+                          <Th>Description</Th>
+                          <Th width="100px">Type</Th>
+                          <Th width="100px" isNumeric>Amount</Th>
+                          <Th width="100px">Status</Th>
+                        </Tr>
+                      </Thead>
+                      <Tbody>
+                        {selectedBankId === 'all' ? (
+                          // Group transactions by bank when showing all banks
+                          connectedBanks.map(bank => {
+                            // Get transactions for this bank
+                            const bankTransactions = filteredTransactions.filter(t => t.bank_id === bank.id);
                             
-                            // If we have more credits, also take a lower amount one
-                            if (credits.length > 1) {
-                              const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                              if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
-                                diverseTransactions.push(lowestCredit);
+                            // Skip banks with no transactions
+                            if (bankTransactions.length === 0) return null;
+                            
+                            // For each bank, select a diverse set of transactions
+                            const diverseTransactions = [];
+                            
+                            // Try to get both credit and debit transactions with diverse amounts
+                            const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
+                            const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
+                            
+                            // Take highest amount credit transaction if available
+                            if (credits.length > 0) {
+                              const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                              diverseTransactions.push(highestCredit);
+                              
+                              // If we have more credits, also take a lower amount one
+                              if (credits.length > 1) {
+                                const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                                if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
+                                  diverseTransactions.push(lowestCredit);
+                                }
                               }
                             }
-                          }
-                          
-                          // Take highest amount debit transaction if available
-                          if (debits.length > 0) {
-                            const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                            diverseTransactions.push(highestDebit);
                             
-                            // If we have more debits, also take a lower amount one
-                            if (debits.length > 1) {
-                              const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                              if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
-                                diverseTransactions.push(lowestDebit);
+                            // Take highest amount debit transaction if available
+                            if (debits.length > 0) {
+                              const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                              diverseTransactions.push(highestDebit);
+                              
+                              // If we have more debits, also take a lower amount one
+                              if (debits.length > 1) {
+                                const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                                if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
+                                  diverseTransactions.push(lowestDebit);
+                                }
                               }
                             }
-                          }
-                          
-                          // If we didn't get enough transactions, add more from the original list
-                          if (diverseTransactions.length < 5) {
-                            const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
-                            const remainingTransactions = bankTransactions
-                              .filter(t => !existingIds.has(t.transaction_id))
-                              .slice(0, 5 - diverseTransactions.length);
                             
-                            diverseTransactions.push(...remainingTransactions);
-                          }
-                          
-                          // Sort by date (most recent first)
-                          diverseTransactions.sort((a, b) => 
-                            new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
-                          );
-                          
-                          // Limit to 5 transactions per bank
-                          const selectedTransactions = diverseTransactions.slice(0, 5);
-                          
-                          return selectedTransactions.length > 0 ? (
-                            <React.Fragment key={bank.id}>
-                              <Tr>
-                                <Td 
-                                  colSpan={6} 
-                                  bg="gray.50" 
-                                  fontWeight="medium"
-                                  py={2}
-                                >
-                                  {bank.bank_identifier || bank.name}
+                            // If we didn't get enough transactions, add more from the original list
+                            if (diverseTransactions.length < 5) {
+                              const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
+                              const remainingTransactions = bankTransactions
+                                .filter(t => !existingIds.has(t.transaction_id))
+                                .slice(0, 5 - diverseTransactions.length);
+                              
+                              diverseTransactions.push(...remainingTransactions);
+                            }
+                            
+                            // Sort by date (most recent first)
+                            diverseTransactions.sort((a, b) => 
+                              new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+                            );
+                            
+                            // Limit to 5 transactions per bank
+                            const selectedTransactions = diverseTransactions.slice(0, 5);
+                            
+                            return selectedTransactions.length > 0 ? (
+                              <React.Fragment key={bank.id}>
+                                <Tr>
+                                  <Td 
+                                    colSpan={6} 
+                                    bg="gray.50" 
+                                    fontWeight="medium"
+                                    py={2}
+                                  >
+                                    {bank.bank_identifier || bank.name}
+                                  </Td>
+                                </Tr>
+                                {selectedTransactions.map((transaction) => (
+                                  <Tr key={transaction.transaction_id}>
+                                    <Td>
+                                      <Text noOfLines={1} title={transaction.transaction_id}>
+                                        {transaction.transaction_id.slice(0, 8)}...
+                                      </Text>
+                                    </Td>
+                                    <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
+                                    <Td maxW="400px">
+                                      <HStack>
+                                        <Box 
+                                          bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
+                                          color="white" 
+                                          w="24px" 
+                                          h="24px" 
+                                          flexShrink={0}
+                                          borderRadius="full"
+                                          display="flex"
+                                          alignItems="center"
+                                          justifyContent="center"
+                                        >
+                                          {transaction.bank_name?.[0] || 'B'}
+                                        </Box>
+                                        <Text noOfLines={1} title={transaction.transaction_information}>
+                                          {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
+                                            .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
+                                            || 'Bank Transaction'}
+                                        </Text>
+                                      </HStack>
+                                    </Td>
+                                    <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
+                                    <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
+                                      ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
+                                    </Td>
+                                    <Td>
+                                      <Badge 
+                                        colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
+                                      >
+                                        {transaction.status}
+                                      </Badge>
+                                    </Td>
+                                  </Tr>
+                                ))}
+                              </React.Fragment>
+                            ) : null;
+                          })
+                        ) : (
+                          // For single bank view, also use diverse transaction selection
+                          (() => {
+                            const bankTransactions = filteredTransactions;
+                            
+                            // Try to get both credit and debit transactions with diverse amounts
+                            const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
+                            const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
+                            
+                            const diverseTransactions = [];
+                            
+                            // Take highest and lowest amount credit transactions if available
+                            if (credits.length > 0) {
+                              // Sort by amount descending and take highest
+                              const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                              diverseTransactions.push(highestCredit);
+                              
+                              // If we have more than one, take lowest amount too
+                              if (credits.length > 1) {
+                                const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                                if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
+                                  diverseTransactions.push(lowestCredit);
+                                }
+                              }
+                            }
+                            
+                            // Take highest and lowest amount debit transactions if available
+                            if (debits.length > 0) {
+                              // Sort by amount descending and take highest
+                              const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
+                              diverseTransactions.push(highestDebit);
+                              
+                              // If we have more than one, take lowest amount too
+                              if (debits.length > 1) {
+                                const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
+                                if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
+                                  diverseTransactions.push(lowestDebit);
+                                }
+                              }
+                            }
+                            
+                            // If we didn't get enough transactions, add more from the original list
+                            if (diverseTransactions.length < 10) {
+                              const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
+                              const remainingTransactions = bankTransactions
+                                .filter(t => !existingIds.has(t.transaction_id))
+                                .slice(0, 10 - diverseTransactions.length);
+                              
+                              diverseTransactions.push(...remainingTransactions);
+                            }
+                            
+                            // Sort by date (most recent first)
+                            diverseTransactions.sort((a, b) => 
+                              new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+                            );
+                            
+                            // Limit to 10 transactions
+                            return diverseTransactions.slice(0, 10).map((transaction) => (
+                              <Tr key={transaction.transaction_id}>
+                                <Td>
+                                  <Text noOfLines={1} title={transaction.transaction_id}>
+                                    {transaction.transaction_id.slice(0, 8)}...
+                                  </Text>
+                                </Td>
+                                <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
+                                <Td maxW="400px">
+                                  <HStack>
+                                    <Box 
+                                      bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
+                                      color="white" 
+                                      w="24px" 
+                                      h="24px" 
+                                      flexShrink={0}
+                                      borderRadius="full"
+                                      display="flex"
+                                      alignItems="center"
+                                      justifyContent="center"
+                                    >
+                                      {transaction.bank_name?.[0] || 'B'}
+                                    </Box>
+                                    <Text noOfLines={1} title={transaction.transaction_information}>
+                                      {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
+                                        .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
+                                        || 'Bank Transaction'}
+                                    </Text>
+                                  </HStack>
+                                </Td>
+                                <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
+                                <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
+                                  ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
+                                </Td>
+                                <Td>
+                                  <Badge 
+                                    colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
+                                  >
+                                    {transaction.status}
+                                  </Badge>
                                 </Td>
                               </Tr>
-                              {selectedTransactions.map((transaction) => (
-                                <Tr key={transaction.transaction_id}>
-                                  <Td>
-                                    <Text noOfLines={1} title={transaction.transaction_id}>
-                                      {transaction.transaction_id.slice(0, 8)}...
-                                    </Text>
-                                  </Td>
-                                  <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
-                                  <Td maxW="400px">
-                        <HStack>
-                          <Box 
-                                        bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
-                            color="white" 
-                            w="24px" 
-                            h="24px" 
-                                        flexShrink={0}
-                            borderRadius="full"
-                            display="flex"
-                            alignItems="center"
-                            justifyContent="center"
-                          >
-                                        {transaction.bank_name?.[0] || 'B'}
-                          </Box>
-                                      <Text noOfLines={1} title={transaction.transaction_information}>
-                                        {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
-                                          .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
-                                          || 'Bank Transaction'}
-                                      </Text>
-                        </HStack>
-                      </Td>
-                                  <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
-                                  <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
-                                    ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
-                                  </Td>
-                      <Td>
-                        <Badge 
-                                      colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
-                        >
-                          {transaction.status}
-                        </Badge>
-                      </Td>
-                    </Tr>
-                  ))}
-                            </React.Fragment>
-                          ) : null;
-                        })
-                      ) : (
-                        // For single bank view, also use diverse transaction selection
-                        (() => {
-                          const bankTransactions = filteredTransactions;
-                          
-                          // Try to get both credit and debit transactions with diverse amounts
-                          const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
-                          const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
-                          
-                          const diverseTransactions = [];
-                          
-                          // Take highest and lowest amount credit transactions if available
-                          if (credits.length > 0) {
-                            // Sort by amount descending and take highest
-                            const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                            diverseTransactions.push(highestCredit);
-                            
-                            // If we have more than one, take lowest amount too
-                            if (credits.length > 1) {
-                              const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                              if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
-                                diverseTransactions.push(lowestCredit);
-                              }
-                            }
-                          }
-                          
-                          // Take highest and lowest amount debit transactions if available
-                          if (debits.length > 0) {
-                            // Sort by amount descending and take highest
-                            const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                            diverseTransactions.push(highestDebit);
-                            
-                            // If we have more than one, take lowest amount too
-                            if (debits.length > 1) {
-                              const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                              if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
-                                diverseTransactions.push(lowestDebit);
-                              }
-                            }
-                          }
-                          
-                          // If we didn't get enough transactions, add more from the original list
-                          if (diverseTransactions.length < 10) {
-                            const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
-                            const remainingTransactions = bankTransactions
-                              .filter(t => !existingIds.has(t.transaction_id))
-                              .slice(0, 10 - diverseTransactions.length);
-                            
-                            diverseTransactions.push(...remainingTransactions);
-                          }
-                          
-                          // Sort by date (most recent first)
-                          diverseTransactions.sort((a, b) => 
-                            new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
-                          );
-                          
-                          // Limit to 10 transactions
-                          return diverseTransactions.slice(0, 10).map((transaction) => (
-                          <Tr key={transaction.transaction_id}>
-                            <Td>
-                              <Text noOfLines={1} title={transaction.transaction_id}>
-                                {transaction.transaction_id.slice(0, 8)}...
-                              </Text>
-                            </Td>
-                            <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
-                            <Td maxW="400px">
-                              <HStack>
-                                <Box 
-                                  bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
-                                  color="white" 
-                                  w="24px" 
-                                  h="24px" 
-                                  flexShrink={0}
-                                  borderRadius="full"
-                                  display="flex"
-                                  alignItems="center"
-                                  justifyContent="center"
-                                >
-                                  {transaction.bank_name?.[0] || 'B'}
-                                </Box>
-                                <Text noOfLines={1} title={transaction.transaction_information}>
-                                  {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
-                                    .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
-                                    || 'Bank Transaction'}
-                                </Text>
-                              </HStack>
-                            </Td>
-                            <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
-                            <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
-                              ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
-                            </Td>
-                            <Td>
-                              <Badge 
-                                colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
-                              >
-                                {transaction.status}
-                              </Badge>
-                            </Td>
-                          </Tr>
-                          ));
-                        })()
-                      )}
-                </Tbody>
-              </Table>
-            </TableContainer>
-                {selectedBankId === 'all' ? (
-                  <Text mt={4} color="gray.600" textAlign="center">
-                    Showing up to 5 recent transactions per bank ({filteredTransactions.length} total transactions)
-                  </Text>
-                ) : filteredTransactions.length > 10 && (
-                  <Text mt={4} color="gray.600" textAlign="center">
-                    Showing 10 of {filteredTransactions.length} transactions
-                  </Text>
-                )}
+                            ));
+                          })()
+                        )}
+                      </Tbody>
+                    </Table>
+                  </TableContainer>
+                  {selectedBankId === 'all' ? (
+                    <Text mt={4} color="gray.600" textAlign="center">
+                      Showing up to 5 recent transactions per bank ({filteredTransactions.length} total transactions)
+                    </Text>
+                  ) : filteredTransactions.length > 10 && (
+                    <Text mt={4} color="gray.600" textAlign="center">
+                      Showing 10 of {filteredTransactions.length} transactions
+                    </Text>
+                  )}
+                </Box>
+              </>
+            )}
           </Box>
-            </>
-          )}
         </Box>
 
         {/* Summary Footer */}
@@ -766,10 +1157,17 @@ export default function CashflowStatementPage() {
           bg="teal.700" 
           color="white" 
           p={4}
+          data-summary-footer
+          position="sticky"
+          bottom={0}
+          zIndex={1}
         >
           <HStack justify="space-between">
-            <Text>Summary: Retained Cash</Text>
-            <Text>Net Amount: ${retainedCash.toFixed(2)}</Text>
+            <Text>Summary: Cash Flow</Text>
+            <Text>Net Cash Flow: {filteredTransactions.reduce((total, transaction) => {
+              const amount = transaction.amount.amount;
+              return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
+            }, 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
           </HStack>
         </Box>
       </Box>

@@ -330,18 +330,35 @@ export default function BalanceSheetPage() {
     return [
       {
         amount: `$ ${totals.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        title: 'Total Cash Account Balance'
-      },
-      {
+      title: 'Total Cash Account Balance'
+    },
+    {
         amount: `$ ${totals.ePayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        title: 'E-Payment Balance'
-      },
-      {
+      title: 'E-Payment Balance'
+    },
+    {
         amount: `$ ${totals.bank.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        title: 'Total Bank Account Balance'
-      }
-    ]
+      title: 'Total Bank Account Balance'
+    }
+  ]
   }, [bankAccounts, selectedAccount])
+
+  // Calculate net profit based on filtered transactions
+  const netProfit = React.useMemo(() => {
+    const relevantTransactions = selectedAccount === 'all' 
+      ? transactions 
+      : transactions.filter(t => {
+          const bank = bankAccounts.find(b => b.id === selectedAccount);
+          return bank?.accounts.some(a => a.account_id === t.account_id);
+        });
+
+    const total = relevantTransactions.reduce((acc, transaction) => {
+      const amount = transaction.amount.amount;
+      return acc + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
+    }, 0);
+
+    return total;
+  }, [transactions, selectedAccount, bankAccounts])
 
   // Filter transactions based on selected account
   const filteredTransactions = React.useMemo(() => {
@@ -583,6 +600,7 @@ export default function BalanceSheetPage() {
       let pageNum = 1;
       let currentY = contentStartY;
       let remainingHeight = imgHeight;
+      let lastContentY = 0;
 
       // Make the content splitting process async to handle async header
       async function generatePages() {
@@ -597,7 +615,7 @@ export default function BalanceSheetPage() {
           await addHeader(pageNum);
 
           // Calculate how much content can fit on this page
-          const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight - 40; // Increased buffer
+          const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight + 10; // Increased buffer to 40mm
           const heightToDraw = Math.min(remainingHeight, availableHeight);
 
           // Calculate the portion of the image to use
@@ -635,6 +653,7 @@ export default function BalanceSheetPage() {
             );
           }
 
+          lastContentY = currentY + heightToDraw;
           remainingHeight -= heightToDraw;
           pageNum++;
         }
@@ -656,7 +675,7 @@ export default function BalanceSheetPage() {
           const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width;
 
           // Position footer from the bottom of the page
-          const footerY = pageHeight - footerMargin - pageNumberHeight - footerImgHeight - 10;
+          const footerY = pageHeight - footerMargin - pageNumberHeight - footerImgHeight + 10;
           
           pdf.addImage(
             footerImgData,
