@@ -170,9 +170,6 @@ export default function ProfitLossPage() {
       const contentStartY = marginY + headerHeight; // Y position where content starts
       
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
-      let heightLeft = imgHeight;
-      let position = 0;
-
       const pdf = new jsPDF('p', 'mm', 'a4');
       const imgData = canvas.toDataURL('image/png');
 
