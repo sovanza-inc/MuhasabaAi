@@ -283,8 +283,9 @@ export default function ProfitLossPage() {
         pageNum--; // Adjust for last increment
 
         // Add summary footer
-        const footerElement = document.querySelector('[data-summary-footer]');
-        if (footerElement) {
+        const footerElements = document.querySelectorAll('[data-summary-footer]');
+        if (footerElements.length > 0) {
+          const footerElement = footerElements[0]; // Take only the first footer element
           const footerCanvas = await html2canvas(footerElement as HTMLElement, {
             scale: 2,
             logging: false,
@@ -615,6 +616,9 @@ export default function ProfitLossPage() {
         color="white" 
         p={4}
         data-summary-footer
+        position="sticky"
+        bottom={0}
+        zIndex={1}
       >
         <HStack justify="space-between">
           <Text>Summary: Revenue-Expenses</Text>
