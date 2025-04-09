@@ -343,23 +343,6 @@ export default function BalanceSheetPage() {
   ]
   }, [bankAccounts, selectedAccount])
 
-  // Calculate net profit based on filtered transactions
-  const netProfit = React.useMemo(() => {
-    const relevantTransactions = selectedAccount === 'all' 
-      ? transactions 
-      : transactions.filter(t => {
-          const bank = bankAccounts.find(b => b.id === selectedAccount);
-          return bank?.accounts.some(a => a.account_id === t.account_id);
-        });
-
-    const total = relevantTransactions.reduce((acc, transaction) => {
-      const amount = transaction.amount.amount;
-      return acc + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
-    }, 0);
-
-    return total;
-  }, [transactions, selectedAccount, bankAccounts])
-
   // Filter transactions based on selected account
   const filteredTransactions = React.useMemo(() => {
     if (selectedAccount === 'all') {
@@ -600,7 +583,6 @@ export default function BalanceSheetPage() {
       let pageNum = 1;
       let currentY = contentStartY;
       let remainingHeight = imgHeight;
-      let lastContentY = 0;
 
       // Make the content splitting process async to handle async header
       async function generatePages() {
@@ -653,7 +635,6 @@ export default function BalanceSheetPage() {
             );
           }
 
-          lastContentY = currentY + heightToDraw;
           remainingHeight -= heightToDraw;
           pageNum++;
         }

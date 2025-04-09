@@ -319,14 +319,6 @@ export default function CashflowStatementPage() {
       .slice(-30) // Show last 30 days
   }, [filteredTransactions])
 
-  // Calculate retained cash
-  const retainedCash = React.useMemo(() => {
-    return filteredTransactions.reduce((total, transaction) => {
-      const amount = transaction.amount.amount;
-      return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
-    }, 0);
-  }, [filteredTransactions])
-
   // Get available months from transactions
   const availableMonths = React.useMemo(() => {
     const months = new Set<string>()
