@@ -330,17 +330,17 @@ export default function BalanceSheetPage() {
     return [
       {
         amount: `$ ${totals.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        title: 'Total Cash Account Balance'
-      },
-      {
+      title: 'Total Cash Account Balance'
+    },
+    {
         amount: `$ ${totals.ePayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        title: 'E-Payment Balance'
-      },
-      {
+      title: 'E-Payment Balance'
+    },
+    {
         amount: `$ ${totals.bank.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-        title: 'Total Bank Account Balance'
-      }
-    ]
+      title: 'Total Bank Account Balance'
+    }
+  ]
   }, [bankAccounts, selectedAccount])
 
   // Filter transactions based on selected account
@@ -597,7 +597,7 @@ export default function BalanceSheetPage() {
           await addHeader(pageNum);
 
           // Calculate how much content can fit on this page
-          const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight - 40; // Increased buffer
+          const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight + 10; // Increased buffer to 40mm
           const heightToDraw = Math.min(remainingHeight, availableHeight);
 
           // Calculate the portion of the image to use
@@ -656,7 +656,7 @@ export default function BalanceSheetPage() {
           const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width;
 
           // Position footer from the bottom of the page
-          const footerY = pageHeight - footerMargin - pageNumberHeight - footerImgHeight - 10;
+          const footerY = pageHeight - footerMargin - pageNumberHeight - footerImgHeight + 10;
           
           pdf.addImage(
             footerImgData,
