@@ -1,17 +1,17 @@
 'use client'
 
-import { 
-  Box, 
-  Heading, 
-  Text, 
-  HStack, 
-  Select, 
-  Table, 
-  Thead, 
-  Tbody, 
-  Tr, 
-  Th, 
-  Td, 
+import {
+  Box,
+  Heading,
+  Text,
+  HStack,
+  Select,
+  Table,
+  Thead,
+  Tbody,
+  Tr,
+  Th,
+  Td,
   TableContainer,
   Icon,
   Badge,
@@ -81,11 +81,11 @@ export default function CashflowStatementPage() {
             'Content-Type': 'application/json'
           }
         });
-        
+
         if (!authResponse.ok) {
           throw new Error('Failed to authenticate');
         }
-        
+
         const authData = await authResponse.json();
         setAuthToken(authData.access_token);
 
@@ -129,7 +129,7 @@ export default function CashflowStatementPage() {
       })
 
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.details || 'Failed to fetch connected banks')
       }
@@ -160,7 +160,7 @@ export default function CashflowStatementPage() {
       })
 
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.details || 'Failed to fetch bank accounts')
       }
@@ -183,7 +183,7 @@ export default function CashflowStatementPage() {
       })
 
       const data = await response.json()
-      
+
       if (!response.ok) {
         throw new Error(data.details || 'Failed to fetch transactions')
       }
@@ -204,10 +204,10 @@ export default function CashflowStatementPage() {
       try {
         const banks = await fetchConnectedBanks();
         let allTransactions: BankTransaction[] = [];
-        
+
         for (const bank of banks) {
           const accounts = await fetchAccountsForBank(bank.id);
-          
+
           for (const account of accounts) {
             const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id);
             const transactionsWithBank = accountTransactions.map((transaction: BankTransaction) => ({
@@ -215,13 +215,13 @@ export default function CashflowStatementPage() {
               bank_name: bank.bank_identifier || bank.name,
               bank_id: bank.id
             }));
-            
+
             allTransactions = [...allTransactions, ...transactionsWithBank];
           }
         }
 
         // Sort transactions by date (most recent first)
-        allTransactions.sort((a, b) => 
+        allTransactions.sort((a, b) =>
           new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
         );
 
@@ -266,11 +266,11 @@ export default function CashflowStatementPage() {
 
       // Filter by type
       if (selectedType !== 'All') {
-        const isCredit = transaction.credit_debit_indicator === 'CREDIT' || 
-                        transaction.credit_debit_indicator === 'C' ||
-                        transaction.transaction_information?.includes('SALARY') ||
-                        transaction.transaction_information?.includes('CREDIT') ||
-                        transaction.transaction_information?.includes('DEPOSIT');
+        const isCredit = transaction.credit_debit_indicator === 'CREDIT' ||
+          transaction.credit_debit_indicator === 'C' ||
+          transaction.transaction_information?.includes('SALARY') ||
+          transaction.transaction_information?.includes('CREDIT') ||
+          transaction.transaction_information?.includes('DEPOSIT');
 
         if (selectedType === 'Income' && !isCredit) {
           return false;
@@ -287,21 +287,21 @@ export default function CashflowStatementPage() {
   // Calculate daily cash flow data for the chart
   const chartData = React.useMemo(() => {
     const dailyData: { [key: string]: { income: number; spending: number } } = {}
-    
+
     filteredTransactions.forEach(transaction => {
       const date = new Date(transaction.booking_date_time).toISOString().split('T')[0]
       const amount = transaction.amount.amount
-      
+
       if (!dailyData[date]) {
         dailyData[date] = { income: 0, spending: 0 }
       }
-      
-      const isCredit = transaction.credit_debit_indicator === 'CREDIT' || 
-                      transaction.credit_debit_indicator === 'C' ||
-                      transaction.transaction_information?.includes('SALARY') ||
-                      transaction.transaction_information?.includes('CREDIT') ||
-                      transaction.transaction_information?.includes('DEPOSIT');
-      
+
+      const isCredit = transaction.credit_debit_indicator === 'CREDIT' ||
+        transaction.credit_debit_indicator === 'C' ||
+        transaction.transaction_information?.includes('SALARY') ||
+        transaction.transaction_information?.includes('CREDIT') ||
+        transaction.transaction_information?.includes('DEPOSIT');
+
       if (isCredit) {
         dailyData[date].income += amount
       } else {
@@ -343,16 +343,16 @@ export default function CashflowStatementPage() {
     if (!contentRef.current) return;
 
     try {
-      // Create a temporary container to hold all content
+      // Create a temporary container
       const tempContainer = document.createElement('div');
       tempContainer.style.position = 'absolute';
       tempContainer.style.left = '-9999px';
       tempContainer.style.top = '-9999px';
-      tempContainer.style.width = '1400px'; // Increased width for better table scaling
-      tempContainer.style.padding = '40px'; // Increased padding
+      tempContainer.style.width = '1400px';
+      tempContainer.style.padding = '40px';
       tempContainer.style.backgroundColor = 'white';
 
-      // Add logo image to the container
+      // Add logo image (hidden) to the container for the header generation later
       const logoImg = document.createElement('img');
       logoImg.src = logoRef.current?.src || '';
       logoImg.style.display = 'none';
@@ -360,9 +360,10 @@ export default function CashflowStatementPage() {
 
       document.body.appendChild(tempContainer);
 
-      // Clone the content and modify table styles for better PDF rendering
+      // 1. Clone the main content and apply PDF styles
       const contentClone = contentRef.current.cloneNode(true) as HTMLElement;
-      
+
+      // --- Start of Styling Logic (MUST BE PRESERVED) ---
       // Adjust table styles for better rendering
       const tables = contentClone.getElementsByTagName('table');
       for (let i = 0; i < tables.length; i++) {
@@ -392,20 +393,20 @@ export default function CashflowStatementPage() {
       for (let i = 0; i < headers.length; i++) {
         const header = headers[i] as HTMLTableCellElement;
         header.style.padding = '20px 16px';
-        header.style.fontSize = '20px';          // Increased header size
+        header.style.fontSize = '20px';
         header.style.fontWeight = '600';
         header.style.backgroundColor = '#f7fafc';
         header.style.borderBottom = '2px solid #e2e8f0';
         header.style.whiteSpace = 'nowrap';
         header.style.color = '#2D3748';
       }
-      
+
       // Adjust all table cells
       const cells = contentClone.getElementsByTagName('td');
       for (let j = 0; j < cells.length; j++) {
         const cell = cells[j] as HTMLTableCellElement;
-        cell.style.padding = '20px 16px';       // Increased padding
-        cell.style.fontSize = '18px';           // Increased cell size
+        cell.style.padding = '20px 16px';
+        cell.style.fontSize = '18px';
         cell.style.lineHeight = '1.6';
         cell.style.borderBottom = '1px solid #e2e8f0';
         cell.style.whiteSpace = 'normal';
@@ -420,7 +421,7 @@ export default function CashflowStatementPage() {
         const headerElement = header as HTMLTableCellElement;
         headerElement.style.backgroundColor = '#f7fafc';
         headerElement.style.padding = '20px 16px';
-        headerElement.style.fontSize = '20px';     // Match regular header size
+        headerElement.style.fontSize = '20px';
         headerElement.style.fontWeight = '600';
         headerElement.style.color = '#2D3748';
       });
@@ -434,9 +435,9 @@ export default function CashflowStatementPage() {
           badge.style.padding = '6px 12px';
           badge.style.fontWeight = '500';
           badge.style.borderRadius = '6px';
-          badge.style.display = 'inline-block';    // Ensure consistent display
-          badge.style.minWidth = '90px';          // Set minimum width
-          badge.style.textAlign = 'center';       // Center the text
+          badge.style.display = 'inline-block';
+          badge.style.minWidth = '90px';
+          badge.style.textAlign = 'center';
         }
       }
 
@@ -444,7 +445,7 @@ export default function CashflowStatementPage() {
       const texts = contentClone.getElementsByTagName('p');
       for (let i = 0; i < texts.length; i++) {
         const text = texts[i] as HTMLParagraphElement;
-        text.style.fontSize = '18px';          // Match cell size
+        text.style.fontSize = '18px';
         text.style.lineHeight = '1.6';
         text.style.color = '#2D3748';
       }
@@ -453,52 +454,33 @@ export default function CashflowStatementPage() {
       const headings = contentClone.getElementsByTagName('h2');
       for (let i = 0; i < headings.length; i++) {
         const heading = headings[i] as HTMLHeadingElement;
-        heading.style.fontSize = '20px';       // Increased heading size
+        heading.style.fontSize = '20px';
         heading.style.marginBottom = '16px';
         heading.style.color = '#1A202C';
         heading.style.fontWeight = '600';
       }
 
-      // Adjust summary text sizes
-      const summaryTexts = contentClone.querySelectorAll('[data-summary-footer] p, [data-summary-footer] span');
-      summaryTexts.forEach(text => {
-        const element = text as HTMLElement;
-        element.style.fontSize = '20px';       // Match header size
-        element.style.fontWeight = '500';
-        element.style.color = 'white';
-      });
-
       // Adjust amounts and numbers for better visibility
       const numericCells = contentClone.querySelectorAll('td[isNumeric]');
       numericCells.forEach(cell => {
         const numericCell = cell as HTMLTableCellElement;
-        numericCell.style.fontSize = '18px';   // Match regular cell size
-        numericCell.style.fontWeight = '600';  // Make amounts bolder
-        numericCell.style.fontFamily = 'monospace'; // Use monospace for amounts
+        numericCell.style.fontSize = '18px';
+        numericCell.style.fontWeight = '600';
+        numericCell.style.fontFamily = 'monospace';
       });
 
       // Ensure consistent font size for transaction IDs
       const refIdCells = contentClone.querySelectorAll('td:first-child');
       refIdCells.forEach(cell => {
         const refCell = cell as HTMLTableCellElement;
-        refCell.style.fontSize = '18px';      // Match regular cell size
-        refCell.style.fontFamily = 'monospace'; // Use monospace for IDs
+        refCell.style.fontSize = '18px';
+        refCell.style.fontFamily = 'monospace';
       });
+      // --- End of Styling Logic ---
 
-      tempContainer.appendChild(contentClone);
+      tempContainer.appendChild(contentClone); // Add styled content clone
 
-      // Clone and append the summary footer
-      const summaryFooter = document.querySelector('[data-summary-footer]')?.cloneNode(true) as HTMLElement;
-      if (summaryFooter) {
-        const footerElement = summaryFooter as HTMLDivElement;
-        footerElement.style.position = 'relative';
-        footerElement.style.bottom = 'auto';
-        footerElement.style.padding = '16px';
-        footerElement.style.fontSize = '14px';
-        tempContainer.appendChild(footerElement);
-      }
-
-      // Generate PDF
+      // 3. Generate PDF from the entire container (now only containing the main content)
       const canvas = await html2canvas(tempContainer, {
         scale: 2,
         logging: false,
@@ -510,39 +492,34 @@ export default function CashflowStatementPage() {
         backgroundColor: '#ffffff'
       });
 
-      // Clean up
+      // Clean up the temporary container from DOM
       document.body.removeChild(tempContainer);
 
-      const imgWidth = 190; // Width for A4
-      const pageHeight = 297; // A4 height in mm
-      const marginX = 10; // Side margins
-      const marginY = 15; // Top margin
-      const footerMargin = 10; // Bottom margin
-      const headerHeight = 15; // Header height
-      const pageNumberHeight = 8; // Page number height
+      // 4. Proceed with page splitting and PDF creation using the single canvas
+      const imgWidth = 190;
+      const pageHeight = 297;
+      const marginX = 10;
+      const marginY = 15;
+      const footerMargin = 10;
+      const headerHeight = 15;
+      const pageNumberHeight = 8;
       const contentStartY = marginY + headerHeight;
-      const contentBuffer = 5; // Reduced buffer between sections (from 15 to 5)
-      const summaryFooterSpace = 4; // Minimal space between content and summary footer
-      
+
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       const pdf = new jsPDF('p', 'mm', 'a4');
 
-      // Function to add header to each page
+      // --- Helper Functions (MUST REMAIN) ---
       async function addHeader(pageNum: number): Promise<void> {
         pdf.setPage(pageNum);
-
         try {
           if (logoImg.complete && logoImg.naturalWidth > 0) {
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = logoImg.naturalWidth;
             tempCanvas.height = logoImg.naturalHeight;
             const tempCtx = tempCanvas.getContext('2d');
-            
             if (tempCtx) {
               tempCtx.drawImage(logoImg, 0, 0);
               const logoData = tempCanvas.toDataURL('image/png');
-              
-              // Reduced logo size
               const logoWidth = 25;
               const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
               const logoHeight = logoWidth / aspectRatio;
@@ -553,153 +530,83 @@ export default function CashflowStatementPage() {
         } catch (error) {
           console.error('Error adding logo:', error);
         }
-
-        // Add title and date with adjusted positioning
-        pdf.setFontSize(14); // Reduced font size
+        pdf.setFontSize(14);
         pdf.setTextColor(0, 0, 0);
         pdf.text('Cash Flow Statement', pdf.internal.pageSize.width / 2, marginY + 3, { align: 'center' });
-        
-        pdf.setFontSize(8); // Smaller font for date
+        pdf.setFontSize(8);
         pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdf.internal.pageSize.width / 2, marginY + 7, { align: 'center' });
       }
 
-      // Function to add footer to each page
       function addFooter(pageNum: number, totalPages: number): void {
         pdf.setPage(pageNum);
         pdf.setFontSize(8);
         pdf.setTextColor(100);
         pdf.text(`Page ${pageNum} of ${totalPages}`, pdf.internal.pageSize.width / 2, pdf.internal.pageSize.height - (footerMargin / 2), { align: 'center' });
       }
+      // --- End Helper Functions ---
 
-      // Split content into pages with optimized spacing
+      // Split content into pages
       let pageNum = 1;
       let currentY = contentStartY;
       let remainingHeight = imgHeight;
 
-      async function generatePages() {
-        // Calculate space needed for the footer
-        const summaryFooterElements = document.querySelectorAll('[data-summary-footer]');
-        let footerImgHeight = 0;
-        let footerCanvas;
-        let footerImgData;
-        
-        if (summaryFooterElements.length > 0) {
-          const footerElement = summaryFooterElements[0];
-          footerCanvas = await html2canvas(footerElement as HTMLElement, {
-            scale: 2,
-            logging: false,
-            useCORS: true,
-            backgroundColor: null
-          });
-          
-          footerImgData = footerCanvas.toDataURL('image/png');
-          const footerImgWidth = 190;
-          footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width;
-        }
-        
-        // Calculate available height on first page, accounting for footer
-        const firstPageAvailableHeight = pageHeight - contentStartY - footerMargin - pageNumberHeight - footerImgHeight - summaryFooterSpace;
-        let isFirstPage = true;
-        let contentEndY = 0; // Track where content ends
-
-        while (remainingHeight > 0) {
-          if (pageNum > 1) {
-            pdf.addPage();
-            currentY = contentStartY;
-            isFirstPage = false;
-          }
-
-          await addHeader(pageNum);
-
-          // Calculate available height considering if it's the first page
-          const availableHeight = isFirstPage ? firstPageAvailableHeight : (pageHeight - currentY - footerMargin - pageNumberHeight - contentBuffer);
-          const heightToDraw = Math.min(remainingHeight, availableHeight);
-
-          const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
-          const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
-
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = sourceHeight;
-          const tempCtx = tempCanvas.getContext('2d');
-          
-          if (tempCtx) {
-            tempCtx.drawImage(
-              canvas, 
-              0, 
-              sourceY, 
-              canvas.width, 
-              sourceHeight, 
-              0, 
-              0, 
-              canvas.width, 
-              sourceHeight
-            );
-            
-            const portionImgData = tempCanvas.toDataURL('image/png');
-            pdf.addImage(
-              portionImgData,
-              'PNG',
-              marginX,
-              currentY,
-              imgWidth,
-              heightToDraw
-            );
-
-            currentY += heightToDraw;
-            if (isFirstPage) {
-              contentEndY = currentY; // Track where content ends on first page
-            }
-          }
-
-          remainingHeight -= heightToDraw;
-          
-          if (remainingHeight > 0) {
-            pageNum++;
-          }
+      while (remainingHeight > 0) {
+        if (pageNum > 1) {
+          pdf.addPage();
+          currentY = contentStartY;
         }
 
-        // Add summary footer right after the content on the first page
-        if (summaryFooterElements.length > 0 && footerCanvas && footerImgData) {
-          pdf.setPage(1);
-          const footerY = contentEndY + summaryFooterSpace; // Position footer right after content with minimal spacing
-          
+        await addHeader(pageNum); // Call addHeader
+
+        // Calculate available height for content on this page
+        const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight;
+        const heightToDraw = Math.min(remainingHeight, availableHeight);
+
+        // Calculate the portion of the image to draw
+        const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
+        const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
+
+        // Draw the portion
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = sourceHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        if (tempCtx) {
+          tempCtx.drawImage(
+            canvas,
+            0, sourceY, canvas.width, sourceHeight,
+            0, 0, canvas.width, sourceHeight
+          );
+          const portionImgData = tempCanvas.toDataURL('image/png');
           pdf.addImage(
-            footerImgData,
+            portionImgData,
             'PNG',
             marginX,
-            footerY,
-            190, // Full width
-            footerImgHeight
+            currentY,
+            imgWidth,
+            heightToDraw
           );
         }
 
-        // Add page numbers to all pages
-        for (let i = 1; i <= pageNum; i++) {
-          addFooter(i, pageNum);
-        }
+        remainingHeight -= heightToDraw;
 
-        pdf.save('cashflow-statement-report.pdf');
+        if (remainingHeight > 0) {
+          pageNum++;
+        }
       }
 
-      await generatePages();
+      // Add page numbers to all pages
+      for (let i = 1; i <= pageNum; i++) {
+        addFooter(i, pageNum); // Call addFooter
+      }
 
-      toast({
-        title: "Export successful",
-        description: "Your cash flow statement report has been downloaded",
-        status: "success",
-        duration: 3000,
-        isClosable: true,
-      });
+      pdf.save('cashflow-statement-report.pdf');
+
+      toast({ title: "Export successful", description: "Your cash flow statement report has been downloaded", status: "success", duration: 3000, isClosable: true });
+
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      toast({
-        title: "Export failed",
-        description: "There was an error exporting your report",
-        status: "error",
-        duration: 3000,
-        isClosable: true,
-      });
+      toast({ title: "Export failed", description: "There was an error exporting your report", status: "error", duration: 3000, isClosable: true });
     }
   };
 
@@ -717,8 +624,8 @@ export default function CashflowStatementPage() {
           width="120px"
           height="auto"
         />
-        
-        <Box 
+
+        <Box
           height="calc(100vh - 65px)"
           position="relative"
           display="flex"
@@ -754,7 +661,7 @@ export default function CashflowStatementPage() {
             </Box>
 
             <Box display="flex" justifyContent="flex-end" mb={4}>
-              <Select 
+              <Select
                 maxW="200px"
                 value={selectedBankId}
                 onChange={(e) => setSelectedBankId(e.target.value)}
@@ -789,8 +696,8 @@ export default function CashflowStatementPage() {
                         <Heading size="md">Cash Flow Summary</Heading>
                         <Text color="gray.600">{filteredTransactions.length} Transactions</Text>
                       </Box>
-                      
-                      <Select 
+
+                      <Select
                         size="sm"
                         maxW="120px"
                         value={selectedMonth}
@@ -821,16 +728,16 @@ export default function CashflowStatementPage() {
                         minValue={Math.min(...chartData.map(d => d.value)) * 1.1}
                         maxValue={Math.max(...chartData.map(d => d.value)) * 1.1}
                       />
-                      
+
                       {chartData.length > 0 && (
-                        <Box 
-                          position="absolute" 
-                          top="20%" 
-                          left="30%" 
-                          bg="green.500" 
-                          color="white" 
-                          px={3} 
-                          py={1} 
+                        <Box
+                          position="absolute"
+                          top="20%"
+                          left="30%"
+                          bg="green.500"
+                          color="white"
+                          px={3}
+                          py={1}
                           borderRadius="md"
                           boxShadow="md"
                         >
@@ -846,19 +753,19 @@ export default function CashflowStatementPage() {
                   {/* Filters */}
                   <HStack mb={4} spacing={4}>
                     <ButtonGroup size="sm" isAttached variant="outline">
-                      <Button 
+                      <Button
                         isActive={selectedType === 'All'}
                         onClick={() => setSelectedType('All')}
                       >
                         All
                       </Button>
-                      <Button 
+                      <Button
                         isActive={selectedType === 'Income'}
                         onClick={() => setSelectedType('Income')}
                       >
                         Income
                       </Button>
-                      <Button 
+                      <Button
                         isActive={selectedType === 'Expenses'}
                         onClick={() => setSelectedType('Expenses')}
                       >
@@ -868,8 +775,8 @@ export default function CashflowStatementPage() {
 
                     <Box flex="1" />
 
-                    <Select 
-                      size="sm" 
+                    <Select
+                      size="sm"
                       maxW="150px"
                       value={selectedStatus}
                       onChange={(e) => setSelectedStatus(e.target.value)}
@@ -909,22 +816,22 @@ export default function CashflowStatementPage() {
                           connectedBanks.map(bank => {
                             // Get transactions for this bank
                             const bankTransactions = filteredTransactions.filter(t => t.bank_id === bank.id);
-                            
+
                             // Skip banks with no transactions
                             if (bankTransactions.length === 0) return null;
-                            
+
                             // For each bank, select a diverse set of transactions
                             const diverseTransactions = [];
-                            
+
                             // Try to get both credit and debit transactions with diverse amounts
                             const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
                             const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
-                            
+
                             // Take highest amount credit transaction if available
                             if (credits.length > 0) {
                               const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
                               diverseTransactions.push(highestCredit);
-                              
+
                               // If we have more credits, also take a lower amount one
                               if (credits.length > 1) {
                                 const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
@@ -933,12 +840,12 @@ export default function CashflowStatementPage() {
                                 }
                               }
                             }
-                            
+
                             // Take highest amount debit transaction if available
                             if (debits.length > 0) {
                               const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
                               diverseTransactions.push(highestDebit);
-                              
+
                               // If we have more debits, also take a lower amount one
                               if (debits.length > 1) {
                                 const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
@@ -947,31 +854,31 @@ export default function CashflowStatementPage() {
                                 }
                               }
                             }
-                            
+
                             // If we didn't get enough transactions, add more from the original list
                             if (diverseTransactions.length < 5) {
                               const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
                               const remainingTransactions = bankTransactions
                                 .filter(t => !existingIds.has(t.transaction_id))
                                 .slice(0, 5 - diverseTransactions.length);
-                              
+
                               diverseTransactions.push(...remainingTransactions);
                             }
-                            
+
                             // Sort by date (most recent first)
-                            diverseTransactions.sort((a, b) => 
+                            diverseTransactions.sort((a, b) =>
                               new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
                             );
-                            
+
                             // Limit to 5 transactions per bank
                             const selectedTransactions = diverseTransactions.slice(0, 5);
-                            
+
                             return selectedTransactions.length > 0 ? (
                               <React.Fragment key={bank.id}>
                                 <Tr>
-                                  <Td 
-                                    colSpan={6} 
-                                    bg="gray.50" 
+                                  <Td
+                                    colSpan={6}
+                                    bg="gray.50"
                                     fontWeight="medium"
                                     py={2}
                                   >
@@ -988,11 +895,11 @@ export default function CashflowStatementPage() {
                                     <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
                                     <Td maxW="400px">
                                       <HStack>
-                                        <Box 
-                                          bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
-                                          color="white" 
-                                          w="24px" 
-                                          h="24px" 
+                                        <Box
+                                          bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}
+                                          color="white"
+                                          w="24px"
+                                          h="24px"
                                           flexShrink={0}
                                           borderRadius="full"
                                           display="flex"
@@ -1013,7 +920,7 @@ export default function CashflowStatementPage() {
                                       ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
                                     </Td>
                                     <Td>
-                                      <Badge 
+                                      <Badge
                                         colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
                                       >
                                         {transaction.status}
@@ -1028,19 +935,19 @@ export default function CashflowStatementPage() {
                           // For single bank view, also use diverse transaction selection
                           (() => {
                             const bankTransactions = filteredTransactions;
-                            
+
                             // Try to get both credit and debit transactions with diverse amounts
                             const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
                             const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
-                            
+
                             const diverseTransactions = [];
-                            
+
                             // Take highest and lowest amount credit transactions if available
                             if (credits.length > 0) {
                               // Sort by amount descending and take highest
                               const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
                               diverseTransactions.push(highestCredit);
-                              
+
                               // If we have more than one, take lowest amount too
                               if (credits.length > 1) {
                                 const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
@@ -1049,13 +956,13 @@ export default function CashflowStatementPage() {
                                 }
                               }
                             }
-                            
+
                             // Take highest and lowest amount debit transactions if available
                             if (debits.length > 0) {
                               // Sort by amount descending and take highest
                               const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
                               diverseTransactions.push(highestDebit);
-                              
+
                               // If we have more than one, take lowest amount too
                               if (debits.length > 1) {
                                 const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
@@ -1064,22 +971,22 @@ export default function CashflowStatementPage() {
                                 }
                               }
                             }
-                            
+
                             // If we didn't get enough transactions, add more from the original list
                             if (diverseTransactions.length < 10) {
                               const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
                               const remainingTransactions = bankTransactions
                                 .filter(t => !existingIds.has(t.transaction_id))
                                 .slice(0, 10 - diverseTransactions.length);
-                              
+
                               diverseTransactions.push(...remainingTransactions);
                             }
-                            
+
                             // Sort by date (most recent first)
-                            diverseTransactions.sort((a, b) => 
+                            diverseTransactions.sort((a, b) =>
                               new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
                             );
-                            
+
                             // Limit to 10 transactions
                             return diverseTransactions.slice(0, 10).map((transaction) => (
                               <Tr key={transaction.transaction_id}>
@@ -1091,11 +998,11 @@ export default function CashflowStatementPage() {
                                 <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
                                 <Td maxW="400px">
                                   <HStack>
-                                    <Box 
-                                      bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'} 
-                                      color="white" 
-                                      w="24px" 
-                                      h="24px" 
+                                    <Box
+                                      bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}
+                                      color="white"
+                                      w="24px"
+                                      h="24px"
                                       flexShrink={0}
                                       borderRadius="full"
                                       display="flex"
@@ -1116,7 +1023,7 @@ export default function CashflowStatementPage() {
                                   ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
                                 </Td>
                                 <Td>
-                                  <Badge 
+                                  <Badge
                                     colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
                                   >
                                     {transaction.status}
@@ -1144,24 +1051,25 @@ export default function CashflowStatementPage() {
           </Box>
         </Box>
 
-        {/* Summary Footer */}
-        <Box 
-          bg="teal.700" 
-          color="white" 
-          p={4}
-          data-summary-footer
-          position="sticky"
-          bottom={0}
-          zIndex={1}
-        >
-          <HStack justify="space-between">
-            <Text>Summary: Cash Flow</Text>
-            <Text>Net Cash Flow: {filteredTransactions.reduce((total, transaction) => {
-              const amount = transaction.amount.amount;
-              return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
-            }, 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
-          </HStack>
-        </Box>
+
+      </Box>
+      {/* Summary Footer */}
+      <Box
+        bg="teal.700"
+        color="white"
+        p={4}
+        data-summary-footer
+        position="sticky"
+        bottom={0}
+        zIndex={1}
+      >
+        <HStack justify="space-between">
+          <Text>Summary: Cash Flow</Text>
+          <Text>Net Cash Flow: {filteredTransactions.reduce((total, transaction) => {
+            const amount = transaction.amount.amount;
+            return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
+          }, 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+        </HStack>
       </Box>
     </Box>
   )
