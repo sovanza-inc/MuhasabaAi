@@ -138,13 +138,14 @@ export default function ProfitLossPage() {
 
       // Clone the content
       const contentClone = contentRef.current.cloneNode(true) as HTMLElement;
-      tempContainer.appendChild(contentClone);
-
-      // Clone and append the summary footer
-      const summaryFooter = document.querySelector('[data-summary-footer]')?.cloneNode(true) as HTMLElement;
-      if (summaryFooter) {
-        tempContainer.appendChild(summaryFooter);
+      
+      // Remove the summary footer from the cloned content before PDF generation
+      const summaryFooterInClone = contentClone.querySelector('[data-summary-footer]');
+      if (summaryFooterInClone) {
+        summaryFooterInClone.remove();
       }
+      
+      tempContainer.appendChild(contentClone);
 
       // Generate PDF
       const canvas = await html2canvas(tempContainer, {
@@ -281,49 +282,6 @@ export default function ProfitLossPage() {
         }
 
         pageNum--; // Adjust for last increment
-
-        // Add summary footer
-        const footerElements = document.querySelectorAll('[data-summary-footer]');
-        if (footerElements.length > 0) {
-          const footerElement = footerElements[0]; // Take only the first footer element
-          const footerCanvas = await html2canvas(footerElement as HTMLElement, {
-            scale: 2,
-            logging: false,
-            useCORS: true
-          });
-          
-          const footerImgData = footerCanvas.toDataURL('image/png');
-          const footerImgWidth = 190;
-          const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width;
-
-          // Calculate space available on the last page
-          const availableSpace = pageHeight - lastContentY - footerMargin - pageNumberHeight;
-
-          if (availableSpace >= footerImgHeight + 10) {
-            // Add footer on the current page if there's enough space
-            pdf.addImage(
-              footerImgData,
-              'PNG',
-              marginX,
-              lastContentY + 5,
-              footerImgWidth,
-              footerImgHeight
-            );
-          } else {
-            // Add footer on a new page
-            pdf.addPage();
-            pageNum++;
-            await addHeader(pageNum);
-            pdf.addImage(
-              footerImgData,
-              'PNG',
-              marginX,
-              contentStartY,
-              footerImgWidth,
-              footerImgHeight
-            );
-          }
-        }
 
         // Add page numbers to all pages
         for (let i = 1; i <= pageNum; i++) {

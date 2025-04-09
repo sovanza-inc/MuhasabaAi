@@ -482,14 +482,16 @@ export default function BalanceSheetPage() {
     if (!contentRef.current) return;
 
     try {
-      // Create a temporary container to hold all content
+      // Create a temporary container
       const tempContainer = document.createElement('div');
       tempContainer.style.position = 'absolute';
       tempContainer.style.left = '-9999px';
       tempContainer.style.top = '-9999px';
-      tempContainer.style.width = '1024px'; // Fixed width for consistent rendering
+      tempContainer.style.width = '1024px';
+      tempContainer.style.minHeight = '2000px'; // Set minimum height
+      tempContainer.style.height = 'auto'; // Allow height to grow
 
-      // Add logo image to the container
+      // Add logo image (hidden) for header generation
       const logoImg = document.createElement('img');
       logoImg.src = logoRef.current?.src || '';
       logoImg.style.display = 'none';
@@ -497,194 +499,135 @@ export default function BalanceSheetPage() {
 
       document.body.appendChild(tempContainer);
 
-      // Clone the content
+      // 1. Clone the main content (contentRef)
       const contentClone = contentRef.current.cloneNode(true) as HTMLElement;
+      // Ensure content is fully visible
+      contentClone.style.height = 'auto';
+      contentClone.style.overflow = 'visible';
       tempContainer.appendChild(contentClone);
 
-      // Clone and append the summary footer
-      const summaryFooter = document.querySelector('[data-summary-footer]')?.cloneNode(true) as HTMLElement;
-      if (summaryFooter) {
-        console.log('Cloning footer element'); // Debugging log
-        tempContainer.appendChild(summaryFooter);
-      }
+      // Wait a moment for content to render
+      await new Promise(resolve => setTimeout(resolve, 100));
 
-      // Ensure only one footer is added
-      const footerElements = document.querySelectorAll('[data-summary-footer]');
-      if (footerElements.length > 1) {
-        console.warn('Multiple footer elements detected:', footerElements.length);
-      }
-
-      // Generate PDF
+      // 2. Generate PDF canvas from the temporary container
       const canvas = await html2canvas(tempContainer, {
         scale: 2,
         logging: false,
         useCORS: true,
         width: 1024,
-        height: tempContainer.offsetHeight,
+        height: Math.max(tempContainer.scrollHeight, tempContainer.offsetHeight, 2000), // Use maximum height
         windowWidth: 1024,
-        windowHeight: tempContainer.offsetHeight
+        windowHeight: Math.max(tempContainer.scrollHeight, tempContainer.offsetHeight, 2000)
       });
 
-      // Clean up
+      // Clean up temporary container
       document.body.removeChild(tempContainer);
 
-      const imgWidth = 190; // Reduced from 210 to add margins
-      const pageHeight = 297; // A4 height in mm
-      const marginX = 10; // Left and right margins in mm
-      const marginY = 20; // Top margin
-      const footerMargin = 15; // Bottom margin for page numbers
-      const headerHeight = 15; // Height for header
-      const pageNumberHeight = 15; // Height reserved for page numbers
-      const contentStartY = marginY + headerHeight; // Y position where content starts
+      // 3. Proceed with page splitting and PDF creation
+      const imgWidth = 190;
+      const pageHeight = 297;
+      const marginX = 10;
+      const marginY = 20;
+      const footerMargin = 15;
+      const headerHeight = 15;
+      const pageNumberHeight = 15;
+      const contentStartY = marginY + headerHeight;
       
       const imgHeight = (canvas.height * imgWidth) / canvas.width;
       const pdf = new jsPDF('p', 'mm', 'a4');
 
-      // Function to add header to each page
+      // --- Helper Functions (addHeader, addFooter - Keep definitions) ---
       async function addHeader(pageNum: number): Promise<void> {
         pdf.setPage(pageNum);
-
         try {
           if (logoImg.complete && logoImg.naturalWidth > 0) {
-            // Convert logo to data URL
             const tempCanvas = document.createElement('canvas');
             tempCanvas.width = logoImg.naturalWidth;
             tempCanvas.height = logoImg.naturalHeight;
             const tempCtx = tempCanvas.getContext('2d');
-            
             if (tempCtx) {
               tempCtx.drawImage(logoImg, 0, 0);
               const logoData = tempCanvas.toDataURL('image/png');
-              
-              // Add logo at the top center with proper aspect ratio
-              const logoWidth = 34; // Width in mm
+              const logoWidth = 34;
               const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
-              const logoHeight = logoWidth / aspectRatio; // Height adjusted by aspect ratio
+              const logoHeight = logoWidth / aspectRatio;
               const logoX = (pdf.internal.pageSize.width - logoWidth) / 2;
               pdf.addImage(logoData, 'PNG', logoX, 5, logoWidth, logoHeight);
             }
           }
         } catch (error) {
           console.error('Error adding logo:', error);
-          // Continue without logo if there's an error
         }
-
-        // Add title and date below logo position regardless of logo loading success
         pdf.setFontSize(16);
         pdf.setTextColor(0, 0, 0);
         pdf.text('Balance Sheet Report', pdf.internal.pageSize.width / 2, marginY + 5, { align: 'center' });
-        
         pdf.setFontSize(10);
         pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdf.internal.pageSize.width / 2, marginY + 10, { align: 'center' });
       }
 
-      // Function to add footer to each page
       function addFooter(pageNum: number, totalPages: number): void {
         pdf.setPage(pageNum);
         pdf.setFontSize(10);
         pdf.setTextColor(100);
         pdf.text(`Page ${pageNum} of ${totalPages}`, pdf.internal.pageSize.width / 2, pdf.internal.pageSize.height - (footerMargin / 2), { align: 'center' });
       }
+      // --- End Helper Functions ---
 
       // Split content into pages
       let pageNum = 1;
       let currentY = contentStartY;
       let remainingHeight = imgHeight;
 
-      // Make the content splitting process async to handle async header
-      async function generatePages() {
-        while (remainingHeight > 0) {
-          // Add new page if needed
-          if (pageNum > 1) {
-            pdf.addPage();
-            currentY = contentStartY;
-          }
-
-          // Add header
-          await addHeader(pageNum);
-
-          // Calculate how much content can fit on this page
-          const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight + 10; // Increased buffer to 40mm
-          const heightToDraw = Math.min(remainingHeight, availableHeight);
-
-          // Calculate the portion of the image to use
-          const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
-          const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
-
-          // Create a temporary canvas for the portion we want to draw
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = sourceHeight;
-          const tempCtx = tempCanvas.getContext('2d');
-          
-          if (tempCtx) {
-            tempCtx.drawImage(
-              canvas, 
-              0, 
-              sourceY, 
-              canvas.width, 
-              sourceHeight, 
-              0, 
-              0, 
-              canvas.width, 
-              sourceHeight
-            );
-            
-            // Draw portion of content
-            const portionImgData = tempCanvas.toDataURL('image/png');
-            pdf.addImage(
-              portionImgData,
-              'PNG',
-              marginX,
-              currentY,
-              imgWidth,
-              heightToDraw
-            );
-          }
-
-          remainingHeight -= heightToDraw;
-          pageNum++;
+      while (remainingHeight > 0) {
+        if (pageNum > 1) {
+          pdf.addPage();
+          currentY = contentStartY;
         }
 
-        pageNum--; // Adjust for last increment
+        await addHeader(pageNum);
 
-        // Add summary footer with fixed positioning from bottom
-        const footerElements = document.querySelectorAll('[data-summary-footer]');
-        if (footerElements.length > 0) {
-          const footerElement = footerElements[0];
-          const footerCanvas = await html2canvas(footerElement as HTMLElement, {
-            scale: 2,
-            logging: false,
-            useCORS: true
-          });
-          
-          const footerImgData = footerCanvas.toDataURL('image/png');
-          const footerImgWidth = 190;
-          const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width;
+        // Calculate available height (no need to account for separate footer image)
+        const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight + 10;
+        const heightToDraw = Math.min(remainingHeight, availableHeight);
 
-          // Position footer from the bottom of the page
-          const footerY = pageHeight - footerMargin - pageNumberHeight - footerImgHeight + 10;
-          
+        // Calculate source rect from the main canvas (which no longer includes the footer)
+        const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
+        const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
+
+        // Draw portion of content
+        const tempCanvas = document.createElement('canvas');
+        tempCanvas.width = canvas.width;
+        tempCanvas.height = sourceHeight;
+        const tempCtx = tempCanvas.getContext('2d');
+        if (tempCtx) {
+          tempCtx.drawImage(
+            canvas, 
+            0, sourceY, canvas.width, sourceHeight, 
+            0, 0, canvas.width, sourceHeight
+          );
+          const portionImgData = tempCanvas.toDataURL('image/png');
           pdf.addImage(
-            footerImgData,
+            portionImgData,
             'PNG',
             marginX,
-            footerY,
-            footerImgWidth,
-            footerImgHeight
+            currentY,
+            imgWidth,
+            heightToDraw
           );
         }
 
-        // Add page numbers to all pages
-        for (let i = 1; i <= pageNum; i++) {
-          addFooter(i, pageNum);
+        remainingHeight -= heightToDraw;
+        if (remainingHeight > 0) {
+          pageNum++;
         }
-
-        pdf.save('balance-sheet-report.pdf');
       }
 
-      // Start the PDF generation
-      await generatePages();
+      // Add page numbers to all pages
+      for (let i = 1; i <= pageNum; i++) {
+        addFooter(i, pageNum);
+      }
+
+      pdf.save('balance-sheet-report.pdf');
 
       toast({
         title: "Export successful",
@@ -864,13 +807,9 @@ export default function BalanceSheetPage() {
       >
         <HStack justify="space-between">
           <Text>Summary: Assets-Liabilities</Text>
-          <Text>Total Equity: {bankAccounts.reduce((total, bank) => {
-            return total + bank.accounts.reduce((bankTotal, account) => {
-              if (account.balance) {
-                return bankTotal + (account.balance.balance || 0);
-              }
-              return bankTotal;
-            }, 0);
+          <Text>Net Worth: {filteredTransactions.reduce((total, transaction) => {
+            const amount = transaction.amount.amount;
+            return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
           }, 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
         </HStack>
       </Box>
