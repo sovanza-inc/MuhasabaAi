@@ -762,11 +762,9 @@ export default function BalanceSheetPage() {
               >
                 <option value="all">All Banks</option>
                 {bankAccounts.map((bank) => (
-                  bank.accounts.map((account) => (
-                    <option key={account.account_id} value={account.account_id}>
-                      {bank.name} - {account.nickname || account.account_id}
-                    </option>
-                  ))
+                  <option key={bank.id} value={bank.id}>
+                    {bank.name}
+                  </option>
                 ))}
               </Select>
             </Box>
