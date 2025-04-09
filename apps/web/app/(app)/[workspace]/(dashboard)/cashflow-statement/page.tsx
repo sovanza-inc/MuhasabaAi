@@ -26,8 +26,6 @@ import { AreaChart } from '@saas-ui/charts'
 import React from 'react'
 import { LuChevronsUpDown } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
-import { useApiCache } from '#features/common/hooks/use-api-cache'
-import { useQueryClient } from '@tanstack/react-query'
 
 interface BankTransaction {
   transaction_id: string;
@@ -56,9 +54,7 @@ interface Bank {
 
 export default function CashflowStatementPage() {
   const toast = useToast()
-  const { CACHE_KEYS, prefetchData } = useApiCache()
   const [workspace] = useCurrentWorkspace()
-  const queryClient = useQueryClient()
   const [isLoading, setIsLoading] = React.useState(true)
   const [transactions, setTransactions] = React.useState<BankTransaction[]>([])
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -112,9 +108,7 @@ export default function CashflowStatementPage() {
       }
     }
 
-    if (workspace?.id) {
-      initializeAuth()
-    }
+    initializeAuth()
   }, [workspace?.id, toast])
 
   // Fetch connected banks and their accounts
@@ -122,30 +116,21 @@ export default function CashflowStatementPage() {
     if (!customerId || !authToken) return []
 
     try {
-      // Create a unique cache key that includes the customer ID
-      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}`
-      const cachedData = await prefetchData(
-        cacheKey,
-        async () => {
-          const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            }
-          })
-
-          const data = await response.json()
-          
-          if (!response.ok) {
-            throw new Error(data.details || 'Failed to fetch connected banks')
-          }
-
-          return data
+      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         }
-      )
+      })
 
-      setConnectedBanks(cachedData)
-      return cachedData
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.details || 'Failed to fetch connected banks')
+      }
+
+      setConnectedBanks(data)
+      return data
     } catch (error) {
       console.error('Error fetching connected banks:', error)
       toast({
@@ -157,171 +142,121 @@ export default function CashflowStatementPage() {
       })
       return []
     }
-  }, [customerId, authToken, toast, prefetchData])
+  }, [customerId, authToken, toast])
 
   // Fetch accounts for each bank
   const fetchAccountsForBank = React.useCallback(async (entityId: string) => {
     try {
-      // Create a unique cache key that includes both customer ID and entity ID
-      const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}_${entityId}`
-      return await prefetchData(
-        cacheKey,
-        async () => {
-          const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            }
-          })
-
-          const data = await response.json()
-          
-          if (!response.ok) {
-            throw new Error(data.details || 'Failed to fetch bank accounts')
-          }
-
-          return data
+      const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${entityId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         }
-      )
+      })
+
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.details || 'Failed to fetch bank accounts')
+      }
+
+      return data
     } catch (error) {
       console.error('Error fetching bank accounts:', error)
       return []
     }
-  }, [authToken, customerId, prefetchData])
+  }, [authToken])
 
   // Fetch transactions for an account
   const fetchTransactionsForAccount = React.useCallback(async (accountId: string, entityId: string) => {
     try {
-      // Create a unique cache key that includes customer ID, account ID, and entity ID
-      const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_${customerId}_${accountId}_${entityId}`
-      return await prefetchData(
-        cacheKey,
-        async () => {
-          const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            }
-          })
-
-          const data = await response.json()
-          
-          if (!response.ok) {
-            throw new Error(data.details || 'Failed to fetch transactions')
-          }
-
-          return data.transactions || []
+      const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         }
-      )
+      })
+
+      const data = await response.json()
+      
+      if (!response.ok) {
+        throw new Error(data.details || 'Failed to fetch transactions')
+      }
+
+      return data.transactions || []
     } catch (error) {
       console.error('Error fetching transactions:', error)
       return []
     }
-  }, [authToken, customerId, prefetchData])
+  }, [authToken])
 
   // Fetch all transactions
   React.useEffect(() => {
     const fetchAllTransactions = async () => {
-      if (!customerId || !authToken) return
+      if (!customerId || !authToken) return;
 
-      setIsLoading(true)
+      setIsLoading(true);
       try {
-        // Create a unique cache key for all transactions
-        const allTransactionsCacheKey = `${CACHE_KEYS.TRANSACTIONS}_all_${customerId}`
-        const cachedTransactions = queryClient.getQueryData([allTransactionsCacheKey])
-        if (cachedTransactions && Array.isArray(cachedTransactions)) {
-          setTransactions(cachedTransactions)
-          setIsLoading(false)
-          return
-        }
-
-        const banks = await fetchConnectedBanks()
-        let allTransactions: BankTransaction[] = []
+        const banks = await fetchConnectedBanks();
+        let allTransactions: BankTransaction[] = [];
         
         for (const bank of banks) {
-          const accounts = await fetchAccountsForBank(bank.id)
+          const accounts = await fetchAccountsForBank(bank.id);
           
           for (const account of accounts) {
-            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id)
-            const accountType = account.account_type || account.account_sub_type || "";
-            const accountName = account.nickname || accountType || account.account_id;
+            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id);
+            const transactionsWithBank = accountTransactions.map((transaction: BankTransaction) => ({
+              ...transaction,
+              bank_name: bank.bank_identifier || bank.name,
+              bank_id: bank.id
+            }));
             
-            const transactionsWithBank = accountTransactions.map((transaction: BankTransaction) => {
-              // Log transaction details for debugging
-              console.log('Transaction:', {
-                id: transaction.transaction_id,
-                indicator: transaction.credit_debit_indicator,
-                amount: transaction.amount,
-                info: transaction.transaction_information
-              });
-              
-              // Determine if this is a credit transaction based on various indicators
-              const isCredit = transaction.credit_debit_indicator === 'CREDIT' || 
-                             transaction.credit_debit_indicator === 'C' ||
-                             transaction.transaction_information?.includes('SALARY') ||
-                             transaction.transaction_information?.includes('CREDIT') ||
-                             transaction.transaction_information?.includes('DEPOSIT');
-
-              return {
-                ...transaction,
-                bank_name: bank.bank_identifier || bank.name,
-                bank_id: bank.id,
-                credit_debit_indicator: isCredit ? 'CREDIT' : 'DEBIT',
-                account_type: accountType,
-                account_name: accountName
-              }
-            })
-            
-            allTransactions = [...allTransactions, ...transactionsWithBank]
+            allTransactions = [...allTransactions, ...transactionsWithBank];
           }
         }
 
         // Sort transactions by date (most recent first)
         allTransactions.sort((a, b) => 
           new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
-        )
+        );
 
-        // Cache the combined transactions
-        queryClient.setQueryData([allTransactionsCacheKey], allTransactions)
-        setTransactions(allTransactions)
+        setTransactions(allTransactions);
       } catch (error) {
-        console.error('Error fetching all transactions:', error)
+        console.error('Error fetching all transactions:', error);
         toast({
           title: 'Error',
           description: 'Failed to fetch transactions',
           status: 'error',
           duration: 5000,
           isClosable: true,
-        })
+        });
       } finally {
-        setIsLoading(false)
+        setIsLoading(false);
       }
-    }
+    };
 
-    if (customerId && authToken) {
-      fetchAllTransactions()
-    }
-  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, toast, queryClient])
+    fetchAllTransactions();
+  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, toast]);
 
   // Filter transactions based on selected bank, month, status, and type
   const filteredTransactions = React.useMemo(() => {
-    return transactions.filter(transaction => {
+    return transactions.filter((transaction: BankTransaction) => {
       // Filter by bank
       if (selectedBankId !== 'all' && transaction.bank_id !== selectedBankId) {
-        return false
+        return false;
       }
 
       // Filter by month
       if (selectedMonth !== 'all') {
-        const transactionMonth = new Date(transaction.booking_date_time).toLocaleString('default', { month: 'long' })
+        const transactionMonth = new Date(transaction.booking_date_time).toLocaleString('default', { month: 'long' });
         if (transactionMonth !== selectedMonth) {
-          return false
+          return false;
         }
       }
 
       // Filter by status
       if (selectedStatus !== 'All' && transaction.status !== selectedStatus.toUpperCase()) {
-        return false
+        return false;
       }
 
       // Filter by type
@@ -333,16 +268,16 @@ export default function CashflowStatementPage() {
                         transaction.transaction_information?.includes('DEPOSIT');
 
         if (selectedType === 'Income' && !isCredit) {
-          return false
+          return false;
         }
         if (selectedType === 'Expenses' && isCredit) {
-          return false
+          return false;
         }
       }
 
-      return true
-    })
-  }, [transactions, selectedBankId, selectedMonth, selectedStatus, selectedType])
+      return true;
+    });
+  }, [transactions, selectedBankId, selectedMonth, selectedStatus, selectedType]);
 
   // Calculate daily cash flow data for the chart
   const chartData = React.useMemo(() => {
