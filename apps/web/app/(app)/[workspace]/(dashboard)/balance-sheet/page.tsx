@@ -1,10 +1,13 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import React from 'react'
+import { LuDownload } from 'react-icons/lu'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
 
 interface BankAccount {
   id?: string;
@@ -68,6 +71,9 @@ export default function BalanceSheetPage() {
   const [customerId, setCustomerId] = React.useState<string | null>(null)
   const [bankAccounts, setBankAccounts] = React.useState<BankWithAccounts[]>([])
   const [transactions, setTransactions] = React.useState<Transaction[]>([])
+  const contentRef = React.useRef<HTMLDivElement>(null)
+  const logoRef = React.useRef<HTMLImageElement>(null)
+  const toast = useToast()
 
   // Initialize auth token and customer ID
   React.useEffect(() => {
@@ -489,20 +495,249 @@ export default function BalanceSheetPage() {
     }
   }, [transactions, selectedAccount, bankAccounts])
 
+  const handleExportPDF = async () => {
+    if (!contentRef.current) return;
+
+    try {
+      // Create a temporary container to hold all content
+      const tempContainer = document.createElement('div');
+      tempContainer.style.position = 'absolute';
+      tempContainer.style.left = '-9999px';
+      tempContainer.style.top = '-9999px';
+      tempContainer.style.width = '1024px'; // Fixed width for consistent rendering
+
+      // Add logo image to the container
+      const logoImg = document.createElement('img');
+      logoImg.src = logoRef.current?.src || '';
+      logoImg.style.display = 'none';
+      tempContainer.appendChild(logoImg);
+
+      document.body.appendChild(tempContainer);
+
+      // Clone the content
+      const contentClone = contentRef.current.cloneNode(true) as HTMLElement;
+      tempContainer.appendChild(contentClone);
+
+      // Clone and append the summary footer
+      const summaryFooter = document.querySelector('[data-summary-footer]')?.cloneNode(true) as HTMLElement;
+      if (summaryFooter) {
+        tempContainer.appendChild(summaryFooter);
+      }
+
+      // Generate PDF
+      const canvas = await html2canvas(tempContainer, {
+        scale: 2,
+        logging: false,
+        useCORS: true,
+        width: 1024,
+        height: tempContainer.offsetHeight,
+        windowWidth: 1024,
+        windowHeight: tempContainer.offsetHeight
+      });
+
+      // Clean up
+      document.body.removeChild(tempContainer);
+
+      const imgWidth = 190; // Reduced from 210 to add margins
+      const pageHeight = 297; // A4 height in mm
+      const marginX = 10; // Left and right margins in mm
+      const marginY = 20; // Top margin
+      const footerMargin = 15; // Bottom margin for page numbers
+      const headerHeight = 15; // Height for header
+      const pageNumberHeight = 15; // Height reserved for page numbers
+      const contentStartY = marginY + headerHeight; // Y position where content starts
+      
+      const imgHeight = (canvas.height * imgWidth) / canvas.width;
+      const pdf = new jsPDF('p', 'mm', 'a4');
+
+      // Function to add header to each page
+      async function addHeader(pageNum: number): Promise<void> {
+        pdf.setPage(pageNum);
+
+        try {
+          if (logoImg.complete && logoImg.naturalWidth > 0) {
+            // Convert logo to data URL
+            const tempCanvas = document.createElement('canvas');
+            tempCanvas.width = logoImg.naturalWidth;
+            tempCanvas.height = logoImg.naturalHeight;
+            const tempCtx = tempCanvas.getContext('2d');
+            
+            if (tempCtx) {
+              tempCtx.drawImage(logoImg, 0, 0);
+              const logoData = tempCanvas.toDataURL('image/png');
+              
+              // Add logo at the top center with proper aspect ratio
+              const logoWidth = 34; // Width in mm
+              const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
+              const logoHeight = logoWidth / aspectRatio; // Height adjusted by aspect ratio
+              const logoX = (pdf.internal.pageSize.width - logoWidth) / 2;
+              pdf.addImage(logoData, 'PNG', logoX, 5, logoWidth, logoHeight);
+            }
+          }
+        } catch (error) {
+          console.error('Error adding logo:', error);
+          // Continue without logo if there's an error
+        }
+
+        // Add title and date below logo position regardless of logo loading success
+        pdf.setFontSize(16);
+        pdf.setTextColor(0, 0, 0);
+        pdf.text('Balance Sheet Report', pdf.internal.pageSize.width / 2, marginY + 5, { align: 'center' });
+        
+        pdf.setFontSize(10);
+        pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdf.internal.pageSize.width / 2, marginY + 10, { align: 'center' });
+      }
+
+      // Function to add footer to each page
+      function addFooter(pageNum: number, totalPages: number): void {
+        pdf.setPage(pageNum);
+        pdf.setFontSize(10);
+        pdf.setTextColor(100);
+        pdf.text(`Page ${pageNum} of ${totalPages}`, pdf.internal.pageSize.width / 2, pdf.internal.pageSize.height - (footerMargin / 2), { align: 'center' });
+      }
+
+      // Split content into pages
+      let pageNum = 1;
+      let currentY = contentStartY;
+      let remainingHeight = imgHeight;
+      let lastContentY = 0;
+
+      // Make the content splitting process async to handle async header
+      async function generatePages() {
+        while (remainingHeight > 0) {
+          // Add new page if needed
+          if (pageNum > 1) {
+            pdf.addPage();
+            currentY = contentStartY;
+          }
+
+          // Add header
+          await addHeader(pageNum);
+
+          // Calculate how much content can fit on this page
+          const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight + 10; // Increased buffer to 40mm
+          const heightToDraw = Math.min(remainingHeight, availableHeight);
+
+          // Calculate the portion of the image to use
+          const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
+          const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
+
+          // Create a temporary canvas for the portion we want to draw
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = canvas.width;
+          tempCanvas.height = sourceHeight;
+          const tempCtx = tempCanvas.getContext('2d');
+          
+          if (tempCtx) {
+            tempCtx.drawImage(
+              canvas, 
+              0, 
+              sourceY, 
+              canvas.width, 
+              sourceHeight, 
+              0, 
+              0, 
+              canvas.width, 
+              sourceHeight
+            );
+            
+            // Draw portion of content
+            const portionImgData = tempCanvas.toDataURL('image/png');
+            pdf.addImage(
+              portionImgData,
+              'PNG',
+              marginX,
+              currentY,
+              imgWidth,
+              heightToDraw
+            );
+          }
+
+          lastContentY = currentY + heightToDraw;
+          remainingHeight -= heightToDraw;
+          pageNum++;
+        }
+
+        pageNum--; // Adjust for last increment
+
+        // Add summary footer with fixed positioning from bottom
+        const footerElements = document.querySelectorAll('[data-summary-footer]');
+        if (footerElements.length > 0) {
+          const footerElement = footerElements[0];
+          const footerCanvas = await html2canvas(footerElement as HTMLElement, {
+            scale: 2,
+            logging: false,
+            useCORS: true
+          });
+          
+          const footerImgData = footerCanvas.toDataURL('image/png');
+          const footerImgWidth = 190;
+          const footerImgHeight = (footerCanvas.height * footerImgWidth) / footerCanvas.width;
+
+          // Position footer from the bottom of the page
+          const footerY = pageHeight - footerMargin - pageNumberHeight - footerImgHeight + 10;
+          
+          pdf.addImage(
+            footerImgData,
+            'PNG',
+            marginX,
+            footerY,
+            footerImgWidth,
+            footerImgHeight
+          );
+        }
+
+        // Add page numbers to all pages
+        for (let i = 1; i <= pageNum; i++) {
+          addFooter(i, pageNum);
+        }
+
+        pdf.save('balance-sheet-report.pdf');
+      }
+
+      // Start the PDF generation
+      await generatePages();
+
+      toast({
+        title: "Export successful",
+        description: "Your balance sheet report has been downloaded",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast({
+        title: "Export failed",
+        description: "There was an error exporting your report",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   return (
     <Box>
       <PageHeader />
-      <Box 
-        height="calc(100vh - 65px)"
-        position="relative"
-        display="flex"
-        flexDirection="column"
-      >
-        <Box
-          flex="1"
-          overflow="auto"
-          py={6} 
-          px={8}
+      <Box p={4}>
+        {/* Hidden logo for PDF generation */}
+        <Image
+          ref={logoRef}
+          src="/img/onboarding/muhasaba-logo.png"
+          alt="Muhasaba Logo"
+          style={{ display: 'none' }}
+          crossOrigin="anonymous"
+          width="120px"
+          height="auto"
+        />
+        
+        <Box 
+          height="calc(100vh - 65px)"
+          position="relative"
+          display="flex"
+          flexDirection="column"
+          overflowY="auto"
           sx={{
             '&::-webkit-scrollbar': {
               display: 'none'
@@ -514,10 +749,22 @@ export default function BalanceSheetPage() {
           {/* Reports Section */}
           <Box mb={6}>
             <Box mb={4}>
-              <Heading size="lg" mb={2}>Reports</Heading>
-              <Text color="gray.600" mb={4} fontSize="md">
-                Effortlessly view and analyze your financial reports in one place with real-time insights and data updates.
-              </Text>
+              <HStack justify="space-between" align="center">
+                <Box>
+                  <Heading size="lg" mb={2}>Balance Sheet</Heading>
+                  <Text color="gray.600" mb={4} fontSize="md">
+                    View your complete financial position with assets, liabilities, and equity in one comprehensive report.
+                  </Text>
+                </Box>
+                <Button
+                  leftIcon={<LuDownload />}
+                  colorScheme="green"
+                  onClick={handleExportPDF}
+                  isLoading={isLoading}
+                >
+                  Export as PDF
+                </Button>
+              </HStack>
             </Box>
 
             <Box display="flex" justifyContent="flex-end" mb={4}>
@@ -534,99 +781,112 @@ export default function BalanceSheetPage() {
               >
                 <option value="all">All Banks</option>
                 {bankAccounts.map((bank) => (
-                  <option key={bank.id} value={bank.id}>
-                    {bank.bank_identifier || bank.name}
-                  </option>
+                  bank.accounts.map((account) => (
+                    <option key={account.account_id} value={account.account_id}>
+                      {bank.name} - {account.nickname || account.account_id}
+                    </option>
+                  ))
                 ))}
               </Select>
             </Box>
           </Box>
 
-          {isLoading ? (
-            <Box textAlign="center" py={10}>
-              <Spinner size="xl" color="green.500" />
-              <Text mt={4} color="gray.600">Loading balance sheet...</Text>
-            </Box>
-          ) : (
-            <>
-          {/* Balance Cards */}
-          <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
-            {balanceData.map((item, index) => (
-              <Card 
-                key={index} 
-                p={6} 
-                borderRadius="lg" 
-                boxShadow="sm"
-                borderTop="4px solid"
-                borderTopColor="green.400"
-              >
-                <CardBody p={0}>
-                  <Text fontSize="2xl" fontWeight="semibold" mb={2}>
-                    {item.amount}
+          <Box ref={contentRef}>
+            {isLoading ? (
+              <Box display="flex" justifyContent="center" p={8}>
+                <Spinner size="xl" />
+              </Box>
+            ) : (
+              <>
+                {/* Balance Cards */}
+                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
+                  {balanceData.map((item, index) => (
+                    <Card 
+                      key={index} 
+                      p={6} 
+                      borderRadius="lg" 
+                      boxShadow="sm"
+                      borderTop="4px solid"
+                      borderTopColor="green.400"
+                    >
+                      <CardBody p={0}>
+                        <Text fontSize="2xl" fontWeight="semibold" mb={2}>
+                          {item.amount}
+                        </Text>
+                        <Text color="gray.600">{item.title}</Text>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </SimpleGrid>
+
+                {/* Transactions Section */}
+                <Box mb={6}>
+                  <Heading size="md" mb={4}>Recent Transactions</Heading>
+                  <Text color="gray.600" mb={6} fontSize="md">
+                    Effortlessly view and manage your accounts in one place with real-time balance updates.
                   </Text>
-                  <Text color="gray.600">{item.title}</Text>
-                </CardBody>
-              </Card>
-            ))}
-          </SimpleGrid>
 
-          {/* Transactions Section */}
-          <Box mb={6}>
-                <Heading size="md" mb={4}>Recent Transactions</Heading>
-            <Text color="gray.600" mb={6} fontSize="md">
-              Effortlessly view and manage your accounts in one place with real-time balance updates.
-            </Text>
-
-            <SimpleGrid columns={1} spacing={4}>
-                  {filteredTransactions.map((transaction) => (
-                <Card 
-                      key={transaction.transaction_id}
-                  borderLeftWidth="4px"
-                      borderLeftColor={transaction.credit_debit_indicator === 'CREDIT' ? 'green.400' : 'red.400'}
-                  boxShadow="sm"
-                >
-                  <CardBody py={4} px={6}>
-                    <Box display="flex" justifyContent="space-between" alignItems="center">
-                      <Box>
-                        <Text fontSize="md" fontWeight="medium">
-                              {transaction.bank_name}
-                        </Text>
-                        <Text fontSize="sm" color="gray.500">
-                              {new Date(transaction.booking_date_time).toLocaleString()}
-                        </Text>
-                        <Text fontSize="sm" color="gray.500">
-                              Transaction ID: {transaction.transaction_id}
-                        </Text>
-                      </Box>
-                      <Text 
-                        fontSize="lg" 
-                        fontWeight="medium"
-                        color={transaction.credit_debit_indicator === 'CREDIT' ? "green.500" : "red.500"}
+                  <SimpleGrid columns={1} spacing={4}>
+                    {filteredTransactions.map((transaction) => (
+                      <Card 
+                        key={transaction.transaction_id}
+                        borderLeftWidth="4px"
+                        borderLeftColor={transaction.credit_debit_indicator === 'CREDIT' ? 'green.400' : 'red.400'}
+                        boxShadow="sm"
                       >
-                        {transaction.credit_debit_indicator === 'CREDIT' ? '+$' : '-$'}
-                        {Math.abs(transaction.amount.amount).toLocaleString()}
-                      </Text>
-                    </Box>
-                  </CardBody>
-                </Card>
-              ))}
-            </SimpleGrid>
+                        <CardBody py={4} px={6}>
+                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                            <Box>
+                              <Text fontSize="md" fontWeight="medium">
+                                {transaction.bank_name}
+                              </Text>
+                              <Text fontSize="sm" color="gray.500">
+                                {new Date(transaction.booking_date_time).toLocaleString()}
+                              </Text>
+                              <Text fontSize="sm" color="gray.500">
+                                Transaction ID: {transaction.transaction_id}
+                              </Text>
+                            </Box>
+                            <Text 
+                              fontSize="lg" 
+                              fontWeight="medium"
+                              color={transaction.credit_debit_indicator === 'CREDIT' ? "green.500" : "red.500"}
+                            >
+                              {transaction.credit_debit_indicator === 'CREDIT' ? '+$' : '-$'}
+                              {Math.abs(transaction.amount.amount).toLocaleString()}
+                            </Text>
+                          </Box>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              </>
+            )}
           </Box>
-            </>
-          )}
         </Box>
-
-        {/* Summary Footer */}
-        <Box 
-          bg="teal.700" 
-          color="white" 
-          p={4}
-        >
-          <HStack justify="space-between">
-            <Text>Summary: Revenue-Expenses</Text>
-            <Text>Net Profit: $ {Math.abs(netProfit).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
-          </HStack>
-        </Box>
+      </Box>
+      {/* Summary Footer */}
+      <Box 
+        bg="teal.700" 
+        color="white" 
+        p={4}
+        data-summary-footer
+        position="sticky"
+        bottom={0}
+        zIndex={1}
+      >
+        <HStack justify="space-between">
+          <Text>Summary: Assets-Liabilities</Text>
+          <Text>Total Equity: {bankAccounts.reduce((total, bank) => {
+            return total + bank.accounts.reduce((bankTotal, account) => {
+              if (account.balance) {
+                return bankTotal + (account.balance.balance || 0);
+              }
+              return bankTotal;
+            }, 0);
+          }, 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+        </HStack>
       </Box>
     </Box>
   )
