@@ -26,6 +26,7 @@ import { LuChevronRight } from 'react-icons/lu'
 
 import { AreaChart, BarChart } from '@saas-ui/charts'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
+import { usePath } from '#features/common/hooks/use-path'
 
 interface ConnectedBank {
   id: string;
@@ -768,7 +769,7 @@ export function DashboardPage() {
           </Box>
           <Button
             as="a"
-            href="#"
+            href={usePath('profit-loss')}
             colorScheme="green"
             variant="link"
             rightIcon={<Icon as={LuChevronRight} />}
