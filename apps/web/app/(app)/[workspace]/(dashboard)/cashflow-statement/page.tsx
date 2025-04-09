@@ -56,12 +56,10 @@ export default function CashflowStatementPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
   const [isLoading, setIsLoading] = React.useState(true)
-  const [transactions, setTransactions] = React.useState<BankTransaction[]>([])
   const [authToken, setAuthToken] = React.useState<string | null>(null)
   const [customerId, setCustomerId] = React.useState<string | null>(null)
   const [connectedBanks, setConnectedBanks] = React.useState<Bank[]>([])
-  const [selectedBankId, setSelectedBankId] = React.useState<string>('all')
-  const [selectedMonth, setSelectedMonth] = React.useState('all')
+  const [transactions, setTransactions] = React.useState<BankTransaction[]>([])
   const [selectedStatus, setSelectedStatus] = React.useState('All')
   const [selectedType, setSelectedType] = React.useState('All')
 
@@ -166,7 +164,7 @@ export default function CashflowStatementPage() {
       return []
     }
   }, [authToken])
-
+        
   // Fetch transactions for an account
   const fetchTransactionsForAccount = React.useCallback(async (accountId: string, entityId: string) => {
     try {
