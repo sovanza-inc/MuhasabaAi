@@ -504,7 +504,14 @@ export default function BalanceSheetPage() {
       // Clone and append the summary footer
       const summaryFooter = document.querySelector('[data-summary-footer]')?.cloneNode(true) as HTMLElement;
       if (summaryFooter) {
+        console.log('Cloning footer element'); // Debugging log
         tempContainer.appendChild(summaryFooter);
+      }
+
+      // Ensure only one footer is added
+      const footerElements = document.querySelectorAll('[data-summary-footer]');
+      if (footerElements.length > 1) {
+        console.warn('Multiple footer elements detected:', footerElements.length);
       }
 
       // Generate PDF
