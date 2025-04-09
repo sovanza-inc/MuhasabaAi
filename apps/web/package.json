@@ -44,6 +44,8 @@
     "cookies-next": "^5.1.0",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.18.1",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^2.5.1",
     "next": "^15.1.5",
     "next-svgr": "^0.0.2",
     "react": "^18.3.1",
