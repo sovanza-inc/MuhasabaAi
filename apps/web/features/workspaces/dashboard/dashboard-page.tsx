@@ -27,6 +27,7 @@ import { LuChevronRight } from 'react-icons/lu'
 import { AreaChart, BarChart } from '@saas-ui/charts'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { usePath } from '#features/common/hooks/use-path'
+import { useApiCache } from '#features/common/hooks/use-api-cache'
 
 interface ConnectedBank {
   id: string;
@@ -80,6 +81,7 @@ export function DashboardPage() {
   const [accounts, setAccounts] = useState<BankAccount[]>([])
   const [workspace] = useCurrentWorkspace()
   const [selectedBankId, setSelectedBankId] = useState<string>('all')
+  const { CACHE_KEYS, prefetchData } = useApiCache()
 
   // Initialize auth token and get customer ID
   React.useEffect(() => {
@@ -127,26 +129,35 @@ export function DashboardPage() {
       if (!authToken || !customerId) return;
 
       try {
-        const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+        // Create a unique cache key that includes the customer ID
+        const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}`
+        const cachedData = await prefetchData(
+          cacheKey,
+          async () => {
+            const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              }
+            });
+
+            const data = await response.json();
+            if (!response.ok) {
+              throw new Error(data.details || 'Failed to fetch connected banks');
+            }
+
+            return data;
           }
-        });
+        );
 
-        const data = await response.json();
-        if (!response.ok) {
-          throw new Error(data.details || 'Failed to fetch connected banks');
-        }
-
-        setConnectedBanks(data || []);
+        setConnectedBanks(cachedData || []);
       } catch (error) {
         console.error('Error fetching connected banks:', error);
       }
     };
 
     fetchConnectedBanks();
-  }, [authToken, customerId]);
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.ACCOUNTS]);
 
   // Fetch accounts for each bank
   React.useEffect(() => {
@@ -157,20 +168,29 @@ export function DashboardPage() {
         const allAccounts: BankAccount[] = [];
 
         for (const bank of connectedBanks) {
-          const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${bank.id}`, {
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            }
-          });
+          // Create a unique cache key that includes both customer ID and bank ID
+          const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}_${bank.id}`
+          const cachedData = await prefetchData(
+            cacheKey,
+            async () => {
+              const response = await fetch(`/api/bank-integration/fetch-accounts?entity_id=${bank.id}`, {
+                headers: {
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${authToken}`
+                }
+              });
 
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.details || 'Failed to fetch accounts');
-          }
+              const data = await response.json();
+              if (!response.ok) {
+                throw new Error(data.details || 'Failed to fetch accounts');
+              }
+
+              return data;
+            }
+          );
 
           // Add bank ID to each account
-          const accountsWithBank = data.map((account: BankAccount) => ({
+          const accountsWithBank = cachedData.map((account: BankAccount) => ({
             ...account,
             bank_id: bank.id
           }));
@@ -185,7 +205,7 @@ export function DashboardPage() {
     };
 
     fetchAccounts();
-  }, [authToken, connectedBanks]);
+  }, [authToken, connectedBanks, customerId, prefetchData, CACHE_KEYS.ACCOUNTS]);
 
   // Fetch transactions when we have accounts
   React.useEffect(() => {
@@ -193,55 +213,55 @@ export function DashboardPage() {
       if (!authToken || accounts.length === 0) return;
 
       try {
-        const allTransactions: BankTransaction[] = [];
+        // Create a unique cache key for all transactions
+        const allTransactionsCacheKey = `${CACHE_KEYS.TRANSACTIONS}_all_${customerId}`
+        const cachedTransactions = await prefetchData(
+          allTransactionsCacheKey,
+          async () => {
+            const allTransactions: BankTransaction[] = [];
 
-        for (const account of accounts) {
-          if (!account.account_id || !account.bank_id) continue;
+            for (const account of accounts) {
+              if (!account.account_id || !account.bank_id) continue;
 
-          const response = await fetch(`/api/bank-integration/transactions?account_id=${account.account_id}&entity_id=${account.bank_id}`, {
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${authToken}`
+              const response = await fetch(`/api/bank-integration/transactions?account_id=${account.account_id}&entity_id=${account.bank_id}`, {
+                headers: {
+                  'Accept': 'application/json',
+                  'Authorization': `Bearer ${authToken}`
+                }
+              });
+
+              const data = await response.json();
+              if (!response.ok) {
+                throw new Error(data.details || 'Failed to fetch transactions');
+              }
+
+              // Add bank information to each transaction
+              const bank = connectedBanks.find(b => b.id === account.bank_id);
+              const transactionsWithBank = (data.transactions || []).map((transaction: BankTransaction) => ({
+                ...transaction,
+                bank_name: bank?.bank_identifier || '',
+                bank_id: account.bank_id,
+                account_type: account.account_type,
+                account_name: account.nickname
+              }));
+
+              allTransactions.push(...transactionsWithBank);
             }
-          });
 
-          const data = await response.json();
-          if (!response.ok) {
-            throw new Error(data.details || 'Failed to fetch transactions');
+            return allTransactions;
           }
-
-          if (data.transactions) {
-            // Add bank information to transactions
-            const bank = connectedBanks.find(b => b.id === account.bank_id);
-            const accountType = account.account_type || account.account_sub_type || "";
-            const accountName = account.nickname || accountType || account.account_id;
-            
-            const transactionsWithBank = data.transactions.map((transaction: BankTransaction) => ({
-              ...transaction,
-              bank_name: bank?.bank_identifier || 'Bank',
-              bank_id: account.bank_id,
-              account_type: accountType,
-              account_name: accountName
-            }));
-            allTransactions.push(...transactionsWithBank);
-          }
-        }
-
-        // Sort transactions by date (most recent first)
-        allTransactions.sort((a, b) => 
-          new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
         );
 
-        setTransactions(allTransactions);
+        setTransactions(cachedTransactions);
+        setIsLoading(false);
       } catch (error) {
         console.error('Error fetching transactions:', error);
-      } finally {
         setIsLoading(false);
       }
     };
 
     fetchTransactions();
-  }, [authToken, accounts, connectedBanks]);
+  }, [authToken, accounts, connectedBanks, customerId, prefetchData, CACHE_KEYS.TRANSACTIONS]);
 
   // Get transactions to display
   const transactionsToDisplay = React.useMemo(() => {
