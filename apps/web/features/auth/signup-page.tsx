@@ -132,7 +132,7 @@ export const SignupPage = () => {
           .
         </Text>
       </Stack>
-      <Stack flex="1" bg="green.600">
+      <Stack flex="1" bg="green.600" display={{ base: 'none', sm: 'none', md: 'flex' }}>
         <Center flex="1">
           <Testimonial />
         </Center>
