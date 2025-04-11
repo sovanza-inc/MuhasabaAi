@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, Flex } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
