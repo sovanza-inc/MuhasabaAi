@@ -599,9 +599,11 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
           base: !selectedChat && isMobileView ? "none" : "block", 
           md: "block" 
         }}
+        h="100vh"
+        position="relative"
       >
         {selectedChat ? (
-          <>
+          <Flex direction="column" h="100%">
             {/* Chat header */}
             <Flex
               p={4}
@@ -730,14 +732,19 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
                 Send
               </Button>
             </Flex>
-          </>
+          </Flex>
         ) : (
           <Flex
-            flex={1}
+            position="absolute"
+            top="0"
+            left="0"
+            right="0"
+            bottom="0"
             align="center"
             justify="center"
             direction="column"
             color="gray.500"
+            bg={chatAreaBg}
           >
             <FiMessageSquare size={48} />
             <Text mt={4}>Select a chat to start messaging</Text>
