@@ -123,11 +123,13 @@ export default function TransactionPage() {
             throw new Error(data.details || 'Failed to fetch connected banks')
           }
 
-          return data
+          // Ensure we return an array
+          return Array.isArray(data) ? data : []
         }
       )
 
-      setConnectedBanks(cachedData)
+      // Update connected banks state immediately after fetching
+      setConnectedBanks(Array.isArray(cachedData) ? cachedData : [])
       return cachedData
     } catch (error) {
       console.error('Error fetching connected banks:', error)
@@ -141,6 +143,13 @@ export default function TransactionPage() {
       return []
     }
   }, [customerId, authToken, toast, prefetchData])
+
+  // Add a separate effect to fetch connected banks when auth is ready
+  React.useEffect(() => {
+    if (customerId && authToken) {
+      fetchConnectedBanks()
+    }
+  }, [customerId, authToken, fetchConnectedBanks])
 
   // Fetch accounts for each bank
   const fetchAccountsForBank = React.useCallback(async (entityId: string) => {
@@ -358,26 +367,26 @@ export default function TransactionPage() {
           <Box mb={6}>
             <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
               <Box>
-            <Heading size="lg" mb={2}>Transactions</Heading>
+                <Heading size="lg" mb={2}>Transactions</Heading>
                 <Text color="gray.600" fontSize="md">
-              Effortlessly view and manage your accounts in one place with real-time balance updates.
-            </Text>
+                  Effortlessly view and manage your accounts in one place with real-time balance updates.
+                </Text>
               </Box>
-              {connectedBanks.length > 0 && (
-                <Select
-                  value={selectedBankId}
-                  onChange={(e) => setSelectedBankId(e.target.value)}
-                  width="250px"
-                  bg="white"
-                >
-                  <option value="all">All Banks</option>
-                  {connectedBanks.map((bank) => (
-                    <option key={bank.id} value={bank.id}>
-                      {bank.bank_identifier || bank.name}
-                    </option>
-                  ))}
-                </Select>
-              )}
+              {/* Always show the Select, but disable it when loading or no banks */}
+              <Select
+                value={selectedBankId}
+                onChange={(e) => setSelectedBankId(e.target.value)}
+                width="250px"
+                bg="white"
+                isDisabled={isLoading || !connectedBanks.length}
+              >
+                <option value="all">All Banks</option>
+                {connectedBanks.map((bank) => (
+                  <option key={bank.id} value={bank.id}>
+                    {bank.bank_identifier || bank.name}
+                  </option>
+                ))}
+              </Select>
             </Box>
             
             {isLoading ? (
