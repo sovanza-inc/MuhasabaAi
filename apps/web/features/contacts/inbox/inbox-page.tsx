@@ -523,19 +523,16 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
   }
 
   return (
-    <Flex h="100vh" bg={bgColor} overflow="hidden">
-      {/* Left sidebar with chat list */}
-      <Box 
-        w={{ base: "100%", md: "350px" }}
-        bg={chatListBg} 
-        borderRight="1px" 
-        borderColor={borderColor}
-        display={{ 
-          base: selectedChat && isMobileView ? "none" : "block", 
-          md: "block" 
-        }}
+    <Box height="100vh" display="flex">
+      {/* Chat list - hide on mobile when chat is selected */}
+      <Box
+        w={isMobileView && selectedChat ? "0" : "300px"}
+        display={isMobileView && selectedChat ? "none" : "block"}
+        borderRight="1px"
+        borderColor={useColorModeValue('gray.200', 'gray.700')}
+        overflowY="auto"
       >
-        {/* Header */}
+        {/* Chat list content */}
         <Flex 
           p={4} 
           justify="space-between" 
@@ -608,53 +605,56 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
         </VStack>
       </Box>
 
-      {/* Right side chat area */}
+      {/* Chat area */}
       <Box 
         flex="1" 
-        bg={chatAreaBg}
-        display={{ 
-          base: !selectedChat && isMobileView ? "none" : "block", 
-          md: "block" 
-        }}
-        h="100vh"
+        display="flex" 
+        flexDirection="column"
         position="relative"
+        visibility={isMobileView && !selectedChat ? "hidden" : "visible"}
       >
-        {selectedChat ? (
-          <Flex direction="column" h="100%">
-            {/* Chat header */}
-            <Flex
-              p={4}
-              bg={chatListBg}
-              borderBottom="1px"
-              borderColor={borderColor}
-              align="center"
-            >
-              <Avatar name={selectedChat} size="sm" />
-              <Box ml={3} flex="1">
-                <Text fontWeight="bold">
-                  {selectedChat === 'ai' ? 'AI Assistant' : selectedChat}
-                </Text>
-                <Text fontSize="xs" color="green.500">
-                  {selectedChat !== 'ai' && 'Online'}
-                </Text>
-              </Box>
-              {isMobileView && (
-                <IconButton
-                  aria-label="Close chat"
-                  icon={<FiX />}
-                  variant="ghost"
-                  onClick={handleCloseChat}
-                />
-              )}
+        {/* Chat header */}
+        <Flex
+          p={4}
+          borderBottom="1px"
+          borderColor={useColorModeValue('gray.200', 'gray.700')}
+          justify="space-between"
+          align="center"
+        >
+          <Flex align="center">
+            {isMobileView && (
               <IconButton
-                ml={2}
-                aria-label="More options"
-                icon={<FiMoreVertical />}
+                icon={<FiX />}
+                aria-label="Close chat"
                 variant="ghost"
+                mr={2}
+                onClick={handleCloseChat}
               />
-            </Flex>
+            )}
+            <Text fontWeight="bold">AI Assistant</Text>
+          </Flex>
+          <IconButton
+            icon={<FiMoreVertical />}
+            aria-label="More options"
+            variant="ghost"
+          />
+        </Flex>
 
-            {/* Chat messages area */}
+        {/* Messages area */}
+        <Box 
+          flex="1" 
+          overflowY="auto" 
+          pb={isMobileView ? "80px" : "20px"}
+          sx={{
+            '&::-webkit-scrollbar': {
+              display: 'none'
+            },
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none'
+          }}
+        >
+          {/* Messages content */}
+          {selectedChat ? (
             <Flex
               ref={chatContainerRef}
               flex={1}
@@ -715,60 +715,70 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
                 </>
               )}
             </Flex>
-
-            {/* Message input */}
+          ) : (
             <Flex
-              p={4}
-              bg={chatListBg}
-              borderTop="1px"
-              borderColor={borderColor}
+              position="absolute"
+              top="0"
+              left="0"
+              right="0"
+              bottom="0"
               align="center"
+              justify="center"
+              direction="column"
+              color="gray.500"
+              bg={chatAreaBg}
             >
-              <Input
-                placeholder="Type a message..."
-                value={messageInput}
-                onChange={(e) => setMessageInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleSendMessage()
-                  }
-                }}
-                bg={messageInputBg}
-                borderRadius="full"
-              />
-              <Button
-                ml={2}
-                colorScheme="blue"
-                borderRadius="full"
-                px={6}
-                isDisabled={!messageInput.trim() || !selectedChat}
-                onClick={handleSendMessage}
-                isLoading={sendMessageMutation.isPending}
-              >
-                Send
-              </Button>
+              <FiMessageSquare size={48} />
+              <Text mt={4}>Select a chat to start messaging</Text>
             </Flex>
+          )}
+        </Box>
+
+        {/* Chat input - fixed position on mobile */}
+        <Box
+          position={isMobileView ? "fixed" : "relative"}
+          bottom={isMobileView ? "0" : "auto"}
+          left={isMobileView ? "0" : "auto"}
+          right={isMobileView ? "0" : "auto"}
+          p={4}
+          bg={useColorModeValue('white', 'gray.800')}
+          borderTop="1px"
+          borderColor={useColorModeValue('gray.200', 'gray.700')}
+          width="100%"
+          sx={{
+            '@media screen and (min-width: 321px) and (max-width: 768px)': {
+              paddingBottom: '20px',
+              boxShadow: '0 -2px 10px rgba(0,0,0,0.1)'
+            }
+          }}
+        >
+          <Flex>
+            <Input
+              value={messageInput}
+              onChange={(e) => setMessageInput(e.target.value)}
+              placeholder="Type your message..."
+              pr="4.5rem"
+              disabled={isAILoading}
+              onKeyPress={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendMessage();
+                }
+              }}
+            />
+            <Button
+              ml={2}
+              colorScheme="blue"
+              isLoading={isAILoading}
+              onClick={handleSendMessage}
+              disabled={!messageInput.trim()}
+            >
+              Send
+            </Button>
           </Flex>
-        ) : (
-          <Flex
-            position="absolute"
-            top="0"
-            left="0"
-            right="0"
-            bottom="0"
-            align="center"
-            justify="center"
-            direction="column"
-            color="gray.500"
-            bg={chatAreaBg}
-          >
-            <FiMessageSquare size={48} />
-            <Text mt={4}>Select a chat to start messaging</Text>
-          </Flex>
-        )}
+        </Box>
       </Box>
-    </Flex>
+    </Box>
   )
 }
 
