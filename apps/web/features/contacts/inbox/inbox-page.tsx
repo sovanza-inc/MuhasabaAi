@@ -536,22 +536,39 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
         }}
       >
         {/* Header */}
-        <Flex p={4} justify="space-between" align="center" borderBottom="1px" borderColor={borderColor}>
-          <Text fontSize="xl" fontWeight="bold">
-            Chats
-          </Text>
-          <HStack spacing={2}>
+        <Flex 
+          p={4} 
+          justify="space-between" 
+          align="center" 
+          borderBottom="1px" 
+          borderColor={borderColor}
+          gap={2}
+        >
+          <Box pl={{ base: 8, sm: 6, md: 5, lg: 2 }} flex="1">
+            <Text 
+              fontSize={{ base: "lg", md: "xl" }} 
+              fontWeight="bold"
+              isTruncated
+            >
+              Chats
+            </Text>
+          </Box>
+          <HStack spacing={{ base: 2, md: 2 }} flexShrink={0} mr={{ base: 2, md: 1 }}>
             <IconButton
               aria-label="Talk to AI"
               icon={<FiBox />}
               variant="ghost"
               colorScheme="blue"
               onClick={() => setSelectedChat('ai')}
+              size={{ base: "sm", md: "md" }}
+              minW={{ base: "32px", md: "40px" }}
             />
             <IconButton
               aria-label="More options"
               icon={<FiMoreVertical />}
               variant="ghost"
+              size={{ base: "sm", md: "md" }}
+              minW={{ base: "32px", md: "40px" }}
             />
           </HStack>
         </Flex>
