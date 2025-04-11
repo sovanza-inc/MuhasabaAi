@@ -5,7 +5,6 @@ import {
   Page,
   PageBody,
   PageHeader,
-  Toolbar,
 } from '@saas-ui-pro/react'
 import { EmptyState } from '@saas-ui/react'
 import { LuWallet } from 'react-icons/lu'
