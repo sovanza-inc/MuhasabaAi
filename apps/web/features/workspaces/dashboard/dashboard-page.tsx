@@ -780,22 +780,32 @@ export function DashboardPage() {
     >
       {/* Receivables Section */}
       <Box mb={8}>
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-          <Box>
+        <Box 
+          display="flex" 
+          flexDirection={{ base: 'column', sm: 'column', md: 'row' }}
+          justifyContent="space-between" 
+          alignItems={{ base: 'flex-start', sm: 'flex-start', md: 'center' }}
+          gap={{ base: 4, sm: 4, md: 0 }}
+          mb={2}
+        >
+          <Box maxW={{ base: "100%", sm: "100%", md: "70%" }}>
             <Heading size="lg" mb={2}>Receivables</Heading>
-            <Text color="gray.600">
+            <Text color="gray.600" noOfLines={2}>
               Effortlessly view and manage your accounts in one place with real-time balance updates.
             </Text>
           </Box>
-          <Button
-            as="a"
-            href={usePath('profit-loss')}
-            colorScheme="green"
-            variant="link"
-            rightIcon={<Icon as={LuChevronRight} />}
-          >
-            View Reports
-          </Button>
+          <Box minW={{ md: "120px" }} mt={{ base: 2, sm: 2, md: 0 }}>
+            <Button
+              as="a"
+              href={usePath('profit-loss')}
+              colorScheme="green"
+              variant="link"
+              rightIcon={<Icon as={LuChevronRight} />}
+              whiteSpace="nowrap"
+            >
+              View Reports
+            </Button>
+          </Box>
         </Box>
 
         <Box display="flex" justifyContent="flex-end" mb={4}>
