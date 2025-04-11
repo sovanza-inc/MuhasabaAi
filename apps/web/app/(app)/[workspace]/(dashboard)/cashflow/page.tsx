@@ -185,14 +185,13 @@ export default function CashflowPage() {
             throw new Error(data.details || 'Failed to fetch connected banks')
           }
 
-          return data
+          // Ensure we return an array
+          return Array.isArray(data) ? data : []
         }
       )
 
       // Update connected banks state immediately after fetching
-      if (Array.isArray(cachedData)) {
-        setConnectedBanks(cachedData)
-      }
+      setConnectedBanks(Array.isArray(cachedData) ? cachedData : [])
       return cachedData
     } catch (error) {
       console.error('Error fetching connected banks:', error)
@@ -583,27 +582,26 @@ export default function CashflowPage() {
         <Box mb={6}>
           <Flex justify="space-between" align="center" mb={4}>
             <Box>
-          <Heading size="lg" mb={2}>Cashflow Analysis</Heading>
+              <Heading size="lg" mb={2}>Cashflow Analysis</Heading>
               <Text color="gray.600" fontSize="md">
-            Effortlessly view and manage your accounts in one place with real-time balance updates.
-          </Text>
+                Effortlessly view and manage your accounts in one place with real-time balance updates.
+              </Text>
             </Box>
-            {Array.isArray(connectedBanks) && connectedBanks.length > 0 && (
-              <Select
-                value={selectedBankId}
-                onChange={(e) => setSelectedBankId(e.target.value)}
-                width="250px"
-                bg="white"
-                isDisabled={isLoading}
-              >
-                <option value="all">All Banks</option>
-                {connectedBanks.map((bank) => (
-                  <option key={bank.id} value={bank.id}>
-                    {bank.bank_identifier || bank.name}
-                  </option>
-                ))}
-              </Select>
-            )}
+            {/* Always show the Select, but disable it when loading or no banks */}
+            <Select
+              value={selectedBankId}
+              onChange={(e) => setSelectedBankId(e.target.value)}
+              width="250px"
+              bg="white"
+              isDisabled={isLoading || !connectedBanks.length}
+            >
+              <option value="all">All Banks</option>
+              {connectedBanks.map((bank) => (
+                <option key={bank.id} value={bank.id}>
+                  {bank.bank_identifier || bank.name}
+                </option>
+              ))}
+            </Select>
           </Flex>
 
           {isLoading ? (
