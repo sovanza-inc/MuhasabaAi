@@ -474,7 +474,18 @@ export default function ProfitLossPage() {
                 {/* Transactions Records */}
                 <Box mb={8}>
                   <Heading size="md" mb={4}>Revenues Transactions Record</Heading>
-                  <TableContainer whiteSpace="normal" overflowX="hidden">
+                  <TableContainer 
+                    whiteSpace="normal" 
+                    overflowX="hidden"
+                    sx={{
+                      '@media screen and (min-width: 321px) and (max-width: 777px)': {
+                        overflowX: 'auto',
+                        '.chakra-table': {
+                          minWidth: '800px'
+                        }
+                      }
+                    }}
+                  >
                     <Table variant="simple" layout="fixed" width="100%">
                       <Thead>
                         <Tr borderBottom="1px" borderColor="gray.200">
@@ -525,7 +536,18 @@ export default function ProfitLossPage() {
 
                 <Box mb={6}>
                   <Heading size="md" mb={4}>Expenses Transaction Records</Heading>
-                  <TableContainer whiteSpace="normal" overflowX="hidden">
+                  <TableContainer 
+                    whiteSpace="normal" 
+                    overflowX="hidden"
+                    sx={{
+                      '@media screen and (min-width: 321px) and (max-width: 777px)': {
+                        overflowX: 'auto',
+                        '.chakra-table': {
+                          minWidth: '800px'
+                        }
+                      }
+                    }}
+                  >
                     <Table variant="simple" layout="fixed" width="100%">
                       <Thead>
                         <Tr borderBottom="1px" borderColor="gray.200">
