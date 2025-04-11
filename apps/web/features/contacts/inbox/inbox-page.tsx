@@ -319,7 +319,6 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
   const borderColor = useColorModeValue('gray.200', 'gray.600');
   const searchBg = useColorModeValue('gray.100', 'gray.700');
   const chatAreaBg = useColorModeValue('gray.100', 'gray.900');
-  const messageInputBg = useColorModeValue('gray.100', 'gray.700');
   const dateSeparatorBorderColor = useColorModeValue('gray.300', 'gray.600');
   const dateSeparatorBg = useColorModeValue('gray.50', 'gray.800');
   const dateSeparatorTextColor = useColorModeValue('gray.500', 'gray.400');
