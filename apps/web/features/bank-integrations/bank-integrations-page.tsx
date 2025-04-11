@@ -5,7 +5,6 @@ import {
   Page,
   PageBody,
   PageHeader,
-  Toolbar,
 } from '@saas-ui-pro/react'
 import { EmptyState } from '@saas-ui/react'
 import { LuWallet } from 'react-icons/lu'
@@ -518,19 +517,6 @@ export function BankIntegrationsPage() {
     <Page>
       <PageHeader 
         title="Bank Integrations" 
-        toolbar={
-          <Toolbar>
-            <Button 
-              colorScheme="primary"
-              size="lg"
-              leftIcon={<LuWallet />}
-              onClick={handleAddBankIntegration}
-              isLoading={isLoading}
-            >
-              Add Bank Integration
-            </Button>
-          </Toolbar>
-        }
         description="Connect and manage your bank accounts securely"
       />
       <PageBody>
@@ -547,6 +533,25 @@ export function BankIntegrationsPage() {
         />
 
         <VStack spacing={4} align="stretch">
+          {!authToken && !connectedEntities.length && (
+            <EmptyState
+              title="No bank integrations yet"
+              description="Connect your bank account to get started with financial management."
+              icon={LuWallet}
+              actions={
+                <Button
+                  colorScheme="primary"
+                  size="lg"
+                  leftIcon={<LuWallet />}
+                  onClick={handleAddBankIntegration}
+                  isLoading={isLoading}
+                >
+                  Add Bank Integration
+                </Button>
+              }
+            />
+          )}
+
           {authToken && (
             <Button 
               colorScheme="primary"
@@ -606,25 +611,6 @@ export function BankIntegrationsPage() {
                 ))}
               </SimpleGrid>
             </Box>
-          )}
-
-          {!authToken && !connectedEntities.length && (
-            <EmptyState
-              title="No bank integrations yet"
-              description="Connect your bank account to get started with financial management."
-              icon={LuWallet}
-              actions={
-                <Button
-                  colorScheme="primary"
-                  size="lg"
-                  leftIcon={<LuWallet />}
-                  onClick={handleAddBankIntegration}
-                  isLoading={isLoading}
-                >
-                  Add Bank Integration
-                </Button>
-              }
-            />
           )}
         </VStack>
 
