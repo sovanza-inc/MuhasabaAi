@@ -518,19 +518,6 @@ export function BankIntegrationsPage() {
     <Page>
       <PageHeader 
         title="Bank Integrations" 
-        toolbar={
-          <Toolbar>
-            <Button 
-              colorScheme="primary"
-              size="lg"
-              leftIcon={<LuWallet />}
-              onClick={handleAddBankIntegration}
-              isLoading={isLoading}
-            >
-              Add Bank Integration
-            </Button>
-          </Toolbar>
-        }
         description="Connect and manage your bank accounts securely"
       />
       <PageBody>
