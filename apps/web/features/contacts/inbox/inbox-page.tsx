@@ -21,6 +21,21 @@ import { api } from '#lib/trpc/react'
 import { v4 as uuidv4 } from 'uuid'
 import { useParams } from 'next/navigation'
 
+// Message type definitions
+interface Message {
+  content: string;
+  timestamp: string;
+  timeGroup: string;
+  isOutgoing: boolean;
+  originalDate: Date;
+  isWelcomeMessage?: boolean;
+  isTimeSeparator?: boolean;
+}
+
+interface MessageGroup {
+  date: string;
+  messages: Message[];
+}
 
 // Chat message component
 interface ChatMessageProps {
@@ -298,6 +313,22 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
 
   const toast = useToast();
 
+  // Move all useColorModeValue hooks to the top level, before any conditional returns
+  const bgColor = useColorModeValue('gray.50', 'gray.900');
+  const chatListBg = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.600');
+  const searchBg = useColorModeValue('gray.100', 'gray.700');
+  const chatAreaBg = useColorModeValue('gray.100', 'gray.900');
+  const messageInputBg = useColorModeValue('gray.100', 'gray.700');
+  const dateSeparatorBorderColor = useColorModeValue('gray.300', 'gray.600');
+  const dateSeparatorBg = useColorModeValue('gray.50', 'gray.800');
+  const dateSeparatorTextColor = useColorModeValue('gray.500', 'gray.400');
+  const timeSeparatorBg = useColorModeValue('gray.100', 'gray.700');
+  const timeSeparatorTextColor = useColorModeValue('gray.500', 'gray.400');
+  const chatHeaderBorderColor = useColorModeValue('gray.200', 'gray.700');
+  const chatInputBg = useColorModeValue('white', 'gray.800');
+  const chatInputBorderColor = useColorModeValue('gray.200', 'gray.700');
+
   // Initialize chat when selecting AI Assistant
   React.useEffect(() => {
     if (selectedChat === 'ai' && workspaceId) {
@@ -332,30 +363,6 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
       hour12: true 
     });
   };
-
-  // Message type definitions
-  interface MessageGroup {
-    date: string;
-    messages: Message[];
-  }
-
-  type Message = {
-    content: string;
-    timestamp: string;
-    timeGroup: string;
-    isOutgoing: boolean;
-    originalDate: Date;
-    isWelcomeMessage?: boolean;
-    isTimeSeparator?: boolean;
-  };
-
-  // Move useColorModeValue hooks to the top level
-  const bgColor = useColorModeValue('gray.50', 'gray.900');
-  const chatListBg = useColorModeValue('white', 'gray.800');
-  const borderColor = useColorModeValue('gray.200', 'gray.600');
-  const searchBg = useColorModeValue('gray.100', 'gray.700');
-  const chatAreaBg = useColorModeValue('gray.100', 'gray.900');
-  const messageInputBg = useColorModeValue('gray.100', 'gray.700');
 
   // Transform chat history into message format with proper typing
   const aiMessages = React.useMemo(() => {
@@ -438,47 +445,6 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
     return groupedMessages;
   }, [chatHistory]);
 
-  // Date Separator Component
-  const DateSeparator = ({ date }: { date: string }) => (
-    <Flex 
-      align="center" 
-      my={4} 
-      mx={2}
-    >
-      <Divider flex={1} borderColor={useColorModeValue('gray.300', 'gray.600')} />
-      <Text 
-        px={3} 
-        fontSize="sm" 
-        color={useColorModeValue('gray.500', 'gray.400')} 
-        bg={useColorModeValue('gray.50', 'gray.800')}
-        borderRadius="full"
-      >
-        {date}
-      </Text>
-      <Divider flex={1} borderColor={useColorModeValue('gray.300', 'gray.600')} />
-    </Flex>
-  );
-
-  // Time Separator Component
-  const TimeSeparator = ({ time }: { time: string }) => (
-    <Flex 
-      align="center" 
-      my={2} 
-      mx={2}
-      justifyContent="center"
-    >
-      <Text 
-        px={3} 
-        fontSize="xs" 
-        color={useColorModeValue('gray.500', 'gray.400')} 
-        bg={useColorModeValue('gray.100', 'gray.700')}
-        borderRadius="full"
-      >
-        {time}
-      </Text>
-    </Flex>
-  );
-
   // Scroll to bottom when messages change
   React.useEffect(() => {
     if (chatContainerRef.current) {
@@ -522,15 +488,63 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
     )
   }
 
+  // Date Separator Component
+  const DateSeparator = ({ date }: { date: string }) => (
+    <Flex 
+      align="center" 
+      my={4} 
+      mx={2}
+    >
+      <Divider flex={1} borderColor={dateSeparatorBorderColor} />
+      <Text 
+        px={3} 
+        fontSize="sm" 
+        color={dateSeparatorTextColor}
+        bg={dateSeparatorBg}
+        borderRadius="full"
+      >
+        {date}
+      </Text>
+      <Divider flex={1} borderColor={dateSeparatorBorderColor} />
+    </Flex>
+  );
+
+  // Time Separator Component
+  const TimeSeparator = ({ time }: { time: string }) => (
+    <Flex 
+      align="center" 
+      my={2} 
+      mx={2}
+      justifyContent="center"
+    >
+      <Text 
+        px={3} 
+        fontSize="xs" 
+        color={timeSeparatorTextColor}
+        bg={timeSeparatorBg}
+        borderRadius="full"
+      >
+        {time}
+      </Text>
+    </Flex>
+  );
+
   return (
-    <Box height="100vh" display="flex">
+    <Box height="100vh" display="flex" bg={bgColor}>
       {/* Chat list - hide on mobile when chat is selected */}
       <Box
-        w={isMobileView && selectedChat ? "0" : "300px"}
+        w={isMobileView && selectedChat ? "0" : { base: "100%", md: "300px" }}
         display={isMobileView && selectedChat ? "none" : "block"}
         borderRight="1px"
-        borderColor={useColorModeValue('gray.200', 'gray.700')}
+        borderColor={borderColor}
         overflowY="auto"
+        bg={chatListBg}
+        sx={{
+          '@media screen and (min-width: 321px) and (max-width: 768px)': {
+            width: selectedChat ? '0' : '100%',
+            display: selectedChat ? 'none' : 'block'
+          }
+        }}
       >
         {/* Chat list content */}
         <Flex 
@@ -612,32 +626,61 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
         flexDirection="column"
         position="relative"
         visibility={isMobileView && !selectedChat ? "hidden" : "visible"}
+        sx={{
+          '@media screen and (min-width: 321px) and (max-width: 768px)': {
+            width: !selectedChat ? '0' : '100%',
+            display: !selectedChat ? 'none' : 'flex'
+          }
+        }}
       >
         {/* Chat header */}
         <Flex
           p={4}
           borderBottom="1px"
-          borderColor={useColorModeValue('gray.200', 'gray.700')}
+          borderColor={chatHeaderBorderColor}
           justify="space-between"
           align="center"
+          sx={{
+            '@media screen and (min-width: 321px) and (max-width: 768px)': {
+              px: 6,
+              gap: 4
+            }
+          }}
         >
-          <Flex align="center">
+          <Text 
+            fontWeight="bold"
+            sx={{
+              '@media screen and (min-width: 321px) and (max-width: 768px)': {
+                pl: 4
+              }
+            }}
+          >
+            AI Assistant
+          </Text>
+          <HStack 
+            spacing={2}
+            sx={{
+              '@media screen and (min-width: 321px) and (max-width: 768px)': {
+                gap: 3
+              }
+            }}
+          >
+            <IconButton
+              icon={<FiMoreVertical />}
+              aria-label="More options"
+              variant="ghost"
+              size={{ base: "sm", md: "md" }}
+            />
             {isMobileView && (
               <IconButton
                 icon={<FiX />}
                 aria-label="Close chat"
                 variant="ghost"
-                mr={2}
+                size={{ base: "sm", md: "md" }}
                 onClick={handleCloseChat}
               />
             )}
-            <Text fontWeight="bold">AI Assistant</Text>
-          </Flex>
-          <IconButton
-            icon={<FiMoreVertical />}
-            aria-label="More options"
-            variant="ghost"
-          />
+          </HStack>
         </Flex>
 
         {/* Messages area */}
@@ -741,9 +784,9 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
           left={isMobileView ? "0" : "auto"}
           right={isMobileView ? "0" : "auto"}
           p={4}
-          bg={useColorModeValue('white', 'gray.800')}
+          bg={chatInputBg}
           borderTop="1px"
-          borderColor={useColorModeValue('gray.200', 'gray.700')}
+          borderColor={chatInputBorderColor}
           width="100%"
           sx={{
             '@media screen and (min-width: 321px) and (max-width: 768px)': {
