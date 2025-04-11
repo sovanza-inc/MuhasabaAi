@@ -19,8 +19,7 @@ import {
   Button,
   Spinner,
   useToast,
-  Image,
-  Stack
+  Image
 } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
