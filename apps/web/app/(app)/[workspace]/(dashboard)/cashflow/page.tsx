@@ -52,13 +52,7 @@ interface Bank {
 
 interface TransactionWithBank extends BankTransaction {
   bank_id?: string;
-}
-
-interface ChartDataItem {
-  [key: string]: string | number;  // Add index signature for Record type
-  name: string;
-  Income: number;
-  Outcome: number;
+  bank_name?: string;
 }
 
 interface ProcessedData {
