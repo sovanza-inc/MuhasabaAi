@@ -533,6 +533,25 @@ export function BankIntegrationsPage() {
         />
 
         <VStack spacing={4} align="stretch">
+          {!authToken && !connectedEntities.length && (
+            <EmptyState
+              title="No bank integrations yet"
+              description="Connect your bank account to get started with financial management."
+              icon={LuWallet}
+              actions={
+                <Button
+                  colorScheme="primary"
+                  size="lg"
+                  leftIcon={<LuWallet />}
+                  onClick={handleAddBankIntegration}
+                  isLoading={isLoading}
+                >
+                  Add Bank Integration
+                </Button>
+              }
+            />
+          )}
+
           {authToken && (
             <Button 
               colorScheme="primary"
@@ -592,25 +611,6 @@ export function BankIntegrationsPage() {
                 ))}
               </SimpleGrid>
             </Box>
-          )}
-
-          {!authToken && !connectedEntities.length && (
-            <EmptyState
-              title="No bank integrations yet"
-              description="Connect your bank account to get started with financial management."
-              icon={LuWallet}
-              actions={
-                <Button
-                  colorScheme="primary"
-                  size="lg"
-                  leftIcon={<LuWallet />}
-                  onClick={handleAddBankIntegration}
-                  isLoading={isLoading}
-                >
-                  Add Bank Integration
-                </Button>
-              }
-            />
           )}
         </VStack>
 
