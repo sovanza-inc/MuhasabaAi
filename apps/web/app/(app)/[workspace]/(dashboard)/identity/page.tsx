@@ -275,9 +275,30 @@ export default function IdentityPage() {
                 overflow="hidden"
               >
                 <CardBody py={4} px={6}>
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Text fontSize="md" color="gray.600">{key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}</Text>
-                      <Text fontSize="md" fontWeight="medium">{value || 'N/A'}</Text>
+                  <Box 
+                    display="flex" 
+                    justifyContent="space-between" 
+                    alignItems="center"
+                    flexWrap={{base: "wrap", sm: "nowrap"}}
+                    gap={2}
+                  >
+                    <Text 
+                      fontSize="md" 
+                      color="gray.600"
+                      flexShrink={0}
+                      minWidth="120px"
+                    >
+                      {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                    </Text>
+                    <Text 
+                      fontSize="md" 
+                      fontWeight="medium"
+                      wordBreak="break-word"
+                      textAlign="right"
+                      flex="1"
+                    >
+                      {value || 'N/A'}
+                    </Text>
                   </Box>
                 </CardBody>
               </Card>
