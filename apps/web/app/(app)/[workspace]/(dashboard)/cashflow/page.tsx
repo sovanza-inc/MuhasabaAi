@@ -230,7 +230,7 @@ export default function CashflowPage() {
       console.error('Error fetching transactions:', error)
       return []
     }
-  }, [authToken, prefetchData, customerId])
+  }, [authToken, customerId, prefetchData, CACHE_KEYS.TRANSACTIONS])
 
   // Categorize transaction based on description
   const categorizeTransaction = (description: string): string => {
@@ -357,9 +357,9 @@ export default function CashflowPage() {
   // Fetch all transactions
   React.useEffect(() => {
     const fetchAllTransactions = async () => {
-      if (!customerId || !authToken) return;
+      if (!customerId || !authToken) return
 
-      setIsLoading(true);
+      setIsLoading(true)
       try {
         // Create a unique cache key for all transactions
         const allTransactionsCacheKey = `${CACHE_KEYS.TRANSACTIONS}_all_${customerId}`
@@ -370,45 +370,61 @@ export default function CashflowPage() {
           return
         }
 
-        const banks = await fetchConnectedBanks();
-        let allTransactions: TransactionWithBank[] = [];
+        const banks = await fetchConnectedBanks()
+        let allTransactions: TransactionWithBank[] = []
         
         for (const bank of banks) {
-          const accounts = await fetchAccountsForBank(bank.id);
+          const accounts = await fetchAccountsForBank(bank.id)
           
           for (const account of accounts) {
-            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id);
-            const transactionsWithBank = accountTransactions.map((transaction: BankTransaction) => ({
-              ...transaction,
+            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id)
+            const transactionsWithBank = accountTransactions.map((t: BankTransaction) => ({
+              ...t,
               bank_name: bank.bank_identifier || bank.name,
               bank_id: bank.id
-            }));
+            }))
             
-            allTransactions = [...allTransactions, ...transactionsWithBank];
+            allTransactions = [...allTransactions, ...transactionsWithBank]
           }
         }
 
+        // Sort transactions by date (most recent first)
+        allTransactions.sort((a, b) => 
+          new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+        )
+
         // Cache the combined transactions
         queryClient.setQueryData([allTransactionsCacheKey], allTransactions)
-        setTransactions(allTransactions);
+        setTransactions(allTransactions)
+
+        // Calculate totals
+        const { income, spent } = allTransactions.reduce((acc, t) => {
+          const amount = t.amount.amount
+          if (t.credit_debit_indicator === 'CREDIT') {
+            acc.income += amount
+          } else {
+            acc.spent += amount
+          }
+          return acc
+        }, { income: 0, spent: 0 })
+
+        setTotals({ income, spent })
       } catch (error) {
-        console.error('Error fetching all transactions:', error);
+        console.error('Error fetching transactions:', error)
         toast({
           title: 'Error',
           description: 'Failed to fetch transactions',
           status: 'error',
           duration: 5000,
           isClosable: true,
-        });
+        })
       } finally {
-        setIsLoading(false);
+        setIsLoading(false)
       }
-    };
-
-    if (customerId && authToken) {
-      fetchAllTransactions();
     }
-  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, toast]);
+
+    fetchAllTransactions()
+  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, queryClient, CACHE_KEYS.TRANSACTIONS, toast])
 
   const categorizedData = React.useMemo(() => {
     return processCategorizedData(filteredTransactions);

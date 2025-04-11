@@ -28,6 +28,7 @@ import { PageHeader } from '#features/common/components/page-header'
 import { useProfitLoss } from '#features/bank-integrations/hooks/use-profit-loss'
 import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
+import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
 import html2canvas from 'html2canvas'
 
@@ -44,6 +45,7 @@ export default function ProfitLossPage() {
   const [authToken, setAuthToken] = React.useState<string | null>(null);
   const [customerId, setCustomerId] = React.useState<string | null>(null);
   const [workspace] = useCurrentWorkspace();
+  const { CACHE_KEYS, prefetchData } = useApiCache();
   const contentRef = React.useRef<HTMLDivElement>(null);
   const toast = useToast();
   const logoRef = React.useRef<HTMLImageElement>(null);
@@ -95,27 +97,42 @@ export default function ProfitLossPage() {
       if (!customerId || !authToken) return;
 
       try {
-        const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-          headers: {
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${authToken}`
+        // Create a unique cache key that includes the customer ID
+        const cacheKey = `${CACHE_KEYS.ACCOUNTS}_${customerId}`;
+        const cachedData = await prefetchData(
+          cacheKey,
+          async () => {
+            const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+              headers: {
+                'Accept': 'application/json',
+                'Authorization': `Bearer ${authToken}`
+              }
+            });
+
+            const data = await response.json();
+            
+            if (!response.ok) {
+              throw new Error(data.details || 'Failed to fetch connected banks');
+            }
+
+            return data;
           }
-        });
+        );
 
-        const data = await response.json();
-        
-        if (!response.ok) {
-          throw new Error(data.details || 'Failed to fetch connected banks');
-        }
-
-        setBanks(data);
+        setBanks(cachedData);
       } catch (error) {
         console.error('Error fetching connected banks:', error);
       }
     };
 
     fetchBanks();
-  }, [customerId, authToken]);
+  }, [customerId, authToken, prefetchData, CACHE_KEYS.ACCOUNTS]);
+
+  // Handle bank selection
+  const handleBankSelect = (bankId: string) => {
+    setSelectedBankId(bankId);
+    selectBank(bankId);
+  };
 
   const handleExportPDF = async () => {
     if (!contentRef.current) return;
@@ -360,8 +377,7 @@ export default function ProfitLossPage() {
                 maxW="200px"
                 value={selectedBankId}
                 onChange={(e) => {
-                  setSelectedBankId(e.target.value);
-                  selectBank(e.target.value);
+                  handleBankSelect(e.target.value);
                 }}
                 bg="green.50"
                 color="green.500"
