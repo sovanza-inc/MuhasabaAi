@@ -354,7 +354,17 @@ export default function ProfitLossPage() {
           {/* Reports Section */}
           <Box mb={6}>
             <Box mb={4}>
-              <HStack justify="space-between" align="center">
+              <HStack 
+                justify="space-between" 
+                align="center"
+                sx={{
+                  '@media screen and (min-width: 321px) and (max-width: 740px)': {
+                    flexDirection: 'column',
+                    alignItems: 'flex-start',
+                    gap: '1rem'
+                  }
+                }}
+              >
                 <Box>
                   <Heading size="lg" mb={2}>Profit & Loss</Heading>
                   <Text color="gray.600" mb={4} fontSize="md">
