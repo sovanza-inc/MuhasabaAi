@@ -16,7 +16,7 @@ import {
   useToast,
   Spinner,
 } from '@chakra-ui/react'
-import { FiMessageSquare, FiBox, FiMoreVertical, FiSearch} from 'react-icons/fi'
+import { FiMessageSquare, FiBox, FiMoreVertical, FiSearch, FiX } from 'react-icons/fi'
 import { api } from '#lib/trpc/react'
 import { v4 as uuidv4 } from 'uuid'
 import { useParams } from 'next/navigation'
@@ -168,6 +168,24 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
   const [conversationId] = React.useState<string>(uuidv4())
   const [isAILoading, setIsAILoading] = React.useState(false)
   const [isWelcomeLoading, setIsWelcomeLoading] = React.useState(true)
+  const [isMobileView, setIsMobileView] = React.useState(false)
+
+  // Check for mobile view on mount and window resize
+  React.useEffect(() => {
+    const checkMobileView = () => {
+      setIsMobileView(window.innerWidth >= 321 && window.innerWidth <= 768);
+    };
+
+    checkMobileView();
+    window.addEventListener('resize', checkMobileView);
+    return () => window.removeEventListener('resize', checkMobileView);
+  }, []);
+
+  // Handle closing chat on mobile
+  const handleCloseChat = () => {
+    setSelectedChat(null);
+  };
+
   // Fetch user session first
   const { data: sessionData } = api.auth.me.useQuery(undefined, {
     retry: 1,
@@ -507,7 +525,16 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
   return (
     <Flex h="100vh" bg={bgColor} overflow="hidden">
       {/* Left sidebar with chat list */}
-      <Box w="350px" bg={chatListBg} borderRight="1px" borderColor={borderColor}>
+      <Box 
+        w={{ base: "100%", md: "350px" }}
+        bg={chatListBg} 
+        borderRight="1px" 
+        borderColor={borderColor}
+        display={{ 
+          base: selectedChat && isMobileView ? "none" : "block", 
+          md: "block" 
+        }}
+      >
         {/* Header */}
         <Flex p={4} justify="space-between" align="center" borderBottom="1px" borderColor={borderColor}>
           <Text fontSize="xl" fontWeight="bold">
@@ -565,7 +592,14 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
       </Box>
 
       {/* Right side chat area */}
-      <Flex flex={1} direction="column" bg={chatAreaBg} overflow="hidden">
+      <Box 
+        flex="1" 
+        bg={chatAreaBg}
+        display={{ 
+          base: !selectedChat && isMobileView ? "none" : "block", 
+          md: "block" 
+        }}
+      >
         {selectedChat ? (
           <>
             {/* Chat header */}
@@ -577,7 +611,7 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
               align="center"
             >
               <Avatar name={selectedChat} size="sm" />
-              <Box ml={3}>
+              <Box ml={3} flex="1">
                 <Text fontWeight="bold">
                   {selectedChat === 'ai' ? 'AI Assistant' : selectedChat}
                 </Text>
@@ -585,8 +619,16 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
                   {selectedChat !== 'ai' && 'Online'}
                 </Text>
               </Box>
+              {isMobileView && (
+                <IconButton
+                  aria-label="Close chat"
+                  icon={<FiX />}
+                  variant="ghost"
+                  onClick={handleCloseChat}
+                />
+              )}
               <IconButton
-                ml="auto"
+                ml={2}
                 aria-label="More options"
                 icon={<FiMoreVertical />}
                 variant="ghost"
@@ -701,7 +743,7 @@ export const InboxListPage: React.FC<InboxListPageProps> = ({ params }) => {
             <Text mt={4}>Select a chat to start messaging</Text>
           </Flex>
         )}
-      </Flex>
+      </Box>
     </Flex>
   )
 }
