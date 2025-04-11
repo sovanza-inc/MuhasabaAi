@@ -52,6 +52,12 @@ interface TransactionWithBank extends BankTransaction {
   bank_id?: string;
 }
 
+interface ChartDataItem {
+  month: string;
+  income: number;
+  outcome: number;
+}
+
 export default function CashflowPage() {
   const toast = useToast()
   const { CACHE_KEYS, prefetchData } = useApiCache()
@@ -76,11 +82,22 @@ export default function CashflowPage() {
     return `$${value.toFixed(0)}`
   }
 
-  // Filter transactions based on selected bank
+  // Filter transactions based on selected bank with caching
   const filteredTransactions = React.useMemo(() => {
-    if (selectedBankId === 'all') return transactions;
-    return transactions.filter(t => t.bank_id === selectedBankId);
-  }, [transactions, selectedBankId]);
+    const filteredCacheKey = `${CACHE_KEYS.CASHFLOW}_filtered_${customerId}_${selectedBankId}`
+    const cachedFiltered = queryClient.getQueryData<TransactionWithBank[]>([filteredCacheKey])
+    
+    if (cachedFiltered) {
+      return cachedFiltered
+    }
+
+    const filtered = selectedBankId === 'all' 
+      ? transactions 
+      : transactions.filter(t => t.bank_id === selectedBankId)
+
+    queryClient.setQueryData([filteredCacheKey], filtered)
+    return filtered
+  }, [transactions, selectedBankId, customerId, queryClient, CACHE_KEYS.CASHFLOW])
 
   // Initialize auth token and customer ID
   React.useEffect(() => {
@@ -251,8 +268,15 @@ export default function CashflowPage() {
     return 'other';
   }
 
-  // Process transactions into categories
-  const processCategorizedData = (transactions: BankTransaction[]): Record<string, CategoryData> => {
+  // Process transactions into categories with improved caching
+  const processCategorizedData = React.useCallback((transactions: BankTransaction[]): Record<string, CategoryData> => {
+    const categorizedCacheKey = `${CACHE_KEYS.CASHFLOW}_categorized_${customerId}_${selectedBankId}`
+    const cachedCategorized = queryClient.getQueryData<Record<string, CategoryData>>([categorizedCacheKey])
+    
+    if (cachedCategorized) {
+      return cachedCategorized
+    }
+
     const categories: Record<string, CategoryData> = {
       shopping: {
         id: 'shopping',
@@ -351,90 +375,28 @@ export default function CashflowPage() {
     });
 
     setTotals({ income: totalIncome, spent: totalSpent });
+
+    // Cache the results
+    queryClient.setQueryData([categorizedCacheKey], categories);
     return categories;
-  };
-
-  // Fetch all transactions
-  React.useEffect(() => {
-    const fetchAllTransactions = async () => {
-      if (!customerId || !authToken) return
-
-      setIsLoading(true)
-      try {
-        // Create a unique cache key for all transactions
-        const allTransactionsCacheKey = `${CACHE_KEYS.TRANSACTIONS}_all_${customerId}`
-        const cachedTransactions = queryClient.getQueryData([allTransactionsCacheKey])
-        if (cachedTransactions && Array.isArray(cachedTransactions)) {
-          setTransactions(cachedTransactions)
-          setIsLoading(false)
-          return
-        }
-
-        const banks = await fetchConnectedBanks()
-        let allTransactions: TransactionWithBank[] = []
-        
-        for (const bank of banks) {
-          const accounts = await fetchAccountsForBank(bank.id)
-          
-          for (const account of accounts) {
-            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id)
-            const transactionsWithBank = accountTransactions.map((t: BankTransaction) => ({
-              ...t,
-              bank_name: bank.bank_identifier || bank.name,
-              bank_id: bank.id
-            }))
-            
-            allTransactions = [...allTransactions, ...transactionsWithBank]
-          }
-        }
-
-        // Sort transactions by date (most recent first)
-        allTransactions.sort((a, b) => 
-          new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
-        )
-
-        // Cache the combined transactions
-        queryClient.setQueryData([allTransactionsCacheKey], allTransactions)
-        setTransactions(allTransactions)
-
-        // Calculate totals
-        const { income, spent } = allTransactions.reduce((acc, t) => {
-          const amount = t.amount.amount
-          if (t.credit_debit_indicator === 'CREDIT') {
-            acc.income += amount
-          } else {
-            acc.spent += amount
-          }
-          return acc
-        }, { income: 0, spent: 0 })
-
-        setTotals({ income, spent })
-      } catch (error) {
-        console.error('Error fetching transactions:', error)
-        toast({
-          title: 'Error',
-          description: 'Failed to fetch transactions',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        })
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
-    fetchAllTransactions()
-  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, queryClient, CACHE_KEYS.TRANSACTIONS, toast])
+  }, [customerId, selectedBankId, queryClient, CACHE_KEYS.CASHFLOW])
 
   const categorizedData = React.useMemo(() => {
     return processCategorizedData(filteredTransactions);
-  }, [filteredTransactions]);
+  }, [filteredTransactions, processCategorizedData]);
 
   const chartData = React.useMemo(() => {
+    // Try to get cached chart data
+    const chartDataCacheKey = `${CACHE_KEYS.CASHFLOW}_chart_${customerId}_${selectedBankId}`
+    const cachedChartData = queryClient.getQueryData([chartDataCacheKey])
+    if (cachedChartData && filteredTransactions === (queryClient.getQueryData([chartDataCacheKey + '_transactions']))) {
+      return cachedChartData as ChartDataItem[]
+    }
+
     const monthlyData: Record<string, { income: number; outcome: number }> = {};
     
     // Get last 6 months including current month
-    const months = [];
+    const months: string[] = [];
     for (let i = 5; i >= 0; i--) {
       const date = new Date();
       date.setMonth(date.getMonth() - i);
@@ -457,12 +419,114 @@ export default function CashflowPage() {
       }
     });
 
-    return months.map(month => ({
+    const result: ChartDataItem[] = months.map(month => ({
       month,
       income: monthlyData[month].income,
       outcome: monthlyData[month].outcome
     }));
-  }, [filteredTransactions]);
+
+    // Cache the chart data and the transactions reference
+    queryClient.setQueryData([chartDataCacheKey], result);
+    queryClient.setQueryData([chartDataCacheKey + '_transactions'], filteredTransactions);
+
+    return result;
+  }, [filteredTransactions, customerId, selectedBankId, queryClient, CACHE_KEYS.CASHFLOW]);
+
+  // Fetch all transactions with improved caching
+  React.useEffect(() => {
+    const fetchAllTransactions = async () => {
+      if (!customerId || !authToken) return
+
+      setIsLoading(true)
+      try {
+        // Check cache first
+        const allTransactionsCacheKey = `${CACHE_KEYS.TRANSACTIONS}_all_${customerId}`
+        const totalsKey = `${CACHE_KEYS.CASHFLOW}_totals_${customerId}`
+        const categorizedKey = `${CACHE_KEYS.CASHFLOW}_categorized_${customerId}`
+        const chartKey = `${CACHE_KEYS.CASHFLOW}_chart_${customerId}`
+
+        // Try to get all cached data
+        const [
+          cachedTransactions,
+          cachedTotals,
+          cachedCategorized,
+          cachedChart
+        ] = await Promise.all([
+          queryClient.getQueryData<TransactionWithBank[]>([allTransactionsCacheKey]),
+          queryClient.getQueryData<{ income: number, spent: number }>([totalsKey]),
+          queryClient.getQueryData([categorizedKey]),
+          queryClient.getQueryData([chartKey])
+        ])
+
+        // If we have all cached data, use it
+        if (cachedTransactions && cachedTotals && cachedCategorized && cachedChart) {
+          setTransactions(cachedTransactions)
+          setTotals(cachedTotals)
+          setIsLoading(false)
+          return
+        }
+
+        // Fetch fresh data
+        const banks = await fetchConnectedBanks()
+        let allTransactions: TransactionWithBank[] = []
+        
+        // Fetch all accounts and transactions in parallel for better performance
+        const bankPromises = banks.map(async (bank: { id: string; bank_identifier: any; name: any }) => {
+          const accounts = await fetchAccountsForBank(bank.id)
+          const accountPromises = accounts.map(async (account: { account_id: string }) => {
+            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id)
+            return accountTransactions.map((t: BankTransaction) => ({
+              ...t,
+              bank_name: bank.bank_identifier || bank.name,
+              bank_id: bank.id
+            }))
+          })
+          const bankTransactions = await Promise.all(accountPromises)
+          return bankTransactions.flat()
+        })
+
+        const bankResults = await Promise.all(bankPromises)
+        allTransactions = bankResults.flat()
+
+        // Sort transactions by date (most recent first)
+        allTransactions.sort((a, b) => 
+          new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+        )
+
+        // Calculate totals
+        const totals = allTransactions.reduce((acc, t) => {
+          const amount = t.amount.amount
+          if (t.credit_debit_indicator === 'CREDIT') {
+            acc.income += amount
+          } else {
+            acc.spent += amount
+          }
+          return acc
+        }, { income: 0, spent: 0 })
+
+        // Cache all data
+        queryClient.setQueryData([allTransactionsCacheKey], allTransactions)
+        queryClient.setQueryData([totalsKey], totals)
+
+        // Update state
+        setTransactions(allTransactions)
+        setTotals(totals)
+      } catch (error) {
+        console.error('Error fetching transactions:', error)
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch transactions',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAllTransactions()
+  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, queryClient, CACHE_KEYS.TRANSACTIONS, CACHE_KEYS.CASHFLOW, toast])
 
   return (
     <Box>
@@ -514,25 +578,25 @@ export default function CashflowPage() {
             <>
           {/* Analytics Chart Section */}
           <Card variant="unstyled" bg="white" mb={6}>
-                <CardBody p={4}>
+            <CardBody p={4}>
               <Heading size="md" mb={4}>Analytics</Heading>
-                  <Box height="300px" pl={4}>
+              <Box height="300px" pl={4}>
                 <BarChart
-                  data={chartData}
+                  data={chartData as unknown as Record<string, string | number>[]}
                   categories={['income', 'outcome']}
                   index="month"
                   height="100%"
-                      valueFormatter={formatCurrency}
-                      showLegend={true}
-                      showGrid={true}
-                      showYAxis={true}
+                  valueFormatter={formatCurrency}
+                  showLegend={true}
+                  showGrid={true}
+                  showYAxis={true}
                   colors={['#10B981', '#064E3B']}
-                      yAxisWidth={65}
-                      minValue={0}
-                      maxValue={chartData.reduce((max, item) => {
-                        const itemMax = Math.max(item.income, item.outcome);
-                        return itemMax > max ? itemMax : max;
-                      }, 0) * 1.2}
+                  yAxisWidth={65}
+                  minValue={0}
+                  maxValue={chartData.reduce((max: number, item: ChartDataItem) => {
+                    const itemMax = Math.max(item.income, item.outcome);
+                    return itemMax > max ? itemMax : max;
+                  }, 0) * 1.2}
                 />
               </Box>
             </CardBody>
