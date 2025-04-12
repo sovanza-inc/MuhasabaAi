@@ -1,7 +1,8 @@
 'use client'
 
 import { AppSidebar } from '../components/sidebar'
-import { AppLayout, AppLayoutProps } from './app-layout'
+import { RestrictedLayout } from './restricted-layout'
+import type { AppLayoutProps } from './app-layout'
 
 /**
  * Default dashboard layout.
@@ -11,8 +12,8 @@ export const DashboardLayout: React.FC<AppLayoutProps> = ({
   ...rest
 }) => {
   return (
-    <AppLayout sidebar={<AppSidebar />} {...rest}>
+    <RestrictedLayout sidebar={<AppSidebar />} {...rest}>
       {children}
-    </AppLayout>
+    </RestrictedLayout>
   )
 }

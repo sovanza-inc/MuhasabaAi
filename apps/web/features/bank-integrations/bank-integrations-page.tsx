@@ -124,6 +124,8 @@ export function BankIntegrationsPage() {
   const [selectedAccount, setSelectedAccount] = React.useState<BankAccount | null>(null);
   const [transactions, setTransactions] = React.useState<BankTransaction[]>([]);
   const [isTransactionsLoading, setIsTransactionsLoading] = React.useState(false);
+  const [showLeanContainer, setShowLeanContainer] = React.useState(false);
+  const [isSdkLoaded, setIsSdkLoaded] = React.useState(false);
 
   const [isLoading, setIsLoading] = React.useState(false)
   const [authToken, setAuthToken] = React.useState<string | null>(null)
@@ -137,86 +139,174 @@ export function BankIntegrationsPage() {
     script.async = true;
     script.onload = () => {
       console.log('Lean SDK loaded successfully');
+      setIsSdkLoaded(true);
     };
     script.onerror = (error) => {
       console.error('Error loading Lean SDK:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load bank integration SDK. Please refresh the page.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     };
     document.body.appendChild(script);
 
     return () => {
       document.body.removeChild(script);
+      setIsSdkLoaded(false);
     };
-  }, [])
+  }, [toast])
+
+  // Fetch connected banks
+  const fetchConnectedBanks = React.useCallback(async () => {
+    if (!customerId || !authToken) return;
+
+    try {
+      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
+        method: 'GET',
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        }
+      });
+
+      const data = await response.json();
+      setConnectedEntities(data || []);
+    } catch (error) {
+      console.error('Error fetching connected banks:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to fetch connected banks',
+        status: 'error',
+        duration: 5000,
+        isClosable: true
+      });
+    }
+  }, [customerId, authToken, toast]);
+
+  // Fetch connected banks when customerId changes
+  React.useEffect(() => {
+    if (customerId && authToken) {
+      fetchConnectedBanks();
+    }
+  }, [customerId, authToken, fetchConnectedBanks]);
 
   const initializeLeanConnect = React.useCallback(() => {
-    if (customerId && customerToken && window.Lean?.connect) {
-      try {
-        window.Lean.connect({
-          app_token: LEAN_TECH_CLIENT_ID,
-          permissions: [
-            "accounts",
-            "balance", 
-            "transactions",
-            "identity"
-          ],
-          customer_id: customerId,
-          sandbox: true,
-          access_token: customerToken,
-          container: 'lean-connect-container',
-          callback: (event) => {
-            console.log('Lean event:', event);
-            // Check for success based on status and exit_point
-            if (event.status === 'SUCCESS' && event.exit_point === 'SUCCESS') {
-              toast({
-                title: 'Bank Connected',
-                description: event.message || 'Successfully connected your bank account',
-                status: 'success',
-                duration: 3000,
-                isClosable: true,
-              });
-            } else if (event.exit_point === 'ERROR' || event.status === 'ERROR') {
-              console.error('Lean SDK error:', event);
-              toast({
-                title: 'Connection Error',
-                description: event.message || 'Failed to connect bank account',
-                status: 'error',
-                duration: 5000,
-                isClosable: true,
-              });
-            } else if (event.exit_point) {
-              // Handle any other exit points
-              toast({
-                title: 'Connection Cancelled',
-                description: event.message || 'Bank connection process was cancelled',
-                status: 'info',
-                duration: 3000,
-                isClosable: true,
-              });
-            }
-          }
-        });
-      } catch (error) {
-        console.error('Error initializing Lean connect:', error);
-        toast({
-          title: 'Connection Error',
-          description: 'Failed to initialize bank connection',
-          status: 'error',
-          duration: 5000,
-          isClosable: true,
-        });
-      }
-    } else {
+    if (!isSdkLoaded) {
+      console.error('Lean SDK not loaded yet');
+      toast({
+        title: 'Error',
+        description: 'Bank integration SDK is not ready. Please wait a moment and try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (!customerId || !customerToken || !window.Lean?.connect) {
       console.error('Missing required configuration for Lean connect:', {
         hasCustomerId: !!customerId,
         hasCustomerToken: !!customerToken,
         hasLeanSDK: !!window.Lean?.connect
       });
+      toast({
+        title: 'Error',
+        description: 'Missing required configuration. Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
     }
-  }, [customerId, customerToken, toast]);
+
+    try {
+      setShowLeanContainer(true);
+      const container = document.getElementById('lean-connect-container');
+      if (container) {
+        container.style.display = 'block';
+      }
+
+      window.Lean.connect({
+        app_token: LEAN_TECH_CLIENT_ID,
+        permissions: [
+          "accounts",
+          "balance", 
+          "transactions",
+          "identity"
+        ],
+        customer_id: customerId,
+        sandbox: true,
+        access_token: customerToken,
+        container: 'lean-connect-container',
+        callback: (event) => {
+          console.log('Lean event:', event);
+          setShowLeanContainer(false);
+          if (container) {
+            container.style.display = 'none';
+          }
+
+          if (event.status === 'SUCCESS' && event.exit_point === 'SUCCESS') {
+            toast({
+              title: 'Bank Connected',
+              description: event.message || 'Successfully connected your bank account',
+              status: 'success',
+              duration: 3000,
+              isClosable: true,
+            });
+            fetchConnectedBanks();
+          } else if (event.exit_point === 'ERROR' || event.status === 'ERROR') {
+            console.error('Lean SDK error:', event);
+            toast({
+              title: 'Connection Error',
+              description: event.message || 'Failed to connect bank account',
+              status: 'error',
+              duration: 5000,
+              isClosable: true,
+            });
+          } else if (event.exit_point) {
+            toast({
+              title: 'Connection Cancelled',
+              description: event.message || 'Bank connection process was cancelled',
+              status: 'info',
+              duration: 3000,
+              isClosable: true,
+            });
+          }
+        }
+      });
+    } catch (error) {
+      console.error('Error initializing Lean connect:', error);
+      setShowLeanContainer(false);
+      const container = document.getElementById('lean-connect-container');
+      if (container) {
+        container.style.display = 'none';
+      }
+      toast({
+        title: 'Connection Error',
+        description: 'Failed to initialize bank connection',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  }, [customerId, customerToken, toast, isSdkLoaded, fetchConnectedBanks]);
 
   const handleConnectBank = React.useCallback(() => {
-    initializeLeanConnect()
-  }, [initializeLeanConnect])
+    if (!isSdkLoaded) {
+      toast({
+        title: 'Please Wait',
+        description: 'Bank integration SDK is still loading...',
+        status: 'info',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    initializeLeanConnect();
+  }, [initializeLeanConnect, isSdkLoaded, toast]);
 
   // Authentication Handler
   const handleAddBankIntegration = React.useCallback(async () => {
@@ -316,40 +406,6 @@ export function BankIntegrationsPage() {
       setIsLoading(false);
     }
   }, [workspace.id, toast]);
-
-  // Fetch connected banks
-  const fetchConnectedBanks = React.useCallback(async () => {
-    if (!customerId || !authToken) return;
-
-    try {
-      const response = await fetch(`/api/bank-integration/accounts?customer_id=${customerId}`, {
-        method: 'GET',
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        }
-      });
-
-      const data = await response.json();
-      setConnectedEntities(data || []);
-    } catch (error) {
-      console.error('Error fetching connected banks:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to fetch connected banks',
-        status: 'error',
-        duration: 5000,
-        isClosable: true
-      });
-    }
-  }, [customerId, authToken, toast]);
-
-  // Fetch connected banks when customerId changes
-  React.useEffect(() => {
-    if (customerId && authToken) {
-      fetchConnectedBanks();
-    }
-  }, [customerId, authToken, fetchConnectedBanks]);
 
   const fetchBalanceForAccount = React.useCallback(async (accountId: string, entityId: string) => {
     if (!accountId || !entityId) {
@@ -529,7 +585,8 @@ export function BankIntegrationsPage() {
           width="100%"
           height="100%"
           zIndex="modal"
-          display="none"
+          display={showLeanContainer ? "block" : "none"}
+          bg="rgba(255, 255, 255, 0.9)"
         />
 
         <VStack spacing={4} align="stretch">
