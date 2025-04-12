@@ -57,6 +57,7 @@ import { useModals } from '@acme/ui/modals'
 
 import { usePath } from '#features/common/hooks/use-path'
 import { useUserSettings } from '#lib/user-settings/use-user-settings'
+import { useBankConnection } from '#features/bank-integrations/context/bank-connection-context'
 
 import { BillingStatus } from './billing-status'
 import { GlobalSearchInput } from './global-search-input'
@@ -70,6 +71,7 @@ export interface AppSidebarProps extends SidebarProps {}
 export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
   const modals = useModals()
   const help = useHelpCenter()
+  const { hasBankConnection, isLoading } = useBankConnection()
 
   const [{ sidebarWidth }, setUserSettings] = useUserSettings()
 
@@ -91,6 +93,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
   const isProfitLossActive = useActivePath('profit-loss', { end: false })
   const isBalanceSheetActive = useActivePath('balance-sheet', { end: false })
   const isCashflowStatementActive = useActivePath('cashflow-statement', { end: false })
+
+  // Check if menu items should be disabled
+  const isDisabled = !isLoading && !hasBankConnection
 
   // Set the parent item to be open if any subpage is active
   React.useEffect(() => {
@@ -171,9 +176,18 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
               {/* Parent Accounting Item */}
               <NavItem
                 icon={<LuBanknote />}
-                onClick={() => setIsAccountingOpen(!isAccountingOpen)}
+                onClick={() => !isDisabled && setIsAccountingOpen(!isAccountingOpen)}
                 display="flex"
                 alignItems="center"
+                opacity={isDisabled ? 0.5 : 1}
+                cursor={isDisabled ? 'not-allowed' : 'pointer'}
+                pointerEvents={isDisabled ? 'none' : 'auto'}
+                position="relative"
+                _hover={{
+                  '[data-tooltip]': {
+                    display: isDisabled ? 'block' : 'none'
+                  }
+                }}
               >
                 Accounting
                 <Box ml="auto">
@@ -185,6 +199,27 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                     color="gray.600"
                   />
                 </Box>
+                {isDisabled && (
+                  <Box
+                    data-tooltip
+                    position="absolute"
+                    display="none"
+                    left="100%"
+                    top="50%"
+                    transform="translateY(-50%)"
+                    ml={2}
+                    px={3}
+                    py={2}
+                    bg="gray.700"
+                    color="white"
+                    borderRadius="md"
+                    fontSize="sm"
+                    zIndex={9999}
+                    whiteSpace="nowrap"
+                  >
+                    Connect at least 1 bank to access these views
+                  </Box>
+                )}
               </NavItem>
 
               {/* Accounting subitems */}
@@ -224,9 +259,18 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
               {/* Parent Reports Item */}
               <NavItem
                 icon={<LuFileText />}
-                onClick={() => setIsReportsOpen(!isReportsOpen)}
+                onClick={() => !isDisabled && setIsReportsOpen(!isReportsOpen)}
                 display="flex"
                 alignItems="center"
+                opacity={isDisabled ? 0.5 : 1}
+                cursor={isDisabled ? 'not-allowed' : 'pointer'}
+                pointerEvents={isDisabled ? 'none' : 'auto'}
+                position="relative"
+                _hover={{
+                  '[data-tooltip]': {
+                    display: isDisabled ? 'block' : 'none'
+                  }
+                }}
               >
                 Reports
                 <Box ml="auto">
@@ -238,6 +282,27 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                     color="gray.600"
                   />
                 </Box>
+                {isDisabled && (
+                  <Box
+                    data-tooltip
+                    position="absolute"
+                    display="none"
+                    left="100%"
+                    top="50%"
+                    transform="translateY(-50%)"
+                    ml={2}
+                    px={3}
+                    py={2}
+                    bg="gray.700"
+                    color="white"
+                    borderRadius="md"
+                    fontSize="sm"
+                    zIndex={9999}
+                    whiteSpace="nowrap"
+                  >
+                    Connect at least 1 bank to access these views
+                  </Box>
+                )}
               </NavItem>
 
               {/* Reports subitems */}
@@ -318,22 +383,29 @@ const AppSidebarLink = <Href extends Route = Route>(
   const { href, label, hotkey, badge, ...rest } = props
   const { push } = useRouter()
   const isActive = useActivePath(href)
-
   const { variant } = useSidebarContext()
+  const { hasBankConnection, isLoading } = useBankConnection()
 
   const command = useHotkeysShortcut(hotkey, () => {
     push(href)
   }, [href])
 
+  // Check if this link should be disabled
+  const isBankingPage = href.toString().includes('bank')
+  const isDisabled = !isLoading && !hasBankConnection && !isBankingPage
+
   return (
     <NavItem
       href={href}
       isActive={isActive}
+      opacity={isDisabled ? 0.5 : 1}
+      cursor={isDisabled ? 'not-allowed' : 'pointer'}
+      pointerEvents={isDisabled ? 'none' : 'auto'}
       {...rest}
       tooltipProps={{
         label: (
           <>
-            {label} <Command>{command}</Command>
+            {label} {isDisabled ? '(Connect at least 1 bank to access this views)' : <Command>{command}</Command>}
           </>
         ),
       }}

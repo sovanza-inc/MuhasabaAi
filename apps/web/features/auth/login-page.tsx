@@ -42,8 +42,7 @@ export const LoginPage = () => {
     mutationFn: (params: LoginFormInput) => auth.logIn(params),
     onSuccess: () => {
       lastUsed.set('credentials')
-
-      router.push(redirectTo ?? '/')
+      router.push('/')
     },
     onError: (error) => {
       snackbar.error({
