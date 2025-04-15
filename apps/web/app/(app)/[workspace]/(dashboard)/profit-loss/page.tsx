@@ -429,14 +429,7 @@ export default function ProfitLossPage() {
                         </Box>
                         <Box>
                           <Text color="gray.600" fontSize="sm">This Month</Text>
-                          <Text fontSize="md" mb={2}>${data.revenues.thisMonth}</Text>
-                          <Progress 
-                            value={parseFloat(data.revenues.totalSpending) > 0 ? (parseFloat(data.revenues.thisMonth) / parseFloat(data.revenues.totalSpending)) * 100 : 0} 
-                            size="sm" 
-                            colorScheme="green"
-                            borderRadius="full"
-                            bg="gray.100"
-                          />
+                          <Text fontSize="md">{data.revenues.thisMonth}</Text>
                         </Box>
                       </SimpleGrid>
                     </CardBody>
@@ -457,14 +450,7 @@ export default function ProfitLossPage() {
                         </Box>
                         <Box>
                           <Text color="gray.600" fontSize="sm">This Month</Text>
-                          <Text fontSize="md" mb={2}>${data.expenses.thisMonth}</Text>
-                          <Progress 
-                            value={parseFloat(data.expenses.totalSpending) > 0 ? (parseFloat(data.expenses.thisMonth) / parseFloat(data.expenses.totalSpending)) * 100 : 0} 
-                            size="sm" 
-                            colorScheme="green"
-                            borderRadius="full"
-                            bg="gray.100"
-                          />
+                          <Text fontSize="md">{data.expenses.thisMonth}</Text>
                         </Box>
                       </SimpleGrid>
                     </CardBody>
@@ -612,7 +598,7 @@ export default function ProfitLossPage() {
       >
         <HStack justify="space-between">
           <Text>Summary: Revenue-Expenses</Text>
-          <Text>Net Profit: {data?.netProfit || '0$'}</Text>
+          <Text>Net Profit: ${data?.netProfit || '0'}</Text>
         </HStack>
       </Box>
     </Box>

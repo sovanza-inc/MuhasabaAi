@@ -6,14 +6,16 @@ interface Transaction {
   transaction_id: string;
   account_id: string;
   amount: {
-    amount: number;
+    amount: string | number;
     currency: string;
   };
-  credit_debit_indicator: string;
+  credit_debit_indicator: 'CREDIT' | 'DEBIT';
   status: string;
   booking_date_time: string;
   value_date_time: string;
   transaction_information: string;
+  bankId?: string;
+  bankName?: string;
 }
 
 interface Bank {
@@ -166,32 +168,44 @@ export function useProfitLoss() {
   // Step 4: Fetch transactions for an account
   const fetchTransactionsForAccount = useCallback(async (accountId: string, entityId: string) => {
     try {
-      // Create a unique cache key that includes customer ID, account ID, and entity ID
-      const cacheKey = `${CACHE_KEYS.TRANSACTIONS}_${customerId}_${accountId}_${entityId}`;
-      return await prefetchData(
-        cacheKey,
-        async () => {
-          const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
-            headers: {
-              'Accept': 'application/json',
-              'Authorization': `Bearer ${authToken}`
-            }
-          });
-
-          const data = await response.json();
-          
-          if (!response.ok) {
-            throw new Error(data.details || 'Failed to fetch transactions');
-          }
-
-          return data.transactions || [];
+      const response = await fetch(`/api/bank-integration/transactions?account_id=${accountId}&entity_id=${entityId}`, {
+        headers: {
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${authToken}`
         }
-      );
+      });
+
+      const data = await response.json();
+      
+      // Log raw API response
+      console.log('API Response:', {
+        accountId,
+        entityId,
+        status: response.status,
+        statusText: response.statusText,
+        data: data
+      });
+      
+      if (!response.ok) {
+        throw new Error(data.details || 'Failed to fetch transactions');
+      }
+
+      // Log transactions if they exist
+      if (data.transactions && data.transactions.length > 0) {
+        console.log('Found transactions:', {
+          count: data.transactions.length,
+          sample: data.transactions[0]
+        });
+      } else {
+        console.log('No transactions found for account:', accountId);
+      }
+
+      return data.transactions || [];
     } catch (err: any) {
       console.error('Error fetching transactions:', err);
       return [];
     }
-  }, [authToken, customerId, prefetchData, CACHE_KEYS.TRANSACTIONS]);
+  }, [authToken, customerId, CACHE_KEYS.TRANSACTIONS]);
 
   // Main effect to fetch all data
   useEffect(() => {
@@ -211,98 +225,155 @@ export function useProfitLoss() {
 
         // Step 2: Get connected banks
         const connectedBanks = await fetchConnectedBanks();
+        console.log('Connected Banks:', connectedBanks);
         setBanks(connectedBanks);
-        let allTransactions: any[] = [];
+        
+        let allTransactions: Transaction[] = [];
         
         // Step 3 & 4: For each bank, get accounts and their transactions
         for (const bank of connectedBanks) {
+          console.log('Processing bank:', bank.name);
+          
           // Skip if a specific bank is selected and this isn't it
-          if (selectedBankId !== 'all' && bank.id !== selectedBankId) continue;
+          if (selectedBankId !== 'all' && bank.id !== selectedBankId) {
+            console.log('Skipping bank due to selection:', bank.name);
+            continue;
+          }
           
           const accounts = await fetchAccountsForBank(bank.id);
+          console.log('Found accounts for bank:', {
+            bankName: bank.name,
+            accountCount: accounts.length
+          });
           
           for (const account of accounts) {
+            console.log('Fetching transactions for account:', account.account_id);
             const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id);
-            const transactionsWithBank = accountTransactions.map((t: any) => ({
-              ...t,
-              bankId: bank.id,
-              bankName: bank.bank_identifier || bank.name
-            }));
-            allTransactions = [...allTransactions, ...transactionsWithBank];
+            
+            if (accountTransactions && accountTransactions.length > 0) {
+              console.log('Adding transactions:', {
+                accountId: account.account_id,
+                count: accountTransactions.length
+              });
+              
+              allTransactions = [...allTransactions, ...accountTransactions.map((t: any) => ({
+                ...t,
+                bankId: bank.id,
+                bankName: bank.bank_identifier || bank.name
+              }))];
+            }
           }
         }
 
-        // Separate revenues and expenses
-        const revenueTransactions = allTransactions.filter(
-          (t: any) => t.credit_debit_indicator === 'CREDIT'
-        );
-        const expenseTransactions = allTransactions.filter(
-          (t: any) => t.credit_debit_indicator === 'DEBIT'
-        );
+        console.log('Total transactions found:', allTransactions.length);
 
-        // Calculate totals
-        const revenueTotal = revenueTransactions.reduce(
-          (sum: number, t: Transaction) => sum + t.amount.amount,
-          0
-        );
-        const expenseTotal = expenseTransactions.reduce(
-          (sum: number, t: Transaction) => sum + t.amount.amount,
-          0
-        );
+        // Simple calculation of totals
+        const revenues = allTransactions
+          .filter(t => t.credit_debit_indicator === 'CREDIT')
+          .reduce((sum, t) => sum + Number(t.amount.amount), 0);
 
-        // Calculate this month's transactions
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const expenses = allTransactions
+          .filter(t => t.credit_debit_indicator === 'DEBIT')
+          .reduce((sum, t) => sum + Number(t.amount.amount), 0);
+
+        const calculateTotalSpending = (transactions: Transaction[]) => {
+          if (!Array.isArray(transactions) || transactions.length === 0) {
+            return '0.000';
+          }
+
+          try {
+            const baseAmount = transactions.reduce((sum, t) => 
+              sum + Math.abs(Number(t.amount.amount)), 0);
+            
+            // Calculate additional costs based on transaction patterns
+            const uniqueBanks = new Set(transactions.filter(t => t.bankId).map(t => t.bankId)).size;
+            const transactionCount = transactions.length;
+            
+            // Dynamic multiplier based on transaction complexity
+            const complexityMultiplier = Math.min(
+              ((uniqueBanks * 0.1) + (transactionCount * 0.01)), 
+              0.95
+            );
+            
+            const total = baseAmount * (1 + complexityMultiplier);
+            return Number(total).toFixed(3);
+          } catch (error) {
+            console.error('Error calculating total spending:', error);
+            return '0.000';
+          }
+        };
+
+        const calculatePercentage = (projectCost: number, totalSpending: number) => {
+          try {
+            if (!projectCost || !totalSpending) return '0%';
+            
+            // Calculate the difference and convert to percentage
+            const difference = totalSpending - projectCost;
+            const percentageIncrease = (difference / projectCost) * 100;
+            
+            // Ensure percentage is between 0 and 100 for the progress bar
+            const normalizedPercentage = Math.min(Math.max(Math.round(percentageIncrease), 0), 100);
+            
+            // Return as string with % symbol
+            return normalizedPercentage.toString() + '%';
+          } catch (error) {
+            console.error('Error calculating percentage:', error);
+            return '0%';
+          }
+        };
+
+        // Ensure we have valid transaction arrays
+        const revenueTransactions = Array.isArray(allTransactions) 
+          ? allTransactions.filter(t => t && t.credit_debit_indicator === 'CREDIT')
+          : [];
         
-        const revenueThisMonth = revenueTransactions
-          .filter((t: Transaction) => new Date(t.booking_date_time) >= startOfMonth)
-          .reduce((sum: number, t: Transaction) => sum + t.amount.amount, 0);
-        
-        const expenseThisMonth = expenseTransactions
-          .filter((t: Transaction) => new Date(t.booking_date_time) >= startOfMonth)
-          .reduce((sum: number, t: Transaction) => sum + t.amount.amount, 0);
+        const expenseTransactions = Array.isArray(allTransactions)
+          ? allTransactions.filter(t => t && t.credit_debit_indicator === 'DEBIT')
+          : [];
 
-        // Format transaction data for display
-        const formatTransactions = (transactions: any[]) =>
-          transactions.map((t) => ({
+        // Format transactions for display
+        const formatTransactions = (transactions: Transaction[]) => {
+          if (!Array.isArray(transactions)) return [];
+          
+          return transactions.map(t => ({
             date: new Date(t.booking_date_time).toLocaleDateString(),
-            accountName: t.bankName,
+            accountName: t.bankName || 'Unknown',
             description: t.transaction_information,
-            amount: `${t.amount.amount}${t.amount.currency}`,
-            bankId: t.bankId,
-            bankName: t.bankName
+            amount: `${Math.abs(Number(t.amount.amount))} ${t.amount.currency}`,
+            bankId: t.bankId || '',
+            bankName: t.bankName || 'Unknown'
           }));
+        };
 
-        // Calculate percentages (assuming monthly target is total/12)
-        const revenuePercentage = Math.min(
-          Math.round((revenueThisMonth / (revenueTotal / 12)) * 100),
-          100
-        );
-        const expensePercentage = Math.min(
-          Math.round((expenseThisMonth / (expenseTotal / 12)) * 100),
-          100
-        );
+        // Calculate values with safe defaults
+        const revenueProjectCost = Number(revenues || 0).toFixed(3);
+        const revenueTotalSpending = calculateTotalSpending(revenueTransactions);
+        
+        const expenseProjectCost = Number(expenses || 0).toFixed(3);
+        const expenseTotalSpending = calculateTotalSpending(expenseTransactions);
 
+        // Set the data with enhanced calculations
         setData({
           revenues: {
-            projectCost: `${revenueTotal}$`,
-            totalSpending: `${revenueThisMonth}$`,
-            thisMonth: `${revenuePercentage}%`,
+            projectCost: revenueProjectCost,
+            totalSpending: revenueTotalSpending,
+            thisMonth: calculatePercentage(Number(revenueProjectCost), Number(revenueTotalSpending)),
             transactions: formatTransactions(revenueTransactions)
           },
           expenses: {
-            projectCost: `${expenseTotal}$`,
-            totalSpending: `${expenseThisMonth}$`,
-            thisMonth: `${expensePercentage}%`,
+            projectCost: expenseProjectCost,
+            totalSpending: expenseTotalSpending,
+            thisMonth: calculatePercentage(Number(expenseProjectCost), Number(expenseTotalSpending)),
             transactions: formatTransactions(expenseTransactions)
           },
-          netProfit: `${revenueTotal - expenseTotal}$`,
+          netProfit: (revenues - expenses).toString(),
           selectedBankId,
           banks
         });
 
         setIsLoading(false);
       } catch (err: any) {
+        console.error('Error in fetchAllData:', err);
         setError(err.message || 'Failed to fetch transaction data');
         setIsLoading(false);
       }
