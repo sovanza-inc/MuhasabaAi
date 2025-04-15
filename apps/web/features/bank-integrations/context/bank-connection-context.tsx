@@ -36,21 +36,17 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
   const redirectToBankIntegration = React.useCallback(async () => {
     if (workspaceSlug) {
       setIsRedirecting(true)
-      router.push(`/${workspaceSlug}/banking-integration`)
+      router.push(`/${workspaceSlug}/bank-integrations`)
     }
   }, [router, workspaceSlug])
 
   // Handle modal visibility based on pathname
   useEffect(() => {
-    // Only handle state changes if we're redirecting
-    if (isRedirecting) {
-      if (pathname?.includes('banking-integration')) {
-        // We've reached the banking-integration page, reset states
-        setShowConnectionModal(false)
-        setIsRedirecting(false)
-      }
+    if (pathname?.includes('bank-integrations')) {
+      setShowConnectionModal(false)
+      setIsRedirecting(false)
     }
-  }, [pathname, isRedirecting])
+  }, [pathname])
 
   // Initial bank connection check
   const checkBankConnection = React.useCallback(async () => {
@@ -137,7 +133,7 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     showConnectionModal,
     redirectToBankIntegration,
     initialCheckDone,
-    isLoading: isAuthLoading || isWorkspaceLoading || !initialCheckDone,
+    isLoading: isAuthLoading || isWorkspaceLoading || (!initialCheckDone && isAuthenticated),
     shouldRestrictUI: initialCheckDone && !hasBankConnection && !pathname?.includes('bank-integrations')
   }), [
     hasBankConnection,
@@ -147,11 +143,12 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     initialCheckDone,
     isAuthLoading,
     isWorkspaceLoading,
-    pathname
+    pathname,
+    isAuthenticated
   ])
 
-  // Show loading overlay until initial check is done
-  if (!initialCheckDone && isAuthenticated) {
+  // Only show loading overlay during initial load
+  if (isAuthLoading || isWorkspaceLoading || (!initialCheckDone && isAuthenticated)) {
     return (
       <div
         style={{
@@ -161,9 +158,14 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
           right: 0,
           bottom: 0,
           backgroundColor: 'white',
-          zIndex: 9999
+          zIndex: 9999,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center'
         }}
-      />
+      >
+        {/* You can add a loading spinner here if needed */}
+      </div>
     )
   }
 
