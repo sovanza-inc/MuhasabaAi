@@ -15,15 +15,19 @@ export function BankRequiredOverlay() {
   // Don't show overlay if:
   // 1. Still loading
   // 2. Has bank connection
-  // 3. On any banking-related pages
+  // 3. On bank-integrations page
   // 4. UI shouldn't be restricted
   if (
     isLoading || 
     hasBankConnection || 
-    pathname.includes('bank') || 
+    pathname?.includes('bank-integrations') || 
     !shouldRestrictUI
   ) {
     return null
+  }
+
+  const handleConnectBank = () => {
+    router.push(`/${workspace?.slug}/bank-integrations`)
   }
 
   return (
@@ -43,18 +47,18 @@ export function BankRequiredOverlay() {
       <VStack spacing={4} maxW="md" textAlign="center" p={6}>
         <LuWallet size={48} color="#1AB294" />
         <Text fontSize="xl" fontWeight="bold">
-          Bank Connection Required
+          Please Connect Your Bank Account
         </Text>
         <Text color="gray.600">
-          Please connect at least one bank account to access all features of the application.
+          Connect at least one bank account to access this feature
         </Text>
         <Button
           colorScheme="green"
-          onClick={() => router.push(`/${workspace?.slug}/banking-integration`)}
+          onClick={handleConnectBank}
           backgroundColor="#1AB294"
-          _hover={{ backgroundColor: 'green.800' }}
+          _hover={{ backgroundColor: 'green.600' }}
         >
-          Connect Bank Account
+          Connect Bank
         </Button>
       </VStack>
     </Box>
