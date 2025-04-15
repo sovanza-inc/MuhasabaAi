@@ -13,6 +13,7 @@ interface BankConnectionContextType {
   redirectToBankIntegration: () => void
   initialCheckDone: boolean
   isLoading: boolean
+  shouldRestrictUI: boolean
 }
 
 const BankConnectionContext = createContext<BankConnectionContextType | undefined>(undefined)
@@ -136,7 +137,8 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     showConnectionModal,
     redirectToBankIntegration,
     initialCheckDone,
-    isLoading: isAuthLoading || isWorkspaceLoading || !initialCheckDone
+    isLoading: isAuthLoading || isWorkspaceLoading || !initialCheckDone,
+    shouldRestrictUI: initialCheckDone && !hasBankConnection && !pathname?.includes('bank-integrations')
   }), [
     hasBankConnection,
     isRedirecting,
@@ -144,7 +146,8 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     redirectToBankIntegration,
     initialCheckDone,
     isAuthLoading,
-    isWorkspaceLoading
+    isWorkspaceLoading,
+    pathname
   ])
 
   // Show loading overlay until initial check is done
