@@ -670,19 +670,29 @@ export function DashboardPage() {
     // Group transactions by month
     const monthlyData = new Map();
     const today = new Date();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonth = today.getMonth(); // This will automatically update each month
+    const currentYear = today.getFullYear();
     
-    // Initialize next 3 months with 0 values
-    for (let i = 0; i < 3; i++) {
-      const futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
-      const monthKey = months[futureDate.getMonth()] + ' ' + futureDate.getFullYear();
+    // Initialize with current month and previous 4 months
+    for (let i = 4; i >= 0; i--) {
+      let monthIndex = currentMonth - i;
+      let year = currentYear;
+      
+      // Adjust for previous year if needed
+      if (monthIndex < 0) {
+        monthIndex += 12;
+        year--;
+      }
+      
+      const date = new Date(year, monthIndex, 1);
+      const monthKey = date.toLocaleString('default', { month: 'short', year: 'numeric' });
       monthlyData.set(monthKey, { income: 0, spending: 0 });
     }
 
     // Process actual transactions
     filteredTransactions.forEach(tx => {
       const date = new Date(tx.booking_date_time);
-      const monthKey = months[date.getMonth()] + ' ' + date.getFullYear();
+      const monthKey = date.toLocaleString('default', { month: 'short', year: 'numeric' });
       
       if (!monthlyData.has(monthKey)) {
         monthlyData.set(monthKey, { income: 0, spending: 0 });
@@ -696,40 +706,58 @@ export function DashboardPage() {
       }
     });
 
-    // Convert to array and sort by date
-    const chartData = Array.from(monthlyData.entries())
-      .map(([day, data]) => ({
-        day,
-        income: data.income,
-        spending: data.spending
-      }))
-      .sort((a, b) => {
-        const [aMonth, aYear] = a.day.split(' ');
-        const [bMonth, bYear] = b.day.split(' ');
-        const aDate = new Date(parseInt(aYear), months.indexOf(aMonth), 1);
-        const bDate = new Date(parseInt(bYear), months.indexOf(bMonth), 1);
-        return aDate.getTime() - bDate.getTime();
-      });
-
-    // If we don't have enough transaction data, use placeholder data
-    const defaultBarData = [
-      { month: 'Jan', income: 300, outcome: 200 },
-      { month: 'Feb', income: 200, outcome: 150 },
-      { month: 'Mar', income: 400, outcome: 300 },
-      { month: 'Apr', income: 300, outcome: 250 },
-      { month: 'May', income: 500, outcome: 400 }
-    ];
-
-    // Convert monthlyData to bar chart format
+    // Convert to array and ensure proper chronological sorting for bar chart
     const barData = Array.from(monthlyData.entries())
       .map(([month, data]) => ({
         month,
         income: data.income,
         outcome: data.spending
       }))
-      .slice(-5);
+      .sort((a, b) => {
+        // Parse the month strings into Date objects for proper sorting
+        const [aMonth, aYear] = a.month.split(' ');
+        const [bMonth, bYear] = b.month.split(' ');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const aDate = new Date(parseInt(aYear), monthNames.indexOf(aMonth), 1);
+        const bDate = new Date(parseInt(bYear), monthNames.indexOf(bMonth), 1);
+        return aDate.getTime() - bDate.getTime();
+      });
 
     const hasBarData = barData.some(item => item.income > 0 || item.outcome > 0);
+
+    // Default data using dynamic current month and previous months
+    const defaultBarData = Array.from({ length: 5 }, (_, i) => {
+      let monthIndex = currentMonth - (4 - i);
+      let year = currentYear;
+      
+      if (monthIndex < 0) {
+        monthIndex += 12;
+        year--;
+      }
+      
+      const date = new Date(year, monthIndex, 1);
+      return {
+        month: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
+        income: Math.floor(Math.random() * 400) + 100,
+        outcome: Math.floor(Math.random() * 300) + 100
+      };
+    });
+
+    // Area chart data with proper sorting
+    const chartData = Array.from(monthlyData.entries())
+      .map(([month, data]) => ({
+        day: month,
+        income: data.income,
+        spending: data.spending
+      }))
+      .sort((a, b) => {
+        const [aMonth, aYear] = a.day.split(' ');
+        const [bMonth, bYear] = b.day.split(' ');
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const aDate = new Date(parseInt(aYear), monthNames.indexOf(aMonth), 1);
+        const bDate = new Date(parseInt(bYear), monthNames.indexOf(bMonth), 1);
+        return aDate.getTime() - bDate.getTime();
+      });
 
     return {
       barChartData: hasBarData ? barData : defaultBarData,
