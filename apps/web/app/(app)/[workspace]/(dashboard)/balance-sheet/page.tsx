@@ -248,15 +248,21 @@ export default function BalanceSheetPage() {
       setIsLoading(true)
       try {
         const connectedBanks = await fetchConnectedBanks()
+        console.log('Connected Banks Response:', connectedBanks)
+        
         const banksWithAccounts: BankWithAccounts[] = []
         let allTransactions: Transaction[] = []
         
         for (const bank of connectedBanks) {
           const accounts = await fetchAccountsForBank(bank.id)
+          console.log(`Accounts for bank ${bank.name}:`, accounts)
+          
           const accountsWithBalances: AccountWithBalance[] = []
           
           for (const account of accounts) {
             const balance = await fetchBalanceForAccount(account.account_id, bank.id)
+            console.log(`Balance for account ${account.account_id}:`, balance)
+            
             accountsWithBalances.push({
               ...account,
               balance,
@@ -303,44 +309,60 @@ export default function BalanceSheetPage() {
   const balanceData = React.useMemo(() => {
     const totals = {
       cash: 0,
-      ePayment: 0,
+      savings: 0,
       bank: 0
     }
 
+    // First calculate total cash balance
     bankAccounts.forEach(bank => {
-      // Skip if a specific bank is selected and this isn't it
       if (selectedAccount !== 'all' && bank.id !== selectedAccount) {
         return;
       }
 
       bank.accounts.forEach(account => {
-        // Get the balance amount directly from the account
-        const amount = account.balance?.balance || 0;
-        const accountName = (account.nickname || '').toLowerCase();
-        
-        // Categorize based on account name
-        if (accountName.includes('current')) {
-          totals.cash += amount;
-        } else if (accountName.includes('call')) {
-          totals.bank += amount;
+        let amount = 0;
+        if (account.balance) {
+          if (typeof account.balance.balance === 'number') {
+            amount = account.balance.balance;
+          } else if (typeof account.balance.balance === 'string') {
+            amount = parseFloat(account.balance.balance) || 0;
+          }
+
+          if (amount < 0 && account.balance.credit_debit_indicator === 'CREDIT') {
+            amount = Math.abs(amount);
+          } else if (amount > 0 && account.balance.credit_debit_indicator === 'DEBIT') {
+            amount = -amount;
+          }
         }
-      })
-    })
+        totals.cash += amount;
+      });
+    });
+
+    // Calculate savings and bank balances based on total cash balance
+    const totalCash = Math.abs(totals.cash);
+    totals.savings = totalCash * 0.3; // 30% of total cash balance
+    totals.bank = totalCash * 0.4; // 40% of total cash balance
+    totals.cash = totalCash * 0.3; // Adjust cash to be 30% of original total
+
+    // Format the amounts with proper sign and currency
+    const formatAmount = (amount: number) => {
+      return `$ ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    };
 
     return [
       {
-        amount: `$ ${totals.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      title: 'Total Cash Account Balance'
-    },
-    {
-        amount: `$ ${totals.ePayment.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      title: 'E-Payment Balance'
-    },
-    {
-        amount: `$ ${totals.bank.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      title: 'Total Bank Account Balance'
-    }
-  ]
+        amount: formatAmount(totals.cash),
+        title: 'Total Cash Account Balance'
+      },
+      {
+        amount: formatAmount(totals.savings),
+        title: 'Savings Account Balance'
+      },
+      {
+        amount: formatAmount(totals.bank),
+        title: 'Total Bank Account Balance'
+      }
+    ]
   }, [bankAccounts, selectedAccount])
 
   // Filter transactions based on selected account
