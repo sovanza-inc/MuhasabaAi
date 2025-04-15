@@ -21,20 +21,32 @@ export const AppSidebarLink = ({
   hotkey,
 }: AppSidebarLinkProps) => {
   const pathname = usePathname()
+  const { hasBankConnection, initialCheckDone, isLoading } = useBankConnection()
   
-  // Default to enabled state
-  let hasBankConnection = true
-  let initialCheckDone = false
-  
-  try {
-    const bankConnectionData = useBankConnection()
-    hasBankConnection = bankConnectionData.hasBankConnection
-    initialCheckDone = bankConnectionData.initialCheckDone
-  } catch (error) {
-    console.error('Error accessing bank connection:', error)
-    // If there's an error, we'll default to enabled state
-    hasBankConnection = true
-    initialCheckDone = true
+  // Don't disable anything while loading
+  if (isLoading) {
+    return (
+      <Link href={href}>
+        <NavItem
+          icon={<Icon />}
+          isActive={isActive ?? pathname === href}
+        >
+          <HStack spacing={2} flex={1}>
+            <Text>{label}</Text>
+            {badge && (
+              <Badge colorScheme="blue" variant="solid" borderRadius="full">
+                {badge}
+              </Badge>
+            )}
+            {hotkey && (
+              <Badge variant="outline" ml="auto">
+                {hotkey}
+              </Badge>
+            )}
+          </HStack>
+        </NavItem>
+      </Link>
+    )
   }
 
   const isOnBankIntegrationsPage = pathname?.includes('/bank-integrations')
