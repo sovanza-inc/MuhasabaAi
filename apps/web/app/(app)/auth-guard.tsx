@@ -4,7 +4,6 @@ import { useEffect } from 'react'
 
 import { useAuth } from '@saas-ui/auth-provider'
 import { useRouter } from 'next/navigation'
-import { useBankConnection } from '#features/bank-integrations/context/bank-connection-context'
 
 /**
  * This component makes sure users are redirected back to the login page
@@ -15,21 +14,16 @@ import { useBankConnection } from '#features/bank-integrations/context/bank-conn
 export function AuthGuard() {
   const router = useRouter()
   const { isLoading, isLoggingIn, isAuthenticated } = useAuth()
-  const { checkBankConnection } = useBankConnection()
 
   useEffect(() => {
     const handleAuth = async () => {
-      if (!isLoading && !isLoggingIn) {
-        if (!isAuthenticated) {
-          router.push('/login')
-        } else {
-          await checkBankConnection()
-        }
+      if (!isLoading && !isLoggingIn && !isAuthenticated) {
+        router.push('/login')
       }
     }
 
     handleAuth()
-  }, [router, isLoading, isLoggingIn, isAuthenticated, checkBankConnection])
+  }, [router, isLoading, isLoggingIn, isAuthenticated])
 
   return null
 }

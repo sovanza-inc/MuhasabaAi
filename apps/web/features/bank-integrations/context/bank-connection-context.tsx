@@ -1,23 +1,26 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { useWorkspace } from '#features/common/hooks/use-workspace'
 import { useAuth } from '@saas-ui/auth-provider'
 import { api } from '#lib/trpc/react'
 
 interface BankConnectionContextType {
   hasBankConnection: boolean
-  isLoading: boolean
-  checkBankConnection: () => Promise<void>
-  shouldRestrictUI: boolean
+  isRedirecting: boolean
+  showConnectionModal: boolean
   redirectToBankIntegration: () => void
+  initialCheckDone: boolean
+  isLoading: boolean
+  shouldRestrictUI: boolean
 }
 
 const BankConnectionContext = createContext<BankConnectionContextType | undefined>(undefined)
 
 export function BankConnectionProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
+  const pathname = usePathname()
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth()
   const workspaceSlug = useWorkspace()
   const { data: workspace, isLoading: isWorkspaceLoading } = api.workspaces.bySlug.useQuery(
@@ -26,21 +29,34 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
   )
   
   const [hasBankConnection, setHasBankConnection] = useState(false)
-  const [isLoading, setIsLoading] = useState(true)
-  const [shouldRestrictUI, setShouldRestrictUI] = useState(false)
+  const [isRedirecting, setIsRedirecting] = useState(false)
+  const [showConnectionModal, setShowConnectionModal] = useState(false)
+  const [initialCheckDone, setInitialCheckDone] = useState(false)
 
-  const redirectToBankIntegration = React.useCallback(() => {
+  const redirectToBankIntegration = React.useCallback(async () => {
     if (workspaceSlug) {
+      setIsRedirecting(true)
       router.push(`/${workspaceSlug}/banking-integration`)
     }
   }, [router, workspaceSlug])
 
+  // Handle modal visibility based on pathname
+  useEffect(() => {
+    // Only handle state changes if we're redirecting
+    if (isRedirecting) {
+      if (pathname?.includes('banking-integration')) {
+        // We've reached the banking-integration page, reset states
+        setShowConnectionModal(false)
+        setIsRedirecting(false)
+      }
+    }
+  }, [pathname, isRedirecting])
+
+  // Initial bank connection check
   const checkBankConnection = React.useCallback(async () => {
     if (!workspace?.id || !isAuthenticated || isAuthLoading || isWorkspaceLoading) {
       return
     }
-
-    setIsLoading(true)
 
     try {
       // Get auth token
@@ -52,7 +68,10 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
       })
       
       if (!authResponse.ok) {
-        throw new Error('Failed to authenticate')
+        setHasBankConnection(false)
+        setShowConnectionModal(true)
+        setInitialCheckDone(true)
+        return
       }
       
       const authData = await authResponse.json()
@@ -66,10 +85,9 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
       })
 
       if (customerCheckResponse.status === 404) {
-        console.log('Customer not found, redirecting to banking integration')
         setHasBankConnection(false)
-        setShouldRestrictUI(false)
-        redirectToBankIntegration()
+        setShowConnectionModal(true)
+        setInitialCheckDone(true)
         return
       }
 
@@ -88,29 +106,25 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
           const banksData = await banksResponse.json()
           const hasConnectedBanks = Array.isArray(banksData) && banksData.length > 0
           setHasBankConnection(hasConnectedBanks)
-          setShouldRestrictUI(!hasConnectedBanks)
           
           if (!hasConnectedBanks) {
-            console.log('No connected banks, redirecting to banking integration')
-            redirectToBankIntegration()
+            setShowConnectionModal(true)
           }
         } else {
           setHasBankConnection(false)
-          setShouldRestrictUI(false)
-          redirectToBankIntegration()
+          setShowConnectionModal(true)
         }
       }
     } catch (error) {
       console.error('Error checking bank connection:', error)
       setHasBankConnection(false)
-      setShouldRestrictUI(false)
-      redirectToBankIntegration()
+      setShowConnectionModal(true)
     } finally {
-      setIsLoading(false)
+      setInitialCheckDone(true)
     }
-  }, [workspace?.id, isAuthenticated, isAuthLoading, isWorkspaceLoading, redirectToBankIntegration])
+  }, [workspace?.id, isAuthenticated, isAuthLoading, isWorkspaceLoading])
 
-  // Run check when workspace is available and user is authenticated
+  // Run check when workspace is available
   useEffect(() => {
     if (workspace?.id && isAuthenticated && !isAuthLoading && !isWorkspaceLoading) {
       checkBankConnection()
@@ -119,20 +133,39 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
 
   const value = React.useMemo(() => ({
     hasBankConnection,
-    isLoading: isLoading || isAuthLoading || isWorkspaceLoading || !workspace,
-    shouldRestrictUI,
-    checkBankConnection,
-    redirectToBankIntegration
+    isRedirecting,
+    showConnectionModal,
+    redirectToBankIntegration,
+    initialCheckDone,
+    isLoading: isAuthLoading || isWorkspaceLoading || !initialCheckDone,
+    shouldRestrictUI: initialCheckDone && !hasBankConnection && !pathname?.includes('bank-integrations')
   }), [
     hasBankConnection,
-    isLoading,
+    isRedirecting,
+    showConnectionModal,
+    redirectToBankIntegration,
+    initialCheckDone,
     isAuthLoading,
     isWorkspaceLoading,
-    workspace,
-    shouldRestrictUI,
-    checkBankConnection,
-    redirectToBankIntegration
+    pathname
   ])
+
+  // Show loading overlay until initial check is done
+  if (!initialCheckDone && isAuthenticated) {
+    return (
+      <div
+        style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'white',
+          zIndex: 9999
+        }}
+      />
+    )
+  }
 
   return (
     <BankConnectionContext.Provider value={value}>

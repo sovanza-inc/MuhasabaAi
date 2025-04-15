@@ -1,14 +1,12 @@
+import { Link, NavItem } from '@saas-ui/react'
+import { Badge, HStack, Text, Tooltip } from '@chakra-ui/react'
 import { usePathname } from 'next/navigation'
 import { useBankConnection } from '#features/bank-integrations/context/bank-connection-context'
-import Link from 'next/link'
-import { NavItem } from '@saas-ui/react'
-import { HStack, Text, Badge, Tooltip } from '@chakra-ui/react'
-import { IconType } from 'react-icons'
 
 interface AppSidebarLinkProps {
   href: string
   label: string
-  icon: IconType
+  icon: React.ComponentType
   badge?: string | number
   isActive?: boolean
   hotkey?: string
@@ -24,23 +22,23 @@ export const AppSidebarLink = ({
 }: AppSidebarLinkProps) => {
   const pathname = usePathname()
   
-  // Default to enabled state while loading
+  // Default to enabled state
   let hasBankConnection = true
-  let isLoading = true
+  let initialCheckDone = false
   
   try {
     const bankConnectionData = useBankConnection()
     hasBankConnection = bankConnectionData.hasBankConnection
-    isLoading = bankConnectionData.isLoading
+    initialCheckDone = bankConnectionData.initialCheckDone
   } catch (error) {
     console.error('Error accessing bank connection:', error)
     // If there's an error, we'll default to enabled state
     hasBankConnection = true
-    isLoading = false
+    initialCheckDone = true
   }
 
   const isOnBankIntegrationsPage = pathname?.includes('/bank-integrations')
-  const shouldDisable = !isLoading && !isOnBankIntegrationsPage && 
+  const shouldDisable = initialCheckDone && !isOnBankIntegrationsPage && 
     (href.startsWith('/accounting') || href.startsWith('/reports')) && 
     !hasBankConnection
 
