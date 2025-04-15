@@ -669,74 +669,49 @@ export function DashboardPage() {
 
     // Group transactions by month
     const monthlyData = new Map();
-    const monthlyAnalysis = new Map();
     const today = new Date();
-    const lastMonth = new Date(today.getFullYear(), today.getMonth() - 1);
-    
-    // Add default months to ensure we have data to display
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentMonth = today.getMonth();
     
-    // Add last 5 months (or fewer if we're early in the year)
-    for (let i = 4; i >= 0; i--) {
-      const monthIndex = (currentMonth - i + 12) % 12; // Handle wrapping around to previous year
-      const month = months[monthIndex];
-      if (!monthlyData.has(month)) {
-        monthlyData.set(month, { month, income: 0, outcome: 0 });
-      }
-    }
-    
-    // Add default days for the area chart
-    for (let day = 1; day <= 8; day++) {
-      if (!monthlyAnalysis.has(day)) {
-        monthlyAnalysis.set(day, { day, lastMonth: 0, thisMonth: 0 });
-      }
+    // Initialize next 3 months with 0 values
+    for (let i = 0; i < 3; i++) {
+      const futureDate = new Date(today.getFullYear(), today.getMonth() + i, 1);
+      const monthKey = months[futureDate.getMonth()] + ' ' + futureDate.getFullYear();
+      monthlyData.set(monthKey, { income: 0, spending: 0 });
     }
 
-    // Process transactions
+    // Process actual transactions
     filteredTransactions.forEach(tx => {
       const date = new Date(tx.booking_date_time);
-      const month = date.toLocaleString('default', { month: 'short' });
-      const amount = tx.amount.amount;
-      const isCredit = tx.credit_debit_indicator === 'CREDIT';
-
-      // For bar chart
-      if (!monthlyData.has(month)) {
-        monthlyData.set(month, { month, income: 0, outcome: 0 });
+      const monthKey = months[date.getMonth()] + ' ' + date.getFullYear();
+      
+      if (!monthlyData.has(monthKey)) {
+        monthlyData.set(monthKey, { income: 0, spending: 0 });
       }
-      if (isCredit) {
-        monthlyData.get(month).income += amount;
+      
+      const amount = Math.abs(tx.amount.amount);
+      if (tx.credit_debit_indicator === 'CREDIT') {
+        monthlyData.get(monthKey).income += amount;
       } else {
-        monthlyData.get(month).outcome += amount;
-      }
-
-      // For area chart
-      const isThisMonth = date.getMonth() === today.getMonth();
-      const isLastMonth = date.getMonth() === lastMonth.getMonth();
-      const day = date.getDate();
-
-      if (isThisMonth || isLastMonth) {
-        if (!monthlyAnalysis.has(day)) {
-          monthlyAnalysis.set(day, { day, lastMonth: 0, thisMonth: 0 });
-        }
-        if (isThisMonth) {
-          monthlyAnalysis.get(day).thisMonth += isCredit ? amount : -amount;
-        } else {
-          monthlyAnalysis.get(day).lastMonth += isCredit ? amount : -amount;
-        }
+        monthlyData.get(monthKey).spending += amount;
       }
     });
 
+    // Convert to array and sort by date
+    const chartData = Array.from(monthlyData.entries())
+      .map(([day, data]) => ({
+        day,
+        income: data.income,
+        spending: data.spending
+      }))
+      .sort((a, b) => {
+        const [aMonth, aYear] = a.day.split(' ');
+        const [bMonth, bYear] = b.day.split(' ');
+        const aDate = new Date(parseInt(aYear), months.indexOf(aMonth), 1);
+        const bDate = new Date(parseInt(bYear), months.indexOf(bMonth), 1);
+        return aDate.getTime() - bDate.getTime();
+      });
+
     // If we don't have enough transaction data, use placeholder data
-    const barData = Array.from(monthlyData.values()).slice(-5);
-    const areaData = Array.from(monthlyAnalysis.values())
-      .sort((a, b) => a.day - b.day)
-      .slice(0, 8);
-      
-    // Add some placeholder values if we don't have real transaction data
-    const hasBarData = barData.some(item => item.income > 0 || item.outcome > 0);
-    const hasAreaData = areaData.some(item => item.lastMonth > 0 || item.thisMonth > 0);
-    
     const defaultBarData = [
       { month: 'Jan', income: 300, outcome: 200 },
       { month: 'Feb', income: 200, outcome: 150 },
@@ -744,24 +719,24 @@ export function DashboardPage() {
       { month: 'Apr', income: 300, outcome: 250 },
       { month: 'May', income: 500, outcome: 400 }
     ];
-    
-    const defaultAreaData = [
-      { day: 1, lastMonth: 3004, thisMonth: 4504 },
-      { day: 2, lastMonth: 3200, thisMonth: 4200 },
-      { day: 3, lastMonth: 2800, thisMonth: 4400 },
-      { day: 4, lastMonth: 2600, thisMonth: 4100 },
-      { day: 5, lastMonth: 2700, thisMonth: 4300 },
-      { day: 6, lastMonth: 2800, thisMonth: 4000 },
-      { day: 7, lastMonth: 2900, thisMonth: 4200 },
-      { day: 8, lastMonth: 3000, thisMonth: 4504 }
-    ];
+
+    // Convert monthlyData to bar chart format
+    const barData = Array.from(monthlyData.entries())
+      .map(([month, data]) => ({
+        month,
+        income: data.income,
+        outcome: data.spending
+      }))
+      .slice(-5);
+
+    const hasBarData = barData.some(item => item.income > 0 || item.outcome > 0);
 
     return {
       barChartData: hasBarData ? barData : defaultBarData,
-      areaChartData: hasAreaData ? areaData : defaultAreaData,
+      areaChartData: chartData,
       isPlaceholderData: {
         bar: !hasBarData,
-        area: !hasAreaData
+        area: false
       }
     };
   }, [transactions, selectedBankId]);
@@ -889,13 +864,17 @@ export function DashboardPage() {
             <CardBody height="300px">
               <Heading size="md" mb={4}>Income vs Expenses</Heading>
               <Box position="relative" height="250px">
-              <BarChart
+                <BarChart
                   data={chartData.barChartData}
-                categories={['income', 'outcome']}
-                index="month"
-                height="250px"
-                colors={['#38B2AC', '#2C7A7B']}
-              />
+                  categories={['income', 'outcome']}
+                  index="month"
+                  height="250px"
+                  colors={['#38B2AC', '#2C7A7B']}
+                  valueFormatter={(value) => `$${value.toLocaleString()}`}
+                  showLegend={true}
+                  showGrid={true}
+                  showYAxis={true}
+                />
               </Box>
             </CardBody>
           </Card>
@@ -906,34 +885,27 @@ export function DashboardPage() {
               <Box position="relative" height="250px">
                 <AreaChart
                   data={chartData.areaChartData}
-                  categories={['lastMonth', 'thisMonth']}
+                  categories={['income', 'spending']}
                   index="day"
                   height="200px"
-                  colors={['#3182CE', '#38B2AC']}
+                  colors={['#38B2AC', '#F56565']}
                   yAxisWidth={65}
-                  valueFormatter={(value) => `$${value}`}
+                  valueFormatter={(value) => `$${value.toLocaleString()}`}
+                  showLegend={true}
+                  showGrid={true}
+                  showYAxis={true}
+                  variant="line"
+                  strokeWidth="2"
                 />
               </Box>
               <HStack justify="center" spacing={8} mt={4}>
                 <HStack>
-                  <Box w="3" h="3" borderRadius="full" bg="blue.500" />
-                  <Text color="gray.600">Last Month</Text>
-                  <Text fontWeight="medium">
-                    ${!chartData.isPlaceholderData.area 
-                      ? (chartData.areaChartData[0]?.lastMonth.toLocaleString() || '0')
-                      : '3,004'
-                    }
-                  </Text>
+                  <Box w="3" h="3" borderRadius="full" bg="teal.500" />
+                  <Text color="gray.600">Income</Text>
                 </HStack>
                 <HStack>
-                  <Box w="3" h="3" borderRadius="full" bg="teal.500" />
-                  <Text color="gray.600">This Month</Text>
-                  <Text fontWeight="medium">
-                    ${!chartData.isPlaceholderData.area 
-                      ? (chartData.areaChartData[0]?.thisMonth.toLocaleString() || '0')
-                      : '4,504'
-                    }
-                  </Text>
+                  <Box w="3" h="3" borderRadius="full" bg="red.400" />
+                  <Text color="gray.600">Spending</Text>
                 </HStack>
               </HStack>
             </CardBody>
