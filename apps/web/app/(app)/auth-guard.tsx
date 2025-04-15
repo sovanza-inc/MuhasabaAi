@@ -4,7 +4,6 @@ import { useEffect } from 'react'
 
 import { useAuth } from '@saas-ui/auth-provider'
 import { useRouter } from 'next/navigation'
-import { useBankConnection } from '#features/bank-integrations/context/bank-connection-context'
 
 /**
  * This component makes sure users are redirected back to the login page
