@@ -12,6 +12,7 @@ interface BankConnectionContextType {
   showConnectionModal: boolean
   redirectToBankIntegration: () => void
   initialCheckDone: boolean
+  isLoading: boolean
 }
 
 const BankConnectionContext = createContext<BankConnectionContextType | undefined>(undefined)
@@ -134,13 +135,16 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     isRedirecting,
     showConnectionModal,
     redirectToBankIntegration,
-    initialCheckDone
+    initialCheckDone,
+    isLoading: isAuthLoading || isWorkspaceLoading || !initialCheckDone
   }), [
     hasBankConnection,
     isRedirecting,
     showConnectionModal,
     redirectToBankIntegration,
-    initialCheckDone
+    initialCheckDone,
+    isAuthLoading,
+    isWorkspaceLoading
   ])
 
   // Show loading overlay until initial check is done
