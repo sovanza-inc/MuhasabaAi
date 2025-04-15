@@ -589,85 +589,220 @@ export function BankIntegrationsPage() {
           bg="rgba(255, 255, 255, 0.9)"
         />
 
-        <VStack spacing={4} align="stretch">
-          {!authToken && !connectedEntities.length && (
-            <EmptyState
-              title="No bank integrations yet"
-              description="Connect your bank account to get started with financial management."
-              icon={LuWallet}
-              actions={
+        <VStack spacing={8} align="stretch" maxW="container.lg" mx="auto">
+          {!authToken && !connectedEntities.length ? (
+            // First step - Initial connection view
+            <Box 
+              p={8} 
+              bg="white" 
+              borderRadius="lg" 
+              boxShadow="md"
+              display="flex"
+              flexDirection="column"
+              alignItems="center"
+              justifyContent="center"
+              minH="400px"
+            >
+              <VStack spacing={6} maxW="md" textAlign="center">
+                <Icon as={LuWallet} boxSize={16} color="#1AB294" />
+                <VStack spacing={4}>
+                  <Text fontSize="2xl" fontWeight="bold">
+                    Connect Your Bank Account
+                  </Text>
+                  <Text color="gray.600" fontSize="md">
+                    Link your bank account to automatically import transactions and manage your finances more effectively.
+                  </Text>
+                </VStack>
                 <Button
-                  colorScheme="primary"
                   size="lg"
                   leftIcon={<LuWallet />}
                   onClick={handleAddBankIntegration}
                   isLoading={isLoading}
+                  backgroundColor="#1AB294"
+                  color="white"
+                  _hover={{ backgroundColor: 'green.600' }}
+                  _focus={{ boxShadow: 'none' }}
+                  _active={{ backgroundColor: 'green.700' }}
+                  px={12}
+                  py={7}
+                  fontSize="md"
                 >
-                  Add Bank Integration
+                  Connect Bank Account
                 </Button>
-              }
-            />
-          )}
-
-          {authToken && (
-            <Button 
-              colorScheme="primary"
-              size="lg"
-              leftIcon={<LuWallet />}
-              onClick={handleConnectBank}
-              isLoading={isLoading}
-            >
-              Connect Bank
-            </Button>
-          )}
-
-          {/* Display Connected Entities */}
-          {connectedEntities.length > 0 && (
-            <Box>
-              <Text fontSize="xl" fontWeight="bold" mb={4}>Connected Bank Entities</Text>
-              <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={4}>
-                {connectedEntities.map((entity) => (
-                  <Box
-                    key={entity.id}
-                    bg="white"
-                    p={4}
-                    borderRadius="lg"
-                    boxShadow="sm"
-                    border="1px"
-                    borderColor="gray.200"
-                    cursor="pointer"
-                    onClick={() => handleBankSelect(entity)}
-                    _hover={{ borderColor: 'blue.500' }}
-                  >
-                    <VStack align="start" spacing={2}>
-                      <HStack justify="space-between" width="100%">
-                        <Badge colorScheme="blue">{entity.bank_type}</Badge>
-                        <Text fontSize="sm" color="gray.500">
-                          {new Date(entity.created_at).toLocaleDateString()}
-                        </Text>
-                      </HStack>
-                      <Text fontWeight="medium">{entity.bank_identifier}</Text>
-                      <Box>
-                        <Text fontSize="sm" fontWeight="medium" mb={1}>Permissions:</Text>
-                        <SimpleGrid columns={2} spacing={2}>
-                          {Object.entries(entity.permissions).map(([key, value]) => (
-                            <HStack key={key} spacing={1}>
-                              <Icon
-                                as={value ? LuWallet : LuWallet}
-                                color={value ? "green.500" : "red.500"}
-                              />
-                              <Text fontSize="xs" color="gray.600">
-                                {key.replace(/_/g, ' ')}
-                              </Text>
-                            </HStack>
-                          ))}
-                        </SimpleGrid>
-                      </Box>
-                    </VStack>
-                  </Box>
-                ))}
-              </SimpleGrid>
+              </VStack>
             </Box>
+          ) : (
+            // Second step - Bank selection view
+            <>
+              <Box 
+                p={8}
+                bg="white" 
+                borderRadius="xl"
+                boxShadow="lg"
+                maxW="800px"
+                mx="auto"
+                mb={8}
+                position="relative"
+                overflow="hidden"
+              >
+                <Box
+                  position="absolute"
+                  top={0}
+                  right={0}
+                  width="300px"
+                  height="300px"
+                  bg="green.50"
+                  borderRadius="full"
+                  transform="translate(50%, -50%)"
+                  opacity={0.3}
+                />
+                <SimpleGrid columns={{ base: 1, lg: 2 }} gap={8} alignItems="center" position="relative">
+                  {/* Left side - Content */}
+                  <VStack align="start" spacing={5}>
+                    <VStack align="start" spacing={2}>
+                      <Text fontSize="2xl" fontWeight="bold" color="gray.800">
+                        Add Another Bank
+                      </Text>
+                      <Text color="gray.600" fontSize="md" lineHeight="tall">
+                        Connect additional bank accounts to manage all your finances in one place.
+                      </Text>
+                    </VStack>
+                    <Button
+                      size="lg"
+                      leftIcon={<LuWallet />}
+                      onClick={handleConnectBank}
+                      isLoading={isLoading}
+                      backgroundColor="#1AB294"
+                      color="white"
+                      _hover={{ backgroundColor: 'green.600', transform: 'translateY(-2px)' }}
+                      _focus={{ boxShadow: 'none' }}
+                      _active={{ backgroundColor: 'green.700' }}
+                      px={6}
+                      py={5}
+                      fontSize="md"
+                      width={{ base: "full", md: "auto" }}
+                      transition="all 0.2s"
+                    >
+                      Connect New Bank
+                    </Button>
+                  </VStack>
+
+                  {/* Right side - Illustration/Icon */}
+                  <Box 
+                    display={{ base: 'none', lg: 'flex' }}
+                    alignItems="center" 
+                    justifyContent="center"
+                  >
+                    <Icon 
+                      as={LuWallet} 
+                      boxSize={24} 
+                      color="#1AB294" 
+                      opacity={0.9}
+                    />
+                  </Box>
+                </SimpleGrid>
+              </Box>
+
+              {/* Connected Banks List */}
+              {connectedEntities.length > 0 && (
+                <Box>
+                  <HStack justify="space-between" align="center" mb={6}>
+                    <VStack align="start" spacing={1}>
+                      <Text fontSize="xl" fontWeight="semibold">Connected Banks</Text>
+                      <Text color="gray.600" fontSize="sm">
+                        {connectedEntities.length} {connectedEntities.length === 1 ? 'bank' : 'banks'} connected
+                      </Text>
+                    </VStack>
+                  </HStack>
+
+                  <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} spacing={6}>
+                    {connectedEntities.map((entity) => (
+                      <Box
+                        key={entity.id}
+                        bg="white"
+                        p={6}
+                        borderRadius="xl"
+                        boxShadow="sm"
+                        cursor="pointer"
+                        onClick={() => handleBankSelect(entity)}
+                        _hover={{ 
+                          transform: 'translateY(-2px)', 
+                          boxShadow: 'md',
+                          borderColor: 'green.200'
+                        }}
+                        transition="all 0.2s"
+                        border="1px solid"
+                        borderColor="gray.100"
+                        position="relative"
+                      >
+                        <Box
+                          position="absolute"
+                          top={4}
+                          right={4}
+                          width={2}
+                          height={2}
+                          borderRadius="full"
+                          bg="green.400"
+                        />
+                        <VStack align="start" spacing={4}>
+                          <HStack justify="space-between" width="100%">
+                            <Badge 
+                              colorScheme="green" 
+                              px={3} 
+                              py={1} 
+                              borderRadius="full"
+                              textTransform="capitalize"
+                            >
+                              {entity.bank_type.toLowerCase()}
+                            </Badge>
+                            <Text fontSize="sm" color="gray.500">
+                              Connected {new Date(entity.created_at).toLocaleDateString()}
+                            </Text>
+                          </HStack>
+                          
+                          <Text fontWeight="semibold" fontSize="lg">{entity.bank_identifier}</Text>
+                          
+                          {/* Permissions Section */}
+                          <Box width="100%" bg="gray.50" p={3} borderRadius="md">
+                            <Text fontSize="sm" color="gray.600" mb={3} fontWeight="medium">
+                              Active Permissions
+                            </Text>
+                            <SimpleGrid columns={2} spacing={3}>
+                              {Object.entries(entity.permissions).map(([key, value]) => (
+                                value && (
+                                  <HStack key={key} spacing={2}>
+                                    <Icon as={LuWallet} color="green.500" boxSize={3.5} />
+                                    <Text fontSize="xs" color="gray.700">
+                                      {key.charAt(0).toUpperCase() + key.slice(1)}
+                                    </Text>
+                                  </HStack>
+                                )
+                              ))}
+                            </SimpleGrid>
+                          </Box>
+                          
+                          <HStack 
+                            width="100%" 
+                            justify="space-between" 
+                            align="center"
+                            pt={2}
+                          >
+                            <Text fontSize="sm" color="gray.500">
+                              View Details
+                            </Text>
+                            <Icon 
+                              as={LuWallet} 
+                              color="green.500" 
+                              boxSize={4}
+                            />
+                          </HStack>
+                        </VStack>
+                      </Box>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              )}
+            </>
           )}
         </VStack>
 
