@@ -32,6 +32,7 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
   const [isRedirecting, setIsRedirecting] = useState(false)
   const [showConnectionModal, setShowConnectionModal] = useState(false)
   const [initialCheckDone, setInitialCheckDone] = useState(false)
+  const [isCheckingConnection, setIsCheckingConnection] = useState(false)
 
   const redirectToBankIntegration = React.useCallback(async () => {
     if (workspaceSlug) {
@@ -55,6 +56,7 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     }
 
     try {
+      setIsCheckingConnection(true)
       // Get auth token
       const authResponse = await fetch('/api/bank-integration/auth', {
         method: 'GET',
@@ -66,7 +68,6 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
       if (!authResponse.ok) {
         setHasBankConnection(false)
         setShowConnectionModal(true)
-        setInitialCheckDone(true)
         return
       }
       
@@ -83,7 +84,6 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
       if (customerCheckResponse.status === 404) {
         setHasBankConnection(false)
         setShowConnectionModal(true)
-        setInitialCheckDone(true)
         return
       }
 
@@ -116,6 +116,7 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
       setHasBankConnection(false)
       setShowConnectionModal(true)
     } finally {
+      setIsCheckingConnection(false)
       setInitialCheckDone(true)
     }
   }, [workspace?.id, isAuthenticated, isAuthLoading, isWorkspaceLoading])
@@ -133,7 +134,7 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     showConnectionModal,
     redirectToBankIntegration,
     initialCheckDone,
-    isLoading: isAuthLoading || isWorkspaceLoading || (!initialCheckDone && isAuthenticated),
+    isLoading: isAuthLoading || isWorkspaceLoading || isCheckingConnection,
     shouldRestrictUI: initialCheckDone && !hasBankConnection && !pathname?.includes('bank-integrations')
   }), [
     hasBankConnection,
@@ -143,12 +144,12 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
     initialCheckDone,
     isAuthLoading,
     isWorkspaceLoading,
-    pathname,
-    isAuthenticated
+    isCheckingConnection,
+    pathname
   ])
 
-  // Only show loading overlay during initial load
-  if (isAuthLoading || isWorkspaceLoading || (!initialCheckDone && isAuthenticated)) {
+  // Show loading overlay for any loading state
+  if (isAuthLoading || isWorkspaceLoading || isCheckingConnection) {
     return (
       <div
         style={{
@@ -161,10 +162,27 @@ export function BankConnectionProvider({ children }: { children: React.ReactNode
           zIndex: 9999,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: 'center'
+          justifyContent: 'center',
+          opacity: 1,
+          transition: 'opacity 0.2s ease-in-out'
         }}
       >
-        {/* You can add a loading spinner here if needed */}
+        <div
+          style={{
+            width: '40px',
+            height: '40px',
+            border: '3px solid #f3f3f3',
+            borderTop: '3px solid #1AB294',
+            borderRadius: '50%',
+            animation: 'spin 1s linear infinite',
+          }}
+        />
+        <style>{`
+          @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+          }
+        `}</style>
       </div>
     )
   }
