@@ -28,6 +28,7 @@ import { AreaChart, BarChart } from '@saas-ui/charts'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { usePath } from '#features/common/hooks/use-path'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
+import { FinancialKPIs } from './metrics/financial-kpis'
 
 interface ConnectedBank {
   id: string;
@@ -943,14 +944,6 @@ export function DashboardPage() {
 
       {/* Transactions Section */}
       <Box mb={6} position="relative">
-        <Box display="flex" justifyContent="space-between" alignItems="center" mb={4}>
-          <Box>
-            <Heading size="lg" mb={2}>Transactions</Heading>
-            <Text color="gray.600">
-              Real-time transaction updates from all your connected bank accounts.
-            </Text>
-          </Box>
-        </Box>
 
         {isLoading ? (
           <Box textAlign="center" py={10}>
@@ -962,41 +955,24 @@ export function DashboardPage() {
             <Text color="gray.600">No transactions found</Text>
           </Box>
         ) : (
-          <SimpleGrid columns={1} spacing={4}>
-            {transactionsToDisplay.map((transaction) => (
-              <Card 
-                key={transaction.transaction_id}
-                borderLeftWidth="4px"
-                borderLeftColor={transaction.credit_debit_indicator === 'CREDIT' ? 'green.400' : 'red.400'}
-              >
-                <CardBody py={4} px={6}>
-                  <Box display="flex" justifyContent="space-between" alignItems="center">
-                    <Box>
-                      <Text fontSize="md" fontWeight="medium">
-                        {transaction.bank_name}
-                      </Text>
-                      <Text fontSize="sm" color="gray.500">
-                        {new Date(transaction.booking_date_time).toLocaleString()}
-                      </Text>
-                      <Text fontSize="sm" color="gray.500" noOfLines={1}>
-                        {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
-                          .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
-                          || 'Bank Transaction'}
-                      </Text>
-                    </Box>
-                    <Text 
-                      fontSize="lg" 
-                      fontWeight="medium"
-                      color={transaction.credit_debit_indicator === 'CREDIT' ? "green.500" : "red.500"}
-                    >
-                      {transaction.credit_debit_indicator === 'CREDIT' ? '+' : '-'}
-                      {transaction.amount.currency} {Math.abs(transaction.amount.amount).toLocaleString()}
+          <Box>
+            {transactions.length > 0 ? (
+              <FinancialKPIs transactions={transactions} />
+            ) : (
+              <Card>
+                <CardBody>
+                  <Box textAlign="center" py={10}>
+                    <Text fontSize="lg" mb={4}>
+                      No transactions available
+                    </Text>
+                    <Text color="gray.500">
+                      Connect your bank account to see your financial metrics
                     </Text>
                   </Box>
                 </CardBody>
               </Card>
-            ))}
-          </SimpleGrid>
+            )}
+          </Box>
         )}
       </Box>
     </Box>
@@ -1004,7 +980,10 @@ export function DashboardPage() {
 
   return (
     <Page>
-      <PageHeader title="Dashboard" />
+      <PageHeader
+        title="Dashboard"
+        description="Overview of your financial metrics"
+      />
       <PageBody
         contentWidth="container.2xl"
         bg="page-body-bg-subtle"
