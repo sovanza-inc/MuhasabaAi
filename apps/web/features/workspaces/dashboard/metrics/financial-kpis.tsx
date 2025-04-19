@@ -179,7 +179,7 @@ const calculateExpenseBreakdown = (transactions: Transaction[]) => {
 
   // Create chart data
   const chartData = Object.entries(expensesByCategory)
-    .filter(([_, amount]) => amount > 0)
+    .filter(entry => entry[1] > 0)
     .map(([category, amount]) => ({
       category: category.slice(0, 20), // Limit category name length
       value: totalExpenses > 0 ? (amount / totalExpenses) * 100 : 0
