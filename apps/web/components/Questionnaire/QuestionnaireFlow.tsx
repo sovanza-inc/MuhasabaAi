@@ -74,7 +74,7 @@ export function QuestionnaireFlow() {
           hasCheckedQuestionnaire.current = true
           await checkCustomer()
         }
-      } catch (error) {
+      } catch {
         if (isMounted) {
           setShowQuestionnaire(true)
           setIsLoading(false)
@@ -108,7 +108,7 @@ export function QuestionnaireFlow() {
       if (!authResponse.ok) throw new Error('Failed to authenticate')
       
       const authData = await authResponse.json()
-      const customerResponse = await fetch(`/api/bank-integration/get-customer?app_user_id=${workspace.id}`, {
+      await fetch(`/api/bank-integration/get-customer?app_user_id=${workspace.id}`, {
         headers: { 'Authorization': `Bearer ${authData.access_token}` }
       })
 
@@ -117,7 +117,7 @@ export function QuestionnaireFlow() {
       if (pathname !== `/${workspace.slug}`) {
         router.push(`/${workspace.slug}`)
       }
-    } catch (error) {
+    } catch {
       toast({
         title: 'Error',
         description: 'Failed to verify customer status.',
