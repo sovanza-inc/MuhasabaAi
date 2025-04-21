@@ -20,6 +20,13 @@ export const theme = extendTheme(
       body: 'Lato, sans-serif',
       mono: 'SFMono-Regular,Menlo,Monaco,Consolas,"Liberation Mono","Courier New",monospace',
     },
+    colors: {
+      primary: baseTheme.colors.green,
+    },
+    config: {
+      initialColorMode: 'light',
+      useSystemColorMode: false,
+    },
   },
   /**
    * Uncomment this to use any of the built-in color schemes.

@@ -6,4 +6,14 @@ export const components = {
   Card: cardTheme,
   SuiToolbar: toolbarTheme,
   SuiPage: pageTheme,
+  Button: {
+    defaultProps: {
+      colorScheme: 'green',
+    },
+  },
+  SubmitButton: {
+    defaultProps: {
+      colorScheme: 'green',
+    },
+  },
 }
