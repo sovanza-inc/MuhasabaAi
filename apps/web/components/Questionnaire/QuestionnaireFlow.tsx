@@ -141,7 +141,7 @@ export function QuestionnaireFlow() {
   }
 
   // Show loading spinner only while workspace is loading and we're not navigating
-  if (!workspaceState.isSuccess && !isNavigating.current) {
+  if ((!workspaceState.isSuccess && !isNavigating.current) || isLoading) {
     return (
       <Center h="100vh">
         <Spinner size="xl" color="blue.500" thickness="4px" />
