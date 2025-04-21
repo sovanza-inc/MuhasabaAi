@@ -11,6 +11,7 @@ import * as workspaces from './workspaces/workspaces.sql'
 import * as chat from './chat/chat.sql'
 import * as chatSchema from './chat/chat.schema'
 import { accounts, authenticators, sessions, users as authUsers, verifications } from '../../better-auth/src/auth.sql'
+import { questionnaireResponses } from './questionnaire/questionnaire.sql'
 
 
 const schema = {
@@ -27,7 +28,8 @@ const schema = {
   auth_authenticators: authenticators,
   auth_sessions: sessions,
   auth_users: authUsers,
-  auth_verifications: verifications
+  auth_verifications: verifications,
+  questionnaireResponses,
 }
 
 export const db = drizzle(postgres(process.env.DATABASE_URL!), {

@@ -15,6 +15,27 @@
       "when": 1743094325249,
       "tag": "0001_familiar_guardian",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1745101452286,
+      "tag": "0002_yellow_veda",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1745104964755,
+      "tag": "0003_mushy_mister_sinister",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1745208367006,
+      "tag": "0004_living_lethal_legion",
+      "breakpoints": true
     }
   ]
 }
