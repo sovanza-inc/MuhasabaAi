@@ -77,7 +77,7 @@ export const WorkspacesMenu: React.FC<WorkspacesMenuProps> = (props) => {
   )
 
   return (
-    <Menu>
+    <Menu isOpen={false}>
       {props.compact ? (
         <MenuButton as={IconButton} {...buttonProps} icon={activeLogo} />
       ) : (
