@@ -79,12 +79,6 @@ interface AccountReceivable {
   terms: string
 }
 
-interface StoredFile {
-  name: string;
-  size?: number;
-  isStored?: boolean;
-}
-
 interface FormData {
   productType: string
   cogsCategories: Array<{ type: string; description: string }>
@@ -204,7 +198,7 @@ const FileList = ({
             </AlertDialogHeader>
 
             <AlertDialogBody>
-              Are you sure you want to remove "{fileToRemove?.name}"? This action cannot be undone.
+              Are you sure you want to remove &quot;{fileToRemove?.name}&quot;? This action cannot be undone.
             </AlertDialogBody>
 
             <AlertDialogFooter>
