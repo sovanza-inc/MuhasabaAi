@@ -22,12 +22,20 @@ import {
   Divider,
   NumberInput,
   NumberInputField,
+  IconButton,
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogContent,
+  AlertDialogOverlay,
+  useDisclosure,
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
 interface QuestionnaireFormProps {
   onComplete: () => void
-  initialData?: FormData
+  initialData?: FormData & { id?: string }
 }
 
 interface FixedAsset {
@@ -95,6 +103,117 @@ interface FormData {
   businessName: string
   industry: string
   operatingSince: number
+  documents: {
+    cogsInventory: (File | string)[]
+    fixedAssets: (File | string)[]
+    accountsPayable: (File | string)[]
+    accountsReceivable: (File | string)[]
+    loans: (File | string)[]
+    vatRegistration: (File | string)[]
+  }
+  preferManualEntry: boolean
+}
+
+const formatFileSize = (bytes: number): string => {
+  if (!bytes || isNaN(bytes)) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(Math.max(bytes, 1)) / Math.log(k))
+  return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[Math.min(i, sizes.length - 1)]}`
+}
+
+const FileList = ({ 
+  files, 
+  onRemove 
+}: { 
+  files: (File | string)[], 
+  onRemove: (index: number) => void 
+}) => {
+  const { isOpen, onOpen, onClose } = useDisclosure()
+  const cancelRef = React.useRef<HTMLButtonElement>(null)
+  const [fileToRemove, setFileToRemove] = React.useState<{ index: number; name: string } | null>(null)
+
+  const handleRemoveClick = (index: number, fileName: string) => {
+    const file = files[index]
+    if (typeof file === 'string') {
+      // For already uploaded files, show confirmation
+      setFileToRemove({ index, name: fileName })
+      onOpen()
+    } else {
+      // For newly added files, remove directly
+      onRemove(index)
+    }
+  }
+
+  const handleConfirmRemove = () => {
+    if (fileToRemove) {
+      onRemove(fileToRemove.index)
+    }
+    onClose()
+    setFileToRemove(null)
+  }
+
+  return (
+    <>
+      <VStack align="stretch" spacing={2} mt={2}>
+        {files.map((file, index) => {
+          const isStoredFile = typeof file === 'string'
+          const fileName = isStoredFile ? file : file.name
+          const fileSize = isStoredFile ? null : (file as File).size
+          
+          return (
+            <HStack key={index} p={2} bg="gray.50" borderRadius="md" justify="space-between">
+              <HStack>
+                <Text fontSize="sm">📎</Text>
+                <Text fontSize="sm">{fileName}</Text>
+                {fileSize && (
+                  <Text fontSize="xs" color="gray.500">({formatFileSize(fileSize)})</Text>
+                )}
+                {isStoredFile && (
+                  <Text fontSize="xs" color="green.500">(Uploaded)</Text>
+                )}
+              </HStack>
+              <IconButton
+                aria-label="Remove file"
+                icon={<Text>✕</Text>}
+                size="sm"
+                variant="ghost"
+                colorScheme="red"
+                onClick={() => handleRemoveClick(index, fileName)}
+              />
+            </HStack>
+          )
+        })}
+      </VStack>
+
+      <AlertDialog
+        isOpen={isOpen}
+        leastDestructiveRef={cancelRef}
+        onClose={onClose}
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Remove Uploaded File
+            </AlertDialogHeader>
+
+            <AlertDialogBody>
+              Are you sure you want to remove &quot;{fileToRemove?.name}&quot;? This action cannot be undone.
+            </AlertDialogBody>
+
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={onClose}>
+                Cancel
+              </Button>
+              <Button colorScheme="red" onClick={handleConfirmRemove} ml={3}>
+                Remove
+              </Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+    </>
+  )
 }
 
 export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireFormProps) {
@@ -104,61 +223,97 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
   const [currentStep, setCurrentStep] = React.useState(0)
 
   // Form state
-  const [formData, setFormData] = React.useState<FormData>(initialData || {
-    productType: '',
-    cogsCategories: [{ type: '', description: '' }],
-    calculateCogs: false,
-    beginningInventory: 0,
-    purchases: 0,
-    endingInventory: 0,
-    hasFixedAssets: false,
-    fixedAssets: [{
-      name: '',
-      type: '',
-      value: 0,
-      purchaseDate: '',
-      depreciationMethod: '',
-      usefulLife: 0
-    }],
-    hasLoans: false,
-    loans: [{
-      purpose: '',
-      amount: 0,
-      interestRate: 0,
-      monthlyPayment: 0,
-      startDate: ''
-    }],
-    hasAccountsPayable: false,
-    accountsPayable: [{
-      vendorName: '',
-      amount: 0,
-      dueDate: '',
-      description: '',
-      terms: ''
-    }],
-    hasAccountsReceivable: false,
-    accountsReceivable: [{
-      customerName: '',
-      amount: 0,
-      dueDate: '',
-      description: '',
-      terms: ''
-    }],
-    paymentType: '',
-    outstandingBalances: [{
-      partyName: '',
-      type: '',
-      amount: 0,
-      dueDate: '',
-      description: ''
-    }],
-    isVatRegistered: false,
-    trn: '',
-    vatFrequency: '',
-    trackVat: false,
-    businessName: '',
-    industry: '',
-    operatingSince: 0
+  const [formData, setFormData] = React.useState<FormData>(() => {
+    if (initialData) {
+      // Convert stored document strings to the correct format
+      const documents = Object.keys(initialData.documents || {}).reduce((acc, key) => {
+        const section = key as keyof FormData['documents']
+        const files = initialData.documents[section] || []
+        // Ensure files is always an array and contains strings for existing files
+        acc[section] = Array.isArray(files) ? files.map(file => typeof file === 'string' ? file : file.name) : []
+        return acc
+      }, {} as FormData['documents'])
+
+      console.log('Initializing form with documents:', documents)
+
+      return {
+        ...initialData,
+        documents: {
+          cogsInventory: documents.cogsInventory || [],
+          fixedAssets: documents.fixedAssets || [],
+          accountsPayable: documents.accountsPayable || [],
+          accountsReceivable: documents.accountsReceivable || [],
+          loans: documents.loans || [],
+          vatRegistration: documents.vatRegistration || [],
+        }
+      }
+    }
+
+    return {
+      productType: '',
+      cogsCategories: [{ type: '', description: '' }],
+      calculateCogs: false,
+      beginningInventory: 0,
+      purchases: 0,
+      endingInventory: 0,
+      hasFixedAssets: false,
+      fixedAssets: [{
+        name: '',
+        type: '',
+        value: 0,
+        purchaseDate: '',
+        depreciationMethod: '',
+        usefulLife: 0
+      }],
+      hasLoans: false,
+      loans: [{
+        purpose: '',
+        amount: 0,
+        interestRate: 0,
+        monthlyPayment: 0,
+        startDate: ''
+      }],
+      hasAccountsPayable: false,
+      accountsPayable: [{
+        vendorName: '',
+        amount: 0,
+        dueDate: '',
+        description: '',
+        terms: ''
+      }],
+      hasAccountsReceivable: false,
+      accountsReceivable: [{
+        customerName: '',
+        amount: 0,
+        dueDate: '',
+        description: '',
+        terms: ''
+      }],
+      paymentType: '',
+      outstandingBalances: [{
+        partyName: '',
+        type: '',
+        amount: 0,
+        dueDate: '',
+        description: ''
+      }],
+      isVatRegistered: false,
+      trn: '',
+      vatFrequency: '',
+      trackVat: false,
+      businessName: '',
+      industry: '',
+      operatingSince: 0,
+      documents: {
+        cogsInventory: [],
+        fixedAssets: [],
+        accountsPayable: [],
+        accountsReceivable: [],
+        loans: [],
+        vatRegistration: []
+      },
+      preferManualEntry: false
+    }
   })
 
   const steps = [
@@ -185,6 +340,11 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       description: 'Equipment and property',
       isComplete: () => {
         if (!formData.hasFixedAssets) return true
+        // If user chose to upload documents, check if files are uploaded
+        if (!formData.preferManualEntry) {
+          return formData.documents.fixedAssets && formData.documents.fixedAssets.length > 0
+        }
+        // For manual entry, check if assets are filled out
         return formData.fixedAssets.some(asset => 
           asset.name && 
           asset.type && 
@@ -265,33 +425,68 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
     setIsSubmitting(true)
 
     try {
-      const response = await fetch('/api/questionnaire', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          workspaceId: workspace?.id,
-          responses: formData,
-        }),
+      const submitData = new FormData()
+      submitData.append('workspaceId', workspace?.id || '')
+      
+      if (initialData?.id) {
+        submitData.append('id', initialData.id)
+      }
+
+      // Create a copy of formData for JSON serialization
+      const formDataForJson = {
+        ...formData,
+        documents: Object.entries(formData.documents).reduce((acc, [key, files]) => {
+          // Include both existing filenames and new file names
+          acc[key] = files.map(file => typeof file === 'string' ? file : file.name)
+          return acc
+        }, {} as Record<string, string[]>)
+      }
+
+      submitData.append('responses', JSON.stringify(formDataForJson))
+
+      // Handle file uploads - both new and existing files
+      Object.entries(formData.documents).forEach(([section, files]) => {
+        files.forEach(file => {
+          if (file instanceof File) {
+            const safeFileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
+            submitData.append(`documents_${section}`, file, safeFileName)
+          }
+        })
       })
 
-      const data = await response.json()
+      const response = await fetch('/api/questionnaire', {
+        method: 'POST',
+        body: submitData
+      })
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to save questionnaire responses')
+        let errorMessage = 'Failed to save questionnaire responses'
+        try {
+          const contentType = response.headers.get('content-type')
+          if (contentType && contentType.includes('application/json')) {
+            const errorData = await response.json()
+            errorMessage = errorData.error || `Error: ${response.status} - ${response.statusText}`
+          } else {
+            const textError = await response.text()
+            errorMessage = textError || `Error: ${response.status} - ${response.statusText}`
+          }
+        } catch (parseError) {
+          console.error('Error parsing response:', parseError)
+          errorMessage = `Server error (${response.status}). Please try again.`
+        }
+        throw new Error(errorMessage)
       }
 
       toast({
         title: 'Success',
-        description: 'Your responses have been saved successfully.',
+        description: 'Your response has been saved successfully.',
         status: 'success',
         duration: 5000,
         isClosable: true,
       })
 
       onComplete()
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Error saving responses:', error)
       toast({
         title: 'Error',
@@ -345,6 +540,62 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
     if (currentStep > 0) {
       setCurrentStep(currentStep - 1)
     }
+  }
+
+  const handleFileUpload = (section: keyof FormData['documents'], files: FileList | null) => {
+    if (!files || files.length === 0) return
+
+    console.log(`Handling file upload for ${section}:`, files)
+
+    setFormData(prev => {
+      const existingFiles = prev.documents[section] || []
+      console.log('Existing files:', existingFiles)
+      
+      const newFiles = Array.from(files)
+      console.log('New files:', newFiles)
+      
+      // Check for duplicate filenames
+      const existingFilenames = new Set(existingFiles.map(f => typeof f === 'string' ? f : f.name))
+      const uniqueNewFiles = newFiles.filter(file => !existingFilenames.has(file.name))
+      
+      console.log('Unique new files:', uniqueNewFiles)
+
+      if (uniqueNewFiles.length !== newFiles.length) {
+        toast({
+          title: 'Duplicate Files',
+          description: 'Some files were skipped as they were already uploaded.',
+          status: 'warning',
+          duration: 3000,
+          isClosable: true,
+        })
+      }
+
+      const updatedFiles = [...existingFiles, ...uniqueNewFiles]
+      console.log('Updated files array:', updatedFiles)
+
+      return {
+        ...prev,
+        documents: {
+          ...prev.documents,
+          [section]: updatedFiles
+        }
+      }
+    })
+  }
+
+  const handleFileRemove = (section: keyof FormData['documents'], index: number) => {
+    setFormData(prev => {
+      const newDocs = { ...prev.documents }
+      if (newDocs[section]) {
+        const files = [...newDocs[section]]
+        files.splice(index, 1)
+        newDocs[section] = files
+      }
+      return {
+        ...prev,
+        documents: newDocs
+      }
+    })
   }
 
   const renderStep = () => {
@@ -535,6 +786,29 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 </Card>
               )}
             </FormControl>
+
+            <FormControl>
+              <FormLabel>Upload Inventory Documents (Optional)</FormLabel>
+              <Text fontSize="sm" color="gray.600" mb={2}>
+                Upload inventory reports, stock counts, or purchase records to help calculate COGS
+              </Text>
+              <Input
+                type="file"
+                multiple
+                accept=".pdf,.xls,.xlsx,.csv"
+                onChange={(e) => handleFileUpload('cogsInventory', e.target.files)}
+                onClick={(e) => {
+                  // Reset the value to allow selecting the same file again
+                  (e.target as HTMLInputElement).value = ''
+                }}
+              />
+              {formData.documents.cogsInventory && formData.documents.cogsInventory.length > 0 && (
+                <FileList
+                  files={formData.documents.cogsInventory}
+                  onRemove={(index) => handleFileRemove('cogsInventory', index)}
+                />
+              )}
+            </FormControl>
           </VStack>
         )
 
@@ -553,144 +827,184 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
               </HStack>
 
               {formData.hasFixedAssets && (
-                <VStack spacing={4} mt={4} align="stretch">
-                  {formData.fixedAssets.map((asset, index) => (
-                    <Card key={index} variant="outline">
-                      <CardBody>
-                        <Stack spacing={4}>
-                          <FormControl>
-                            <FormLabel>Asset Name</FormLabel>
-                            <Input
-                              placeholder="e.g. Delivery Van, Office Equipment"
-                              value={asset.name}
-                              onChange={(e) => {
-                                const newAssets = [...formData.fixedAssets]
-                                newAssets[index] = { ...asset, name: e.target.value }
-                                setFormData({ ...formData, fixedAssets: newAssets })
-                              }}
+                <Card mt={4} variant="outline">
+                  <CardBody>
+                    <Stack spacing={4}>
+                      <FormControl>
+                        <FormLabel>How would you like to provide fixed assets information?</FormLabel>
+                        <RadioGroup
+                          value={formData.preferManualEntry ? 'manual' : 'upload'}
+                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                        >
+                          <Stack direction="row" spacing={4}>
+                            <Radio value="upload">Upload Documents</Radio>
+                            <Radio value="manual">Enter Manually</Radio>
+                          </Stack>
+                        </RadioGroup>
+                      </FormControl>
+
+                      {!formData.preferManualEntry ? (
+                        <FormControl>
+                          <FormLabel>Upload Fixed Assets Documents</FormLabel>
+                          <Text fontSize="sm" color="gray.600" mb={2}>
+                            Upload purchase invoices, asset registers, or depreciation schedules
+                          </Text>
+                          <Input
+                            type="file"
+                            multiple
+                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
+                            onChange={(e) => handleFileUpload('fixedAssets', e.target.files)}
+                          />
+                          {formData.documents.fixedAssets && formData.documents.fixedAssets.length > 0 && (
+                            <FileList
+                              files={formData.documents.fixedAssets}
+                              onRemove={(index) => handleFileRemove('fixedAssets', index)}
                             />
-                          </FormControl>
-
-                          <FormControl>
-                            <FormLabel>Asset Type</FormLabel>
-                            <RadioGroup
-                              value={asset.type}
-                              onChange={(value) => {
-                                const newAssets = [...formData.fixedAssets]
-                                newAssets[index] = { ...asset, type: value }
-                                setFormData({ ...formData, fixedAssets: newAssets })
-                              }}
-                            >
-                              <Stack direction="row" spacing={4}>
-                                <Radio value="equipment">Equipment</Radio>
-                                <Radio value="vehicle">Vehicle</Radio>
-                                <Radio value="furniture">Furniture</Radio>
-                                <Radio value="other">Other</Radio>
-                              </Stack>
-                            </RadioGroup>
-                          </FormControl>
-
-                          <HStack spacing={4}>
-                            <FormControl>
-                              <FormLabel>Purchase Value (AED)</FormLabel>
-                              <NumberInput
-                                min={0}
-                                value={asset.value || undefined}
-                                onChange={(_, valueNumber) => {
-                                  const newAssets = [...formData.fixedAssets]
-                                  newAssets[index] = { ...asset, value: valueNumber || 0 }
-                                  setFormData({ ...formData, fixedAssets: newAssets })
-                                }}
-                              >
-                                <NumberInputField placeholder="Enter amount" />
-                              </NumberInput>
-                            </FormControl>
-
-                            <FormControl>
-                              <FormLabel>Purchase Date</FormLabel>
-                              <Input
-                                type="date"
-                                value={asset.purchaseDate}
-                                onChange={(e) => {
-                                  const newAssets = [...formData.fixedAssets]
-                                  newAssets[index] = { ...asset, purchaseDate: e.target.value }
-                                  setFormData({ ...formData, fixedAssets: newAssets })
-                                }}
-                              />
-                            </FormControl>
-                          </HStack>
-
-                          <HStack spacing={4}>
-                            <FormControl>
-                              <FormLabel>Depreciation Method</FormLabel>
-                              <RadioGroup
-                                value={asset.depreciationMethod}
-                                onChange={(value) => {
-                                  const newAssets = [...formData.fixedAssets]
-                                  newAssets[index] = { ...asset, depreciationMethod: value }
-                                  setFormData({ ...formData, fixedAssets: newAssets })
-                                }}
-                              >
-                                <Stack direction="row" spacing={4}>
-                                  <Radio value="straight-line">Straight-line</Radio>
-                                  <Radio value="declining-balance">Declining balance</Radio>
-                                </Stack>
-                              </RadioGroup>
-                            </FormControl>
-
-                            <FormControl>
-                              <FormLabel>Useful Life (Years)</FormLabel>
-                              <NumberInput
-                                min={0}
-                                value={asset.usefulLife || undefined}
-                                onChange={(_, valueNumber) => {
-                                  const newAssets = [...formData.fixedAssets]
-                                  newAssets[index] = { ...asset, usefulLife: valueNumber || 0 }
-                                  setFormData({ ...formData, fixedAssets: newAssets })
-                                }}
-                              >
-                                <NumberInputField placeholder="Enter years" />
-                              </NumberInput>
-                            </FormControl>
-                          </HStack>
-
-                          {index > 0 && (
-                            <Button
-                              aria-label="Remove asset"
-                              onClick={() => {
-                                const newAssets = formData.fixedAssets.filter((_, i) => i !== index)
-                                setFormData({ ...formData, fixedAssets: newAssets })
-                              }}
-                              colorScheme="red"
-                              variant="ghost"
-                              alignSelf="flex-end"
-                            >
-                              Remove
-                            </Button>
                           )}
-                        </Stack>
-                      </CardBody>
-                    </Card>
-                  ))}
+                        </FormControl>
+                      ) : (
+                        <VStack spacing={4} mt={4} align="stretch">
+                          {formData.fixedAssets.map((asset, index) => (
+                            <Card key={index} variant="outline">
+                              <CardBody>
+                                <Stack spacing={4}>
+                                  <FormControl>
+                                    <FormLabel>Asset Name</FormLabel>
+                                    <Input
+                                      placeholder="e.g. Delivery Van, Office Equipment"
+                                      value={asset.name}
+                                      onChange={(e) => {
+                                        const newAssets = [...formData.fixedAssets]
+                                        newAssets[index] = { ...asset, name: e.target.value }
+                                        setFormData({ ...formData, fixedAssets: newAssets })
+                                      }}
+                                    />
+                                  </FormControl>
 
-                  <Button
-                    onClick={() => setFormData({
-                      ...formData,
-                      fixedAssets: [...formData.fixedAssets, {
-                        name: '',
-                        type: '',
-                        value: 0,
-                        purchaseDate: '',
-                        depreciationMethod: '',
-                        usefulLife: 0
-                      }]
-                    })}
-                    size="sm"
-                    variant="outline"
-                  >
-                    + Add Another Asset
-                  </Button>
-                </VStack>
+                                  <FormControl>
+                                    <FormLabel>Asset Type</FormLabel>
+                                    <RadioGroup
+                                      value={asset.type}
+                                      onChange={(value) => {
+                                        const newAssets = [...formData.fixedAssets]
+                                        newAssets[index] = { ...asset, type: value }
+                                        setFormData({ ...formData, fixedAssets: newAssets })
+                                      }}
+                                    >
+                                      <Stack direction="row" spacing={4}>
+                                        <Radio value="equipment">Equipment</Radio>
+                                        <Radio value="vehicle">Vehicle</Radio>
+                                        <Radio value="furniture">Furniture</Radio>
+                                        <Radio value="other">Other</Radio>
+                                      </Stack>
+                                    </RadioGroup>
+                                  </FormControl>
+
+                                  <HStack spacing={4}>
+                                    <FormControl>
+                                      <FormLabel>Purchase Value (AED)</FormLabel>
+                                      <NumberInput
+                                        min={0}
+                                        value={asset.value || undefined}
+                                        onChange={(_, valueNumber) => {
+                                          const newAssets = [...formData.fixedAssets]
+                                          newAssets[index] = { ...asset, value: valueNumber || 0 }
+                                          setFormData({ ...formData, fixedAssets: newAssets })
+                                        }}
+                                      >
+                                        <NumberInputField placeholder="Enter amount" />
+                                      </NumberInput>
+                                    </FormControl>
+
+                                    <FormControl>
+                                      <FormLabel>Purchase Date</FormLabel>
+                                      <Input
+                                        type="date"
+                                        value={asset.purchaseDate}
+                                        onChange={(e) => {
+                                          const newAssets = [...formData.fixedAssets]
+                                          newAssets[index] = { ...asset, purchaseDate: e.target.value }
+                                          setFormData({ ...formData, fixedAssets: newAssets })
+                                        }}
+                                      />
+                                    </FormControl>
+                                  </HStack>
+
+                                  <HStack spacing={4}>
+                                    <FormControl>
+                                      <FormLabel>Depreciation Method</FormLabel>
+                                      <RadioGroup
+                                        value={asset.depreciationMethod}
+                                        onChange={(value) => {
+                                          const newAssets = [...formData.fixedAssets]
+                                          newAssets[index] = { ...asset, depreciationMethod: value }
+                                          setFormData({ ...formData, fixedAssets: newAssets })
+                                        }}
+                                      >
+                                        <Stack direction="row" spacing={4}>
+                                          <Radio value="straight-line">Straight-line</Radio>
+                                          <Radio value="declining-balance">Declining balance</Radio>
+                                        </Stack>
+                                      </RadioGroup>
+                                    </FormControl>
+
+                                    <FormControl>
+                                      <FormLabel>Useful Life (Years)</FormLabel>
+                                      <NumberInput
+                                        min={0}
+                                        value={asset.usefulLife || undefined}
+                                        onChange={(_, valueNumber) => {
+                                          const newAssets = [...formData.fixedAssets]
+                                          newAssets[index] = { ...asset, usefulLife: valueNumber || 0 }
+                                          setFormData({ ...formData, fixedAssets: newAssets })
+                                        }}
+                                      >
+                                        <NumberInputField placeholder="Enter years" />
+                                      </NumberInput>
+                                    </FormControl>
+                                  </HStack>
+
+                                  {index > 0 && (
+                                    <Button
+                                      aria-label="Remove asset"
+                                      onClick={() => {
+                                        const newAssets = formData.fixedAssets.filter((_, i) => i !== index)
+                                        setFormData({ ...formData, fixedAssets: newAssets })
+                                      }}
+                                      colorScheme="red"
+                                      variant="ghost"
+                                      alignSelf="flex-end"
+                                    >
+                                      Remove
+                                    </Button>
+                                  )}
+                                </Stack>
+                              </CardBody>
+                            </Card>
+                          ))}
+
+                          <Button
+                            onClick={() => setFormData({
+                              ...formData,
+                              fixedAssets: [...formData.fixedAssets, {
+                                name: '',
+                                type: '',
+                                value: 0,
+                                purchaseDate: '',
+                                depreciationMethod: '',
+                                usefulLife: 0
+                              }]
+                            })}
+                            size="sm"
+                            variant="outline"
+                          >
+                            + Add Another Asset
+                          </Button>
+                        </VStack>
+                      )}
+                    </Stack>
+                  </CardBody>
+                </Card>
               )}
             </FormControl>
           </VStack>
@@ -714,107 +1028,143 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 <Card mt={4} variant="outline">
                   <CardBody>
                     <Stack spacing={4}>
-                      {formData.accountsPayable.map((payable, index) => (
-                        <Card key={index} variant="outline">
-                          <CardBody>
-                            <Stack spacing={4}>
-                              <FormControl>
-                                <FormLabel>Vendor Name</FormLabel>
-                                <Input
-                                  placeholder="Enter vendor name"
-                                  value={payable.vendorName}
-                                  onChange={(e) => {
-                                    const newPayables = [...formData.accountsPayable]
-                                    newPayables[index] = { ...payable, vendorName: e.target.value }
-                                    setFormData({ ...formData, accountsPayable: newPayables })
-                                  }}
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Amount</FormLabel>
-                                <NumberInput
-                                  min={0}
-                                  value={payable.amount || undefined}
-                                  onChange={(_, valueNumber) => {
-                                    const newPayables = [...formData.accountsPayable]
-                                    newPayables[index] = { ...payable, amount: valueNumber || 0 }
-                                    setFormData({ ...formData, accountsPayable: newPayables })
-                                  }}
-                                >
-                                  <NumberInputField placeholder="Enter amount" />
-                                </NumberInput>
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Due Date</FormLabel>
-                                <Input
-                                  type="date"
-                                  value={payable.dueDate}
-                                  onChange={(e) => {
-                                    const newPayables = [...formData.accountsPayable]
-                                    newPayables[index] = { ...payable, dueDate: e.target.value }
-                                    setFormData({ ...formData, accountsPayable: newPayables })
-                                  }}
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Description</FormLabel>
-                                <Input
-                                  placeholder="Enter description"
-                                  value={payable.description}
-                                  onChange={(e) => {
-                                    const newPayables = [...formData.accountsPayable]
-                                    newPayables[index] = { ...payable, description: e.target.value }
-                                    setFormData({ ...formData, accountsPayable: newPayables })
-                                  }}
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Terms</FormLabel>
-                                <Input
-                                  placeholder="Enter terms"
-                                  value={payable.terms}
-                                  onChange={(e) => {
-                                    const newPayables = [...formData.accountsPayable]
-                                    newPayables[index] = { ...payable, terms: e.target.value }
-                                    setFormData({ ...formData, accountsPayable: newPayables })
-                                  }}
-                                />
-                              </FormControl>
-                              {index > 0 && (
-                                <Button
-                                  aria-label="Remove account payable"
-                                  onClick={() => {
-                                    const newPayables = formData.accountsPayable.filter((_, i) => i !== index)
-                                    setFormData({ ...formData, accountsPayable: newPayables })
-                                  }}
-                                  colorScheme="red"
-                                  variant="ghost"
-                                  alignSelf="flex-end"
-                                >
-                                  Remove
-                                </Button>
-                              )}
-                            </Stack>
-                          </CardBody>
-                        </Card>
-                      ))}
+                      <FormControl>
+                        <FormLabel>How would you like to provide accounts payable information?</FormLabel>
+                        <RadioGroup
+                          value={formData.preferManualEntry ? 'manual' : 'upload'}
+                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                        >
+                          <Stack direction="row" spacing={4}>
+                            <Radio value="upload">Upload Documents</Radio>
+                            <Radio value="manual">Enter Manually</Radio>
+                          </Stack>
+                        </RadioGroup>
+                      </FormControl>
 
-                      <Button
-                        onClick={() => setFormData({
-                          ...formData,
-                          accountsPayable: [...formData.accountsPayable, {
-                            vendorName: '',
-                            amount: 0,
-                            dueDate: '',
-                            description: '',
-                            terms: ''
-                          }]
-                        })}
-                        size="sm"
-                        variant="outline"
-                      >
-                        + Add Another Account Payable
-                      </Button>
+                      {!formData.preferManualEntry ? (
+                        <FormControl>
+                          <FormLabel>Upload Accounts Payable Documents</FormLabel>
+                          <Text fontSize="sm" color="gray.600" mb={2}>
+                            Upload vendor invoices, statements, or aging reports
+                          </Text>
+                          <Input
+                            type="file"
+                            multiple
+                            accept=".pdf,.xls,.xlsx,.csv"
+                            onChange={(e) => handleFileUpload('accountsPayable', e.target.files)}
+                          />
+                          {formData.documents.accountsPayable && formData.documents.accountsPayable.length > 0 && (
+                            <FileList
+                              files={formData.documents.accountsPayable}
+                              onRemove={(index) => handleFileRemove('accountsPayable', index)}
+                            />
+                          )}
+                        </FormControl>
+                      ) : (
+                        <VStack spacing={4} mt={4} align="stretch">
+                          {formData.accountsPayable.map((payable, index) => (
+                            <Card key={index} variant="outline">
+                              <CardBody>
+                                <Stack spacing={4}>
+                                  <FormControl>
+                                    <FormLabel>Vendor Name</FormLabel>
+                                    <Input
+                                      placeholder="Enter vendor name"
+                                      value={payable.vendorName}
+                                      onChange={(e) => {
+                                        const newPayables = [...formData.accountsPayable]
+                                        newPayables[index] = { ...payable, vendorName: e.target.value }
+                                        setFormData({ ...formData, accountsPayable: newPayables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Amount</FormLabel>
+                                    <NumberInput
+                                      min={0}
+                                      value={payable.amount || undefined}
+                                      onChange={(_, valueNumber) => {
+                                        const newPayables = [...formData.accountsPayable]
+                                        newPayables[index] = { ...payable, amount: valueNumber || 0 }
+                                        setFormData({ ...formData, accountsPayable: newPayables })
+                                      }}
+                                    >
+                                      <NumberInputField placeholder="Enter amount" />
+                                    </NumberInput>
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Due Date</FormLabel>
+                                    <Input
+                                      type="date"
+                                      value={payable.dueDate}
+                                      onChange={(e) => {
+                                        const newPayables = [...formData.accountsPayable]
+                                        newPayables[index] = { ...payable, dueDate: e.target.value }
+                                        setFormData({ ...formData, accountsPayable: newPayables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Description</FormLabel>
+                                    <Input
+                                      placeholder="Enter description"
+                                      value={payable.description}
+                                      onChange={(e) => {
+                                        const newPayables = [...formData.accountsPayable]
+                                        newPayables[index] = { ...payable, description: e.target.value }
+                                        setFormData({ ...formData, accountsPayable: newPayables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Terms</FormLabel>
+                                    <Input
+                                      placeholder="Enter terms"
+                                      value={payable.terms}
+                                      onChange={(e) => {
+                                        const newPayables = [...formData.accountsPayable]
+                                        newPayables[index] = { ...payable, terms: e.target.value }
+                                        setFormData({ ...formData, accountsPayable: newPayables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  {index > 0 && (
+                                    <Button
+                                      aria-label="Remove account payable"
+                                      onClick={() => {
+                                        const newPayables = formData.accountsPayable.filter((_, i) => i !== index)
+                                        setFormData({ ...formData, accountsPayable: newPayables })
+                                      }}
+                                      colorScheme="red"
+                                      variant="ghost"
+                                      alignSelf="flex-end"
+                                    >
+                                      Remove
+                                    </Button>
+                                  )}
+                                </Stack>
+                              </CardBody>
+                            </Card>
+                          ))}
+
+                          <Button
+                            onClick={() => setFormData({
+                              ...formData,
+                              accountsPayable: [...formData.accountsPayable, {
+                                vendorName: '',
+                                amount: 0,
+                                dueDate: '',
+                                description: '',
+                                terms: ''
+                              }]
+                            })}
+                            size="sm"
+                            variant="outline"
+                          >
+                            + Add Another Account Payable
+                          </Button>
+                        </VStack>
+                      )}
                     </Stack>
                   </CardBody>
                 </Card>
@@ -841,107 +1191,143 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 <Card mt={4} variant="outline">
                   <CardBody>
                     <Stack spacing={4}>
-                      {formData.accountsReceivable.map((receivable, index) => (
-                        <Card key={index} variant="outline">
-                          <CardBody>
-                            <Stack spacing={4}>
-                              <FormControl>
-                                <FormLabel>Customer Name</FormLabel>
-                                <Input
-                                  placeholder="Enter customer name"
-                                  value={receivable.customerName}
-                                  onChange={(e) => {
-                                    const newReceivables = [...formData.accountsReceivable]
-                                    newReceivables[index] = { ...receivable, customerName: e.target.value }
-                                    setFormData({ ...formData, accountsReceivable: newReceivables })
-                                  }}
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Amount</FormLabel>
-                                <NumberInput
-                                  min={0}
-                                  value={receivable.amount || undefined}
-                                  onChange={(_, valueNumber) => {
-                                    const newReceivables = [...formData.accountsReceivable]
-                                    newReceivables[index] = { ...receivable, amount: valueNumber || 0 }
-                                    setFormData({ ...formData, accountsReceivable: newReceivables })
-                                  }}
-                                >
-                                  <NumberInputField placeholder="Enter amount" />
-                                </NumberInput>
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Due Date</FormLabel>
-                                <Input
-                                  type="date"
-                                  value={receivable.dueDate}
-                                  onChange={(e) => {
-                                    const newReceivables = [...formData.accountsReceivable]
-                                    newReceivables[index] = { ...receivable, dueDate: e.target.value }
-                                    setFormData({ ...formData, accountsReceivable: newReceivables })
-                                  }}
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Description</FormLabel>
-                                <Input
-                                  placeholder="Enter description"
-                                  value={receivable.description}
-                                  onChange={(e) => {
-                                    const newReceivables = [...formData.accountsReceivable]
-                                    newReceivables[index] = { ...receivable, description: e.target.value }
-                                    setFormData({ ...formData, accountsReceivable: newReceivables })
-                                  }}
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Terms</FormLabel>
-                                <Input
-                                  placeholder="Enter terms"
-                                  value={receivable.terms}
-                                  onChange={(e) => {
-                                    const newReceivables = [...formData.accountsReceivable]
-                                    newReceivables[index] = { ...receivable, terms: e.target.value }
-                                    setFormData({ ...formData, accountsReceivable: newReceivables })
-                                  }}
-                                />
-                              </FormControl>
-                              {index > 0 && (
-                                <Button
-                                  aria-label="Remove account receivable"
-                                  onClick={() => {
-                                    const newReceivables = formData.accountsReceivable.filter((_, i) => i !== index)
-                                    setFormData({ ...formData, accountsReceivable: newReceivables })
-                                  }}
-                                  colorScheme="red"
-                                  variant="ghost"
-                                  alignSelf="flex-end"
-                                >
-                                  Remove
-                                </Button>
-                              )}
-                            </Stack>
-                          </CardBody>
-                        </Card>
-                      ))}
+                      <FormControl>
+                        <FormLabel>How would you like to provide accounts receivable information?</FormLabel>
+                        <RadioGroup
+                          value={formData.preferManualEntry ? 'manual' : 'upload'}
+                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                        >
+                          <Stack direction="row" spacing={4}>
+                            <Radio value="upload">Upload Documents</Radio>
+                            <Radio value="manual">Enter Manually</Radio>
+                          </Stack>
+                        </RadioGroup>
+                      </FormControl>
 
-                      <Button
-                        onClick={() => setFormData({
-                          ...formData,
-                          accountsReceivable: [...formData.accountsReceivable, {
-                            customerName: '',
-                            amount: 0,
-                            dueDate: '',
-                            description: '',
-                            terms: ''
-                          }]
-                        })}
-                        size="sm"
-                        variant="outline"
-                      >
-                        + Add Another Account Receivable
-                      </Button>
+                      {!formData.preferManualEntry ? (
+                        <FormControl>
+                          <FormLabel>Upload Accounts Receivable Documents</FormLabel>
+                          <Text fontSize="sm" color="gray.600" mb={2}>
+                            Upload customer invoices, statements, or aging reports
+                          </Text>
+                          <Input
+                            type="file"
+                            multiple
+                            accept=".pdf,.xls,.xlsx,.csv"
+                            onChange={(e) => handleFileUpload('accountsReceivable', e.target.files)}
+                          />
+                          {formData.documents.accountsReceivable && formData.documents.accountsReceivable.length > 0 && (
+                            <FileList
+                              files={formData.documents.accountsReceivable}
+                              onRemove={(index) => handleFileRemove('accountsReceivable', index)}
+                            />
+                          )}
+                        </FormControl>
+                      ) : (
+                        <VStack spacing={4} mt={4} align="stretch">
+                          {formData.accountsReceivable.map((receivable, index) => (
+                            <Card key={index} variant="outline">
+                              <CardBody>
+                                <Stack spacing={4}>
+                                  <FormControl>
+                                    <FormLabel>Customer Name</FormLabel>
+                                    <Input
+                                      placeholder="Enter customer name"
+                                      value={receivable.customerName}
+                                      onChange={(e) => {
+                                        const newReceivables = [...formData.accountsReceivable]
+                                        newReceivables[index] = { ...receivable, customerName: e.target.value }
+                                        setFormData({ ...formData, accountsReceivable: newReceivables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Amount</FormLabel>
+                                    <NumberInput
+                                      min={0}
+                                      value={receivable.amount || undefined}
+                                      onChange={(_, valueNumber) => {
+                                        const newReceivables = [...formData.accountsReceivable]
+                                        newReceivables[index] = { ...receivable, amount: valueNumber || 0 }
+                                        setFormData({ ...formData, accountsReceivable: newReceivables })
+                                      }}
+                                    >
+                                      <NumberInputField placeholder="Enter amount" />
+                                    </NumberInput>
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Due Date</FormLabel>
+                                    <Input
+                                      type="date"
+                                      value={receivable.dueDate}
+                                      onChange={(e) => {
+                                        const newReceivables = [...formData.accountsReceivable]
+                                        newReceivables[index] = { ...receivable, dueDate: e.target.value }
+                                        setFormData({ ...formData, accountsReceivable: newReceivables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Description</FormLabel>
+                                    <Input
+                                      placeholder="Enter description"
+                                      value={receivable.description}
+                                      onChange={(e) => {
+                                        const newReceivables = [...formData.accountsReceivable]
+                                        newReceivables[index] = { ...receivable, description: e.target.value }
+                                        setFormData({ ...formData, accountsReceivable: newReceivables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Terms</FormLabel>
+                                    <Input
+                                      placeholder="Enter terms"
+                                      value={receivable.terms}
+                                      onChange={(e) => {
+                                        const newReceivables = [...formData.accountsReceivable]
+                                        newReceivables[index] = { ...receivable, terms: e.target.value }
+                                        setFormData({ ...formData, accountsReceivable: newReceivables })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  {index > 0 && (
+                                    <Button
+                                      aria-label="Remove account receivable"
+                                      onClick={() => {
+                                        const newReceivables = formData.accountsReceivable.filter((_, i) => i !== index)
+                                        setFormData({ ...formData, accountsReceivable: newReceivables })
+                                      }}
+                                      colorScheme="red"
+                                      variant="ghost"
+                                      alignSelf="flex-end"
+                                    >
+                                      Remove
+                                    </Button>
+                                  )}
+                                </Stack>
+                              </CardBody>
+                            </Card>
+                          ))}
+
+                          <Button
+                            onClick={() => setFormData({
+                              ...formData,
+                              accountsReceivable: [...formData.accountsReceivable, {
+                                customerName: '',
+                                amount: 0,
+                                dueDate: '',
+                                description: '',
+                                terms: ''
+                              }]
+                            })}
+                            size="sm"
+                            variant="outline"
+                          >
+                            + Add Another Account Receivable
+                          </Button>
+                        </VStack>
+                      )}
                     </Stack>
                   </CardBody>
                 </Card>
@@ -968,111 +1354,147 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 <Card mt={4} variant="outline">
                   <CardBody>
                     <Stack spacing={4}>
-                      {formData.loans.map((loan, index) => (
-                        <Card key={index} variant="outline">
-                          <CardBody>
-                            <Stack spacing={4}>
-                              <FormControl>
-                                <FormLabel>Purpose</FormLabel>
-                                <Input
-                                  placeholder="Enter purpose"
-                                  value={loan.purpose}
-                                  onChange={(e) => {
-                                    const newLoans = [...formData.loans]
-                                    newLoans[index] = { ...loan, purpose: e.target.value }
-                                    setFormData({ ...formData, loans: newLoans })
-                                  }}
-                                />
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Amount</FormLabel>
-                                <NumberInput
-                                  min={0}
-                                  value={loan.amount || undefined}
-                                  onChange={(_, valueNumber) => {
-                                    const newLoans = [...formData.loans]
-                                    newLoans[index] = { ...loan, amount: valueNumber || 0 }
-                                    setFormData({ ...formData, loans: newLoans })
-                                  }}
-                                >
-                                  <NumberInputField placeholder="Enter amount" />
-                                </NumberInput>
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Interest Rate</FormLabel>
-                                <NumberInput
-                                  min={0}
-                                  value={loan.interestRate || undefined}
-                                  onChange={(_, valueNumber) => {
-                                    const newLoans = [...formData.loans]
-                                    newLoans[index] = { ...loan, interestRate: valueNumber || 0 }
-                                    setFormData({ ...formData, loans: newLoans })
-                                  }}
-                                >
-                                  <NumberInputField placeholder="Enter interest rate" />
-                                </NumberInput>
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Monthly Payment</FormLabel>
-                                <NumberInput
-                                  min={0}
-                                  value={loan.monthlyPayment || undefined}
-                                  onChange={(_, valueNumber) => {
-                                    const newLoans = [...formData.loans]
-                                    newLoans[index] = { ...loan, monthlyPayment: valueNumber || 0 }
-                                    setFormData({ ...formData, loans: newLoans })
-                                  }}
-                                >
-                                  <NumberInputField placeholder="Enter monthly payment" />
-                                </NumberInput>
-                              </FormControl>
-                              <FormControl>
-                                <FormLabel>Start Date</FormLabel>
-                                <Input
-                                  type="date"
-                                  value={loan.startDate}
-                                  onChange={(e) => {
-                                    const newLoans = [...formData.loans]
-                                    newLoans[index] = { ...loan, startDate: e.target.value }
-                                    setFormData({ ...formData, loans: newLoans })
-                                  }}
-                                />
-                              </FormControl>
-                              {index > 0 && (
-                                <Button
-                                  aria-label="Remove loan"
-                                  onClick={() => {
-                                    const newLoans = formData.loans.filter((_, i) => i !== index)
-                                    setFormData({ ...formData, loans: newLoans })
-                                  }}
-                                  colorScheme="red"
-                                  variant="ghost"
-                                  alignSelf="flex-end"
-                                >
-                                  Remove
-                                </Button>
-                              )}
-                            </Stack>
-                          </CardBody>
-                        </Card>
-                      ))}
+                      <FormControl>
+                        <FormLabel>How would you like to provide loans information?</FormLabel>
+                        <RadioGroup
+                          value={formData.preferManualEntry ? 'manual' : 'upload'}
+                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                        >
+                          <Stack direction="row" spacing={4}>
+                            <Radio value="upload">Upload Documents</Radio>
+                            <Radio value="manual">Enter Manually</Radio>
+                          </Stack>
+                        </RadioGroup>
+                      </FormControl>
 
-                      <Button
-                        onClick={() => setFormData({
-                          ...formData,
-                          loans: [...formData.loans, {
-                            purpose: '',
-                            amount: 0,
-                            interestRate: 0,
-                            monthlyPayment: 0,
-                            startDate: ''
-                          }]
-                        })}
-                        size="sm"
-                        variant="outline"
-                      >
-                        + Add Another Loan
-                      </Button>
+                      {!formData.preferManualEntry ? (
+                        <FormControl>
+                          <FormLabel>Upload Loan Documents</FormLabel>
+                          <Text fontSize="sm" color="gray.600" mb={2}>
+                            Upload loan agreements, statements, or repayment schedules
+                          </Text>
+                          <Input
+                            type="file"
+                            multiple
+                            accept=".pdf,.doc,.docx"
+                            onChange={(e) => handleFileUpload('loans', e.target.files)}
+                          />
+                          {formData.documents.loans && formData.documents.loans.length > 0 && (
+                            <FileList
+                              files={formData.documents.loans}
+                              onRemove={(index) => handleFileRemove('loans', index)}
+                            />
+                          )}
+                        </FormControl>
+                      ) : (
+                        <VStack spacing={4} mt={4} align="stretch">
+                          {formData.loans.map((loan, index) => (
+                            <Card key={index} variant="outline">
+                              <CardBody>
+                                <Stack spacing={4}>
+                                  <FormControl>
+                                    <FormLabel>Purpose</FormLabel>
+                                    <Input
+                                      placeholder="Enter purpose"
+                                      value={loan.purpose}
+                                      onChange={(e) => {
+                                        const newLoans = [...formData.loans]
+                                        newLoans[index] = { ...loan, purpose: e.target.value }
+                                        setFormData({ ...formData, loans: newLoans })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Amount</FormLabel>
+                                    <NumberInput
+                                      min={0}
+                                      value={loan.amount || undefined}
+                                      onChange={(_, valueNumber) => {
+                                        const newLoans = [...formData.loans]
+                                        newLoans[index] = { ...loan, amount: valueNumber || 0 }
+                                        setFormData({ ...formData, loans: newLoans })
+                                      }}
+                                    >
+                                      <NumberInputField placeholder="Enter amount" />
+                                    </NumberInput>
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Interest Rate</FormLabel>
+                                    <NumberInput
+                                      min={0}
+                                      value={loan.interestRate || undefined}
+                                      onChange={(_, valueNumber) => {
+                                        const newLoans = [...formData.loans]
+                                        newLoans[index] = { ...loan, interestRate: valueNumber || 0 }
+                                        setFormData({ ...formData, loans: newLoans })
+                                      }}
+                                    >
+                                      <NumberInputField placeholder="Enter interest rate" />
+                                    </NumberInput>
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Monthly Payment</FormLabel>
+                                    <NumberInput
+                                      min={0}
+                                      value={loan.monthlyPayment || undefined}
+                                      onChange={(_, valueNumber) => {
+                                        const newLoans = [...formData.loans]
+                                        newLoans[index] = { ...loan, monthlyPayment: valueNumber || 0 }
+                                        setFormData({ ...formData, loans: newLoans })
+                                      }}
+                                    >
+                                      <NumberInputField placeholder="Enter monthly payment" />
+                                    </NumberInput>
+                                  </FormControl>
+                                  <FormControl>
+                                    <FormLabel>Start Date</FormLabel>
+                                    <Input
+                                      type="date"
+                                      value={loan.startDate}
+                                      onChange={(e) => {
+                                        const newLoans = [...formData.loans]
+                                        newLoans[index] = { ...loan, startDate: e.target.value }
+                                        setFormData({ ...formData, loans: newLoans })
+                                      }}
+                                    />
+                                  </FormControl>
+                                  {index > 0 && (
+                                    <Button
+                                      aria-label="Remove loan"
+                                      onClick={() => {
+                                        const newLoans = formData.loans.filter((_, i) => i !== index)
+                                        setFormData({ ...formData, loans: newLoans })
+                                      }}
+                                      colorScheme="red"
+                                      variant="ghost"
+                                      alignSelf="flex-end"
+                                    >
+                                      Remove
+                                    </Button>
+                                  )}
+                                </Stack>
+                              </CardBody>
+                            </Card>
+                          ))}
+
+                          <Button
+                            onClick={() => setFormData({
+                              ...formData,
+                              loans: [...formData.loans, {
+                                purpose: '',
+                                amount: 0,
+                                interestRate: 0,
+                                monthlyPayment: 0,
+                                startDate: ''
+                              }]
+                            })}
+                            size="sm"
+                            variant="outline"
+                          >
+                            + Add Another Loan
+                          </Button>
+                        </VStack>
+                      )}
                     </Stack>
                   </CardBody>
                 </Card>
@@ -1100,33 +1522,69 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                   <CardBody>
                     <Stack spacing={4}>
                       <FormControl>
-                        <FormLabel>TRN (Tax Registration Number)</FormLabel>
-                        <Input
-                          placeholder="Enter your TRN"
-                          value={formData.trn}
-                          onChange={(e) => setFormData({ ...formData, trn: e.target.value })}
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel>VAT Filing Frequency</FormLabel>
+                        <FormLabel>How would you like to provide VAT registration information?</FormLabel>
                         <RadioGroup
-                          value={formData.vatFrequency}
-                          onChange={(value) => setFormData({ ...formData, vatFrequency: value })}
+                          value={formData.preferManualEntry ? 'manual' : 'upload'}
+                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
                         >
                           <Stack direction="row" spacing={4}>
-                            <Radio value="monthly">Monthly</Radio>
-                            <Radio value="quarterly">Quarterly</Radio>
+                            <Radio value="upload">Upload Documents</Radio>
+                            <Radio value="manual">Enter Manually</Radio>
                           </Stack>
                         </RadioGroup>
                       </FormControl>
 
-                      <Checkbox
-                        isChecked={formData.trackVat}
-                        onChange={(e) => setFormData({ ...formData, trackVat: e.target.checked })}
-                      >
-                        Track VAT on sales and purchases
-                      </Checkbox>
+                      {!formData.preferManualEntry ? (
+                        <FormControl>
+                          <FormLabel>Upload VAT Documents</FormLabel>
+                          <Text fontSize="sm" color="gray.600" mb={2}>
+                            Upload VAT registration certificate and recent returns
+                          </Text>
+                          <Input
+                            type="file"
+                            multiple
+                            accept=".pdf,.jpg,.png"
+                            onChange={(e) => handleFileUpload('vatRegistration', e.target.files)}
+                          />
+                          {formData.documents.vatRegistration && formData.documents.vatRegistration.length > 0 && (
+                            <FileList
+                              files={formData.documents.vatRegistration}
+                              onRemove={(index) => handleFileRemove('vatRegistration', index)}
+                            />
+                          )}
+                        </FormControl>
+                      ) : (
+                        <VStack spacing={4} mt={4} align="stretch">
+                          <FormControl>
+                            <FormLabel>TRN (Tax Registration Number)</FormLabel>
+                            <Input
+                              placeholder="Enter your TRN"
+                              value={formData.trn}
+                              onChange={(e) => setFormData({ ...formData, trn: e.target.value })}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>VAT Filing Frequency</FormLabel>
+                            <RadioGroup
+                              value={formData.vatFrequency}
+                              onChange={(value) => setFormData({ ...formData, vatFrequency: value })}
+                            >
+                              <Stack direction="row" spacing={4}>
+                                <Radio value="monthly">Monthly</Radio>
+                                <Radio value="quarterly">Quarterly</Radio>
+                              </Stack>
+                            </RadioGroup>
+                          </FormControl>
+
+                          <Checkbox
+                            isChecked={formData.trackVat}
+                            onChange={(e) => setFormData({ ...formData, trackVat: e.target.checked })}
+                          >
+                            Track VAT on sales and purchases
+                          </Checkbox>
+                        </VStack>
+                      )}
                     </Stack>
                   </CardBody>
                 </Card>
