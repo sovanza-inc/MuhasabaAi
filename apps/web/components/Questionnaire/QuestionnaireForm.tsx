@@ -54,6 +54,22 @@ interface OutstandingBalance {
   description: string
 }
 
+interface AccountPayable {
+  vendorName: string
+  amount: number
+  dueDate: string
+  description: string
+  terms: string
+}
+
+interface AccountReceivable {
+  customerName: string
+  amount: number
+  dueDate: string
+  description: string
+  terms: string
+}
+
 interface FormData {
   productType: string
   cogsCategories: Array<{ type: string; description: string }>
@@ -65,6 +81,10 @@ interface FormData {
   fixedAssets: FixedAsset[]
   hasLoans: boolean
   loans: Loan[]
+  hasAccountsPayable: boolean
+  accountsPayable: AccountPayable[]
+  hasAccountsReceivable: boolean
+  accountsReceivable: AccountReceivable[]
   paymentType: string
   outstandingBalances: OutstandingBalance[]
   isVatRegistered: boolean
@@ -106,6 +126,22 @@ export function QuestionnaireForm({ onComplete }: QuestionnaireFormProps) {
       interestRate: 0,
       monthlyPayment: 0,
       startDate: ''
+    }],
+    hasAccountsPayable: false,
+    accountsPayable: [{
+      vendorName: '',
+      amount: 0,
+      dueDate: '',
+      description: '',
+      terms: ''
+    }],
+    hasAccountsReceivable: false,
+    accountsReceivable: [{
+      customerName: '',
+      amount: 0,
+      dueDate: '',
+      description: '',
+      terms: ''
     }],
     paymentType: '',
     outstandingBalances: [{
@@ -155,6 +191,46 @@ export function QuestionnaireForm({ onComplete }: QuestionnaireFormProps) {
           asset.purchaseDate && 
           asset.depreciationMethod && 
           asset.usefulLife > 0
+        )
+      },
+    },
+    {
+      title: 'Accounts Payable',
+      description: 'Money owed to vendors',
+      isComplete: () => {
+        if (!formData.hasAccountsPayable) return true
+        return formData.accountsPayable.some(payable => 
+          payable.vendorName && 
+          payable.amount > 0 && 
+          payable.dueDate && 
+          payable.terms
+        )
+      },
+    },
+    {
+      title: 'Accounts Receivable',
+      description: 'Money owed by customers',
+      isComplete: () => {
+        if (!formData.hasAccountsReceivable) return true
+        return formData.accountsReceivable.some(receivable => 
+          receivable.customerName && 
+          receivable.amount > 0 && 
+          receivable.dueDate && 
+          receivable.terms
+        )
+      },
+    },
+    {
+      title: 'Loans',
+      description: 'Business loans and financing',
+      isComplete: () => {
+        if (!formData.hasLoans) return true
+        return formData.loans.some(loan => 
+          loan.purpose && 
+          loan.amount > 0 && 
+          loan.interestRate > 0 && 
+          loan.monthlyPayment > 0 && 
+          loan.startDate
         )
       },
     },
@@ -620,6 +696,391 @@ export function QuestionnaireForm({ onComplete }: QuestionnaireFormProps) {
         )
 
       case 4:
+        return (
+          <VStack spacing={6} align="stretch">
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={formData.hasAccountsPayable}
+                  onChange={(e) => setFormData({ ...formData, hasAccountsPayable: e.target.checked })}
+                  size="lg"
+                >
+                  Do you have accounts payable?
+                </Checkbox>
+              </HStack>
+
+              {formData.hasAccountsPayable && (
+                <Card mt={4} variant="outline">
+                  <CardBody>
+                    <Stack spacing={4}>
+                      {formData.accountsPayable.map((payable, index) => (
+                        <Card key={index} variant="outline">
+                          <CardBody>
+                            <Stack spacing={4}>
+                              <FormControl>
+                                <FormLabel>Vendor Name</FormLabel>
+                                <Input
+                                  placeholder="Enter vendor name"
+                                  value={payable.vendorName}
+                                  onChange={(e) => {
+                                    const newPayables = [...formData.accountsPayable]
+                                    newPayables[index] = { ...payable, vendorName: e.target.value }
+                                    setFormData({ ...formData, accountsPayable: newPayables })
+                                  }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Amount</FormLabel>
+                                <NumberInput
+                                  min={0}
+                                  value={payable.amount || undefined}
+                                  onChange={(_, valueNumber) => {
+                                    const newPayables = [...formData.accountsPayable]
+                                    newPayables[index] = { ...payable, amount: valueNumber || 0 }
+                                    setFormData({ ...formData, accountsPayable: newPayables })
+                                  }}
+                                >
+                                  <NumberInputField placeholder="Enter amount" />
+                                </NumberInput>
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Due Date</FormLabel>
+                                <Input
+                                  type="date"
+                                  value={payable.dueDate}
+                                  onChange={(e) => {
+                                    const newPayables = [...formData.accountsPayable]
+                                    newPayables[index] = { ...payable, dueDate: e.target.value }
+                                    setFormData({ ...formData, accountsPayable: newPayables })
+                                  }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Description</FormLabel>
+                                <Input
+                                  placeholder="Enter description"
+                                  value={payable.description}
+                                  onChange={(e) => {
+                                    const newPayables = [...formData.accountsPayable]
+                                    newPayables[index] = { ...payable, description: e.target.value }
+                                    setFormData({ ...formData, accountsPayable: newPayables })
+                                  }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Terms</FormLabel>
+                                <Input
+                                  placeholder="Enter terms"
+                                  value={payable.terms}
+                                  onChange={(e) => {
+                                    const newPayables = [...formData.accountsPayable]
+                                    newPayables[index] = { ...payable, terms: e.target.value }
+                                    setFormData({ ...formData, accountsPayable: newPayables })
+                                  }}
+                                />
+                              </FormControl>
+                              {index > 0 && (
+                                <Button
+                                  aria-label="Remove account payable"
+                                  onClick={() => {
+                                    const newPayables = formData.accountsPayable.filter((_, i) => i !== index)
+                                    setFormData({ ...formData, accountsPayable: newPayables })
+                                  }}
+                                  colorScheme="red"
+                                  variant="ghost"
+                                  alignSelf="flex-end"
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </Stack>
+                          </CardBody>
+                        </Card>
+                      ))}
+
+                      <Button
+                        onClick={() => setFormData({
+                          ...formData,
+                          accountsPayable: [...formData.accountsPayable, {
+                            vendorName: '',
+                            amount: 0,
+                            dueDate: '',
+                            description: '',
+                            terms: ''
+                          }]
+                        })}
+                        size="sm"
+                        variant="outline"
+                      >
+                        + Add Another Account Payable
+                      </Button>
+                    </Stack>
+                  </CardBody>
+                </Card>
+              )}
+            </FormControl>
+          </VStack>
+        )
+
+      case 5:
+        return (
+          <VStack spacing={6} align="stretch">
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={formData.hasAccountsReceivable}
+                  onChange={(e) => setFormData({ ...formData, hasAccountsReceivable: e.target.checked })}
+                  size="lg"
+                >
+                  Do you have accounts receivable?
+                </Checkbox>
+              </HStack>
+
+              {formData.hasAccountsReceivable && (
+                <Card mt={4} variant="outline">
+                  <CardBody>
+                    <Stack spacing={4}>
+                      {formData.accountsReceivable.map((receivable, index) => (
+                        <Card key={index} variant="outline">
+                          <CardBody>
+                            <Stack spacing={4}>
+                              <FormControl>
+                                <FormLabel>Customer Name</FormLabel>
+                                <Input
+                                  placeholder="Enter customer name"
+                                  value={receivable.customerName}
+                                  onChange={(e) => {
+                                    const newReceivables = [...formData.accountsReceivable]
+                                    newReceivables[index] = { ...receivable, customerName: e.target.value }
+                                    setFormData({ ...formData, accountsReceivable: newReceivables })
+                                  }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Amount</FormLabel>
+                                <NumberInput
+                                  min={0}
+                                  value={receivable.amount || undefined}
+                                  onChange={(_, valueNumber) => {
+                                    const newReceivables = [...formData.accountsReceivable]
+                                    newReceivables[index] = { ...receivable, amount: valueNumber || 0 }
+                                    setFormData({ ...formData, accountsReceivable: newReceivables })
+                                  }}
+                                >
+                                  <NumberInputField placeholder="Enter amount" />
+                                </NumberInput>
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Due Date</FormLabel>
+                                <Input
+                                  type="date"
+                                  value={receivable.dueDate}
+                                  onChange={(e) => {
+                                    const newReceivables = [...formData.accountsReceivable]
+                                    newReceivables[index] = { ...receivable, dueDate: e.target.value }
+                                    setFormData({ ...formData, accountsReceivable: newReceivables })
+                                  }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Description</FormLabel>
+                                <Input
+                                  placeholder="Enter description"
+                                  value={receivable.description}
+                                  onChange={(e) => {
+                                    const newReceivables = [...formData.accountsReceivable]
+                                    newReceivables[index] = { ...receivable, description: e.target.value }
+                                    setFormData({ ...formData, accountsReceivable: newReceivables })
+                                  }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Terms</FormLabel>
+                                <Input
+                                  placeholder="Enter terms"
+                                  value={receivable.terms}
+                                  onChange={(e) => {
+                                    const newReceivables = [...formData.accountsReceivable]
+                                    newReceivables[index] = { ...receivable, terms: e.target.value }
+                                    setFormData({ ...formData, accountsReceivable: newReceivables })
+                                  }}
+                                />
+                              </FormControl>
+                              {index > 0 && (
+                                <Button
+                                  aria-label="Remove account receivable"
+                                  onClick={() => {
+                                    const newReceivables = formData.accountsReceivable.filter((_, i) => i !== index)
+                                    setFormData({ ...formData, accountsReceivable: newReceivables })
+                                  }}
+                                  colorScheme="red"
+                                  variant="ghost"
+                                  alignSelf="flex-end"
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </Stack>
+                          </CardBody>
+                        </Card>
+                      ))}
+
+                      <Button
+                        onClick={() => setFormData({
+                          ...formData,
+                          accountsReceivable: [...formData.accountsReceivable, {
+                            customerName: '',
+                            amount: 0,
+                            dueDate: '',
+                            description: '',
+                            terms: ''
+                          }]
+                        })}
+                        size="sm"
+                        variant="outline"
+                      >
+                        + Add Another Account Receivable
+                      </Button>
+                    </Stack>
+                  </CardBody>
+                </Card>
+              )}
+            </FormControl>
+          </VStack>
+        )
+
+      case 6:
+        return (
+          <VStack spacing={6} align="stretch">
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={formData.hasLoans}
+                  onChange={(e) => setFormData({ ...formData, hasLoans: e.target.checked })}
+                  size="lg"
+                >
+                  Do you have any loans or financing?
+                </Checkbox>
+              </HStack>
+
+              {formData.hasLoans && (
+                <Card mt={4} variant="outline">
+                  <CardBody>
+                    <Stack spacing={4}>
+                      {formData.loans.map((loan, index) => (
+                        <Card key={index} variant="outline">
+                          <CardBody>
+                            <Stack spacing={4}>
+                              <FormControl>
+                                <FormLabel>Purpose</FormLabel>
+                                <Input
+                                  placeholder="Enter purpose"
+                                  value={loan.purpose}
+                                  onChange={(e) => {
+                                    const newLoans = [...formData.loans]
+                                    newLoans[index] = { ...loan, purpose: e.target.value }
+                                    setFormData({ ...formData, loans: newLoans })
+                                  }}
+                                />
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Amount</FormLabel>
+                                <NumberInput
+                                  min={0}
+                                  value={loan.amount || undefined}
+                                  onChange={(_, valueNumber) => {
+                                    const newLoans = [...formData.loans]
+                                    newLoans[index] = { ...loan, amount: valueNumber || 0 }
+                                    setFormData({ ...formData, loans: newLoans })
+                                  }}
+                                >
+                                  <NumberInputField placeholder="Enter amount" />
+                                </NumberInput>
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Interest Rate</FormLabel>
+                                <NumberInput
+                                  min={0}
+                                  value={loan.interestRate || undefined}
+                                  onChange={(_, valueNumber) => {
+                                    const newLoans = [...formData.loans]
+                                    newLoans[index] = { ...loan, interestRate: valueNumber || 0 }
+                                    setFormData({ ...formData, loans: newLoans })
+                                  }}
+                                >
+                                  <NumberInputField placeholder="Enter interest rate" />
+                                </NumberInput>
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Monthly Payment</FormLabel>
+                                <NumberInput
+                                  min={0}
+                                  value={loan.monthlyPayment || undefined}
+                                  onChange={(_, valueNumber) => {
+                                    const newLoans = [...formData.loans]
+                                    newLoans[index] = { ...loan, monthlyPayment: valueNumber || 0 }
+                                    setFormData({ ...formData, loans: newLoans })
+                                  }}
+                                >
+                                  <NumberInputField placeholder="Enter monthly payment" />
+                                </NumberInput>
+                              </FormControl>
+                              <FormControl>
+                                <FormLabel>Start Date</FormLabel>
+                                <Input
+                                  type="date"
+                                  value={loan.startDate}
+                                  onChange={(e) => {
+                                    const newLoans = [...formData.loans]
+                                    newLoans[index] = { ...loan, startDate: e.target.value }
+                                    setFormData({ ...formData, loans: newLoans })
+                                  }}
+                                />
+                              </FormControl>
+                              {index > 0 && (
+                                <Button
+                                  aria-label="Remove loan"
+                                  onClick={() => {
+                                    const newLoans = formData.loans.filter((_, i) => i !== index)
+                                    setFormData({ ...formData, loans: newLoans })
+                                  }}
+                                  colorScheme="red"
+                                  variant="ghost"
+                                  alignSelf="flex-end"
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </Stack>
+                          </CardBody>
+                        </Card>
+                      ))}
+
+                      <Button
+                        onClick={() => setFormData({
+                          ...formData,
+                          loans: [...formData.loans, {
+                            purpose: '',
+                            amount: 0,
+                            interestRate: 0,
+                            monthlyPayment: 0,
+                            startDate: ''
+                          }]
+                        })}
+                        size="sm"
+                        variant="outline"
+                      >
+                        + Add Another Loan
+                      </Button>
+                    </Stack>
+                  </CardBody>
+                </Card>
+              )}
+            </FormControl>
+          </VStack>
+        )
+
+      case 7:
         return (
           <VStack spacing={6} align="stretch">
             <FormControl>
