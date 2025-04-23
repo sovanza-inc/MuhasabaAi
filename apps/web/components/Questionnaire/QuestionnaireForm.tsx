@@ -27,6 +27,7 @@ import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspac
 
 interface QuestionnaireFormProps {
   onComplete: () => void
+  initialData?: FormData
 }
 
 interface FixedAsset {
@@ -96,14 +97,14 @@ interface FormData {
   operatingSince: number
 }
 
-export function QuestionnaireForm({ onComplete }: QuestionnaireFormProps) {
+export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireFormProps) {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
   const [isSubmitting, setIsSubmitting] = React.useState(false)
   const [currentStep, setCurrentStep] = React.useState(0)
 
   // Form state
-  const [formData, setFormData] = React.useState<FormData>({
+  const [formData, setFormData] = React.useState<FormData>(initialData || {
     productType: '',
     cogsCategories: [{ type: '', description: '' }],
     calculateCogs: false,
