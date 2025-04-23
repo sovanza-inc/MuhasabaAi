@@ -172,6 +172,14 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 icon={<LuWallet />}
                 hotkey="navigation.bankIntegrations"
               />
+              
+              <AppSidebarLink
+                href={usePath('questionnaire-edit')}
+                isActive={useActivePath('questionnaire-edit', { end: false })}
+                label="Questionnaire"
+                icon={<LuFileText />}
+                hotkey="navigation.questionnaire"
+              />
 
               {/* Parent Accounting Item */}
               <NavItem

@@ -100,14 +100,31 @@ export async function POST(request: NextRequest) {
       }))
     }
 
-    // Save responses to database with a generated id and user_id
-    await db.insert(questionnaireResponses).values({
-      id: generateId(),
-      workspaceId,
-      userId: session.user.id,
-      responses: responsesForStorage,
-      systemPrompt,
+    // Check if a record already exists for this workspace
+    const existingResponse = await db.query.questionnaireResponses.findFirst({
+      where: eq(questionnaireResponses.workspaceId, workspaceId),
+      orderBy: [desc(questionnaireResponses.createdAt)],
     })
+
+    if (existingResponse) {
+      // Update existing record
+      await db.update(questionnaireResponses)
+        .set({
+          responses: responsesForStorage,
+          systemPrompt,
+          updatedAt: new Date(),
+        })
+        .where(eq(questionnaireResponses.id, existingResponse.id))
+    } else {
+      // Create new record
+      await db.insert(questionnaireResponses).values({
+        id: generateId(),
+        workspaceId,
+        userId: session.user.id,
+        responses: responsesForStorage,
+        systemPrompt,
+      })
+    }
 
     return NextResponse.json({ success: true })
   } catch (error) {
