@@ -133,170 +133,211 @@ export default function ProfitLossPage() {
     selectBank(bankId);
   };
 
+  // Helper function to format currency values
+  const formatCurrency = (value: number | string | undefined, defaultValue: string = '-'): string => {
+    if (value === undefined || value === null) return defaultValue;
+    const numValue = typeof value === 'string' ? parseFloat(value) : value;
+    if (isNaN(numValue)) return defaultValue;
+    
+    // Format with thousands separator and handle negative numbers
+    const isNegative = numValue < 0;
+    const formatted = Math.abs(numValue).toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+    return isNegative ? `(${formatted})` : formatted;
+  };
+
+  // Helper function to calculate year-over-year change
+  const calculateYoYChange = (currentYear: number, previousYear: number): string => {
+    if (!previousYear) return '-';
+    const change = ((currentYear - previousYear) / previousYear) * 100;
+    return `${change.toFixed(1)}%`;
+  };
+
   const handleExportPDF = async () => {
-    if (!contentRef.current) return;
+    if (!contentRef.current || !logoRef.current) return;
 
     try {
-      // Create a temporary container to hold all content
-      const tempContainer = document.createElement('div');
-      tempContainer.style.position = 'absolute';
-      tempContainer.style.left = '-9999px';
-      tempContainer.style.top = '-9999px';
-      tempContainer.style.width = '1024px'; // Fixed width for consistent rendering
-
-      // Add logo image to the container
-      const logoImg = document.createElement('img');
-      logoImg.src = logoRef.current?.src || '';
-      logoImg.style.display = 'none';
-      tempContainer.appendChild(logoImg);
-
-      document.body.appendChild(tempContainer);
-
-      // Clone the content
-      const contentClone = contentRef.current.cloneNode(true) as HTMLElement;
-      
-      // Remove the summary footer from the cloned content before PDF generation
-      const summaryFooterInClone = contentClone.querySelector('[data-summary-footer]');
-      if (summaryFooterInClone) {
-        summaryFooterInClone.remove();
-      }
-      
-      tempContainer.appendChild(contentClone);
-
-      // Generate PDF
-      const canvas = await html2canvas(tempContainer, {
-        scale: 2,
-        logging: false,
-        useCORS: true,
-        width: 1024,
-        height: tempContainer.offsetHeight,
-        windowWidth: 1024,
-        windowHeight: tempContainer.offsetHeight
-      });
-
-      // Clean up
-      document.body.removeChild(tempContainer);
-
-      const imgWidth = 190; // Reduced from 210 to add margins
-      const pageHeight = 297; // A4 height in mm
-      const marginX = 10; // Left and right margins in mm
-      const marginY = 20; // Top margin
-      const footerMargin = 15; // Bottom margin for page numbers
-      const headerHeight = 15; // Height for header
-      const pageNumberHeight = 15; // Height reserved for page numbers
-      const contentStartY = marginY + headerHeight; // Y position where content starts
-      
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
       const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.width;
+      const pageHeight = pdf.internal.pageSize.height;
+      const margin = 20;
+      const contentWidth = pageWidth - (2 * margin);
 
-      // Function to add header to each page
-      async function addHeader(pageNum: number): Promise<void> {
+      // Helper function to format amounts consistently
+      const formatAmount = (amount: number) => {
+        const absAmount = Math.abs(amount);
+        const formatted = absAmount.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        return amount < 0 ? `(${formatted})` : formatted;
+      };
+
+      // Helper function to add header with consistent styling
+      const addHeader = async (pageNum: number) => {
         pdf.setPage(pageNum);
 
+        // Add logo on the right
         try {
-          if (logoImg.complete && logoImg.naturalWidth > 0) {
-            // Convert logo to data URL
-            const tempCanvas = document.createElement('canvas');
-            tempCanvas.width = logoImg.naturalWidth;
-            tempCanvas.height = logoImg.naturalHeight;
-            const tempCtx = tempCanvas.getContext('2d');
-            
-            if (tempCtx) {
-              tempCtx.drawImage(logoImg, 0, 0);
-              const logoData = tempCanvas.toDataURL('image/png');
-              
-              // Add logo at the top center with proper aspect ratio
-              const logoWidth = 34; // Width in mm
-              const aspectRatio = logoImg.naturalWidth / logoImg.naturalHeight;
-              const logoHeight = logoWidth / aspectRatio; // Height adjusted by aspect ratio
-              const logoX = (pdf.internal.pageSize.width - logoWidth) / 2;
-              pdf.addImage(logoData, 'PNG', logoX, 5, logoWidth, logoHeight);
-            }
+          const logoCanvas = document.createElement('canvas');
+          const logoCtx = logoCanvas.getContext('2d');
+          if (logoCtx && logoRef.current) {
+            logoCanvas.width = logoRef.current.naturalWidth;
+            logoCanvas.height = logoRef.current.naturalHeight;
+            logoCtx.drawImage(logoRef.current, 0, 0);
+            const logoData = logoCanvas.toDataURL('image/png');
+            const logoWidth = 40;
+            const aspectRatio = logoRef.current.naturalWidth / logoRef.current.naturalHeight;
+            const logoHeight = logoWidth / aspectRatio;
+            const logoX = pageWidth - margin - logoWidth;
+            pdf.addImage(logoData, 'PNG', logoX, margin - 5, logoWidth, logoHeight);
           }
         } catch (error) {
           console.error('Error adding logo:', error);
-          // Continue without logo if there's an error
         }
 
-        // Add title and date below logo position regardless of logo loading success
-        pdf.setFontSize(16);
-        pdf.setTextColor(0, 0, 0);
-        pdf.text('Profit & Loss Report', pdf.internal.pageSize.width / 2, marginY + 5, { align: 'center' });
+        // Add title and date with consistent styling
+        pdf.setFontSize(18);
+        pdf.setFont('helvetica', 'bold');
+        pdf.text('Muhasaba', margin, margin + 5);
+        
+        pdf.setFontSize(14);
+        pdf.text('PROFIT AND LOSS STATEMENT', margin, margin + 12);
         
         pdf.setFontSize(10);
-        pdf.text(`Generated on: ${new Date().toLocaleDateString()}`, pdf.internal.pageSize.width / 2, marginY + 10, { align: 'center' });
-      }
-
-      // Function to add footer to each page
-      function addFooter(pageNum: number, totalPages: number): void {
-        pdf.setPage(pageNum);
-        pdf.setFontSize(10);
-        pdf.setTextColor(100);
-        pdf.text(`Page ${pageNum} of ${totalPages}`, pdf.internal.pageSize.width / 2, pdf.internal.pageSize.height - (footerMargin / 2), { align: 'center' });
-      }
-
-      // Split content into pages
-      let pageNum = 1;
-      let currentY = contentStartY;
-      let remainingHeight = imgHeight;
-
-      while (remainingHeight > 0) {
-        if (pageNum > 1) {
-          pdf.addPage();
-          currentY = contentStartY;
-        }
-
-        await addHeader(pageNum);
-
-        // Calculate available height for content on this page
-        const availableHeight = pageHeight - currentY - footerMargin - pageNumberHeight;
-        const heightToDraw = Math.min(remainingHeight, availableHeight);
-
-        // Calculate the portion of the image to draw
-        const sourceY = ((imgHeight - remainingHeight) / imgHeight) * canvas.height;
-        const sourceHeight = (heightToDraw / imgHeight) * canvas.height;
-
-        // Create a temporary canvas for the portion we want to draw
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = canvas.width;
-        tempCanvas.height = sourceHeight;
-        const tempCtx = tempCanvas.getContext('2d');
+        pdf.setFont('helvetica', 'normal');
+        const currentDate = new Date();
+        const year = currentDate.getFullYear();
+        const month = currentDate.toLocaleString('default', { month: 'long' });
+        const day = currentDate.getDate();
+        pdf.text(`For the Period Ended ${month} ${day}, ${year}`, margin, margin + 18);
         
-        if (tempCtx) {
-          tempCtx.drawImage(
-            canvas, 
-            0, sourceY, canvas.width, sourceHeight, 
-            0, 0, canvas.width, sourceHeight
-          );
+        // Add column headers with consistent styling
+        const startY = margin + 30;
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'bold');
+        
+        // Column headers with consistent alignment
+        pdf.text('Description', margin, startY);
+        pdf.text('Note', pageWidth - margin - 60, startY);
+        pdf.text('Amount', pageWidth - margin, startY, { align: 'right' });
+        
+        // Consistent header underline
+        pdf.setLineWidth(0.2);
+        pdf.line(margin, startY + 1, pageWidth - margin, startY + 1);
+        
+        return startY + 8;
+      };
+
+      // Helper function to add section with consistent styling
+      const addSection = (title: string, items: any[], startY: number) => {
+        let currentY = startY;
+        
+        // Section title with consistent styling
+        pdf.setFont('helvetica', 'bold');
+        pdf.setFontSize(11);
+        pdf.text(title, margin, currentY);
+        currentY += 6;
+        
+        // Items with consistent styling
+        pdf.setFontSize(10);
+        pdf.setFont('helvetica', 'normal');
+        items.forEach(item => {
+          const xPos = margin + (item.indent || 0) * 5;
           
-          // Draw portion of content
-          const portionImgData = tempCanvas.toDataURL('image/png');
-          pdf.addImage(
-            portionImgData,
-            'PNG',
-            marginX,
-            currentY,
-            imgWidth,
-            heightToDraw
-          );
-        }
+          if (item.isTotal || item.isSubTotal) {
+            pdf.setFont('helvetica', 'bold');
+          }
+          
+          // Consistent text alignment
+          pdf.text(item.description, xPos, currentY);
+          if (item.note) {
+            pdf.text(item.note, pageWidth - margin - 60, currentY);
+          }
+          
+          const amountText = formatAmount(item.amount);
+          pdf.text(amountText, pageWidth - margin, currentY, { align: 'right' });
+          
+          // Consistent line styling for totals and subtotals
+          if (item.isTotal) {
+            pdf.setLineWidth(0.2);
+            pdf.line(pageWidth - margin - 70, currentY + 1, pageWidth - margin, currentY + 1);
+            pdf.line(pageWidth - margin - 70, currentY + 2, pageWidth - margin, currentY + 2);
+          } else if (item.isSubTotal) {
+            pdf.setLineWidth(0.2);
+            pdf.line(pageWidth - margin - 70, currentY + 1, pageWidth - margin, currentY + 1);
+          }
+          
+          pdf.setFont('helvetica', 'normal');
+          currentY += 6;
+        });
+        
+        return currentY + 4;
+      };
 
-        remainingHeight -= heightToDraw;
-        if (remainingHeight > 0) {
-          pageNum++;
-        }
+      // Keep your existing data processing logic here
+      let currentY = await addHeader(1);
+
+      if (!data) {
+        throw new Error('No data available for PDF generation');
       }
 
-      // Add page numbers to all pages
-      for (let i = 1; i <= pageNum; i++) {
-        addFooter(i, pageNum);
-      }
+      // Process revenues data
+      const revenuesItems = [
+        { description: 'Revenue', amount: 0 },
+        { 
+          description: 'Project Revenue', 
+          amount: parseFloat(data.revenues.projectCost.replace(/[^0-9.-]+/g, '')), 
+          indent: true 
+        },
+        { 
+          description: 'Total Revenue', 
+          amount: parseFloat(data.revenues.totalSpending.replace(/[^0-9.-]+/g, '')),
+          isSubTotal: true 
+        }
+      ];
+      currentY = addSection('REVENUES', revenuesItems, currentY);
 
-      pdf.save('profit-loss-report.pdf');
+      // Process expenses data
+      const expensesItems = [
+        { description: 'Expenses', amount: 0 },
+        { 
+          description: 'Project Expenses', 
+          amount: -parseFloat(data.expenses.projectCost.replace(/[^0-9.-]+/g, '')), 
+          indent: true 
+        },
+        { 
+          description: 'Total Expenses', 
+          amount: -parseFloat(data.expenses.totalSpending.replace(/[^0-9.-]+/g, '')),
+          isSubTotal: true 
+        }
+      ];
+      currentY = addSection('EXPENSES', expensesItems, currentY);
+
+      // Add net profit/loss
+      const netProfitItems = [
+        { 
+          description: 'NET PROFIT/(LOSS)', 
+          amount: parseFloat(data.netProfit.replace(/[^0-9.-]+/g, '')), 
+          isTotal: true 
+        }
+      ];
+      currentY = addSection('', netProfitItems, currentY);
+
+      // Add footer note
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'italic');
+      const footerNote = 'The accompanying notes are an integral part of these financial statements.';
+      pdf.text(footerNote, margin, pageHeight - margin);
+
+      // Save the PDF
+      pdf.save('profit-and-loss-statement.pdf');
 
       toast({
         title: "Export successful",
-        description: "Your profit and loss report has been downloaded",
+        description: "Your profit & loss statement has been downloaded",
         status: "success",
         duration: 3000,
         isClosable: true,
@@ -329,11 +370,11 @@ export default function ProfitLossPage() {
         <Image
           ref={logoRef}
           src="/img/onboarding/muhasaba-logo.png"
-          alt="Muhasaba Logo"
+          alt="Muhasaba"
           style={{ display: 'none' }}
           crossOrigin="anonymous"
-          width="120px"
-          height="auto"
+          width="30px"
+          height="15px"
         />
         
         <Box 
