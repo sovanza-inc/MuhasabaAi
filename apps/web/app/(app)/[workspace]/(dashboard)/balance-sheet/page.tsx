@@ -592,7 +592,7 @@ export default function BalanceSheetPage() {
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(11);
         pdf.text(title, margin, currentY);
-        currentY += 6;
+        currentY += 4;
         
         // Items with consistent styling
         pdf.setFontSize(10);
@@ -624,10 +624,10 @@ export default function BalanceSheetPage() {
           }
           
           pdf.setFont('helvetica', 'normal');
-          currentY += 6;
+          currentY += 5;
         });
         
-        return currentY + 4;
+        return currentY + 2;
       };
 
       // Process balance data into sections
@@ -670,7 +670,7 @@ export default function BalanceSheetPage() {
       const y = await addHeader(1);
 
       // Assets section
-      addSection('ASSETS', [], y);
+      let currentY = addSection('ASSETS', [], y);
       
       // Current assets
       const currentAssetsItems = [
@@ -678,7 +678,7 @@ export default function BalanceSheetPage() {
         ...processedData.currentAssets,
         { description: 'Total current assets', amount: currentAssetsTotal, isSubTotal: true }
       ];
-      addSection('', currentAssetsItems, y + 6);
+      currentY = addSection('', currentAssetsItems, currentY + 4);
       
       // Non-current assets
       const nonCurrentAssetsItems = [
@@ -686,19 +686,19 @@ export default function BalanceSheetPage() {
         ...processedData.nonCurrentAssets,
         { description: 'Total non-current assets', amount: nonCurrentAssetsTotal, isSubTotal: true }
       ];
-      addSection('', nonCurrentAssetsItems, y + 24);
+      currentY = addSection('', nonCurrentAssetsItems, currentY + 6);
       
       // Total assets
       const totalAssetsItems = [
         { description: 'TOTAL ASSETS', amount: totalAssets, isTotal: true }
       ];
-      addSection('', totalAssetsItems, y + 42);
+      currentY = addSection('', totalAssetsItems, currentY + 6);
 
-      // Add footer note
+      // Add footer note with proper spacing from the last content
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'italic');
       const footerNote = 'The accompanying notes are an integral part of these financial statements.';
-      pdf.text(footerNote, margin, pageHeight - margin);
+      pdf.text(footerNote, margin, Math.min(currentY + 15, pageHeight - margin));
 
       // Save the PDF
       pdf.save('balance-sheet.pdf');
