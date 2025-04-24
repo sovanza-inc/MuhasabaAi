@@ -694,11 +694,11 @@ export default function BalanceSheetPage() {
       ];
       currentY = addSection('', totalAssetsItems, currentY + 6);
 
-      // Add footer note with proper spacing
+      // Add footer note with proper spacing from the last content
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'italic');
       const footerNote = 'The accompanying notes are an integral part of these financial statements.';
-      pdf.text(footerNote, margin, pageHeight - margin);
+      pdf.text(footerNote, margin, Math.min(currentY + 15, pageHeight - margin));
 
       // Save the PDF
       pdf.save('balance-sheet.pdf');
