@@ -670,7 +670,7 @@ export default function BalanceSheetPage() {
       const y = await addHeader(1);
 
       // Assets section
-      addSection('ASSETS', [], y);
+      let currentY = addSection('ASSETS', [], y);
       
       // Current assets
       const currentAssetsItems = [
@@ -678,7 +678,7 @@ export default function BalanceSheetPage() {
         ...processedData.currentAssets,
         { description: 'Total current assets', amount: currentAssetsTotal, isSubTotal: true }
       ];
-      let currentY = addSection('', currentAssetsItems, y + 4);
+      currentY = addSection('', currentAssetsItems, currentY + 4);
       
       // Non-current assets
       const nonCurrentAssetsItems = [
