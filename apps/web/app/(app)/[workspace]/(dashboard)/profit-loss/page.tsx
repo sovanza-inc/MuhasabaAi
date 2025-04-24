@@ -132,28 +132,6 @@ export default function ProfitLossPage() {
     selectBank(bankId);
   };
 
-  // Helper function to format currency values
-  const formatCurrency = (value: number | string | undefined, defaultValue: string = '-'): string => {
-    if (value === undefined || value === null) return defaultValue;
-    const numValue = typeof value === 'string' ? parseFloat(value) : value;
-    if (isNaN(numValue)) return defaultValue;
-    
-    // Format with thousands separator and handle negative numbers
-    const isNegative = numValue < 0;
-    const formatted = Math.abs(numValue).toLocaleString('en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
-    return isNegative ? `(${formatted})` : formatted;
-  };
-
-  // Helper function to calculate year-over-year change
-  const calculateYoYChange = (currentYear: number, previousYear: number): string => {
-    if (!previousYear) return '-';
-    const change = ((currentYear - previousYear) / previousYear) * 100;
-    return `${change.toFixed(1)}%`;
-  };
-
   const handleExportPDF = async () => {
     if (!contentRef.current || !logoRef.current) return;
 
@@ -162,7 +140,6 @@ export default function ProfitLossPage() {
       const pageWidth = pdf.internal.pageSize.width;
       const pageHeight = pdf.internal.pageSize.height;
       const margin = 20;
-      const contentWidth = pageWidth - (2 * margin);
 
       // Helper function to format amounts consistently
       const formatAmount = (amount: number) => {
@@ -272,15 +249,13 @@ export default function ProfitLossPage() {
           pdf.setFont('helvetica', 'normal');
           currentY += 6;
         });
-        
-        return currentY + 4;
       };
 
       if (!data) {
         throw new Error('No data available for PDF generation');
       }
 
-      let y = await addHeader(1);
+      const startY = await addHeader(1);
 
       // Process revenues data
       const revenuesItems = [
@@ -296,7 +271,7 @@ export default function ProfitLossPage() {
           isSubTotal: true 
         }
       ];
-      y = addSection('REVENUES', revenuesItems, y);
+      addSection('REVENUES', revenuesItems, startY);
 
       // Process expenses data
       const expensesItems = [
@@ -312,7 +287,7 @@ export default function ProfitLossPage() {
           isSubTotal: true 
         }
       ];
-      y = addSection('EXPENSES', expensesItems, y);
+      addSection('EXPENSES', expensesItems, startY + 30);
 
       // Add net profit/loss
       const netProfitItems = [
@@ -322,7 +297,7 @@ export default function ProfitLossPage() {
           isTotal: true 
         }
       ];
-      y = addSection('', netProfitItems, y);
+      addSection('', netProfitItems, startY + 60);
 
       // Add footer note
       pdf.setFontSize(9);

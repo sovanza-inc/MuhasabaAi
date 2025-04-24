@@ -70,17 +70,6 @@ interface BalanceSheetItem {
   indent?: boolean;
 }
 
-interface BalanceSheetData {
-  nonCurrentAssets: BalanceSheetItem[];
-  currentAssets: BalanceSheetItem[];
-  totalAssets: number;
-  nonCurrentLiabilities: BalanceSheetItem[];
-  currentLiabilities: BalanceSheetItem[];
-  totalLiabilities: number;
-  equity: BalanceSheetItem[];
-  totalEquity: number;
-}
-
 export default function BalanceSheetPage() {
   const [workspace] = useCurrentWorkspace()
   const { CACHE_KEYS, prefetchData } = useApiCache()
@@ -678,10 +667,10 @@ export default function BalanceSheetPage() {
       const nonCurrentAssetsTotal = processedData.nonCurrentAssets.reduce((sum: number, item: any) => sum + item.amount, 0);
       const totalAssets = currentAssetsTotal + nonCurrentAssetsTotal;
 
-      let y = await addHeader(1);
+      const y = await addHeader(1);
 
       // Assets section
-      y = addSection('ASSETS', [], y);
+      addSection('ASSETS', [], y);
       
       // Current assets
       const currentAssetsItems = [
@@ -689,7 +678,7 @@ export default function BalanceSheetPage() {
         ...processedData.currentAssets,
         { description: 'Total current assets', amount: currentAssetsTotal, isSubTotal: true }
       ];
-      y = addSection('', currentAssetsItems, y);
+      addSection('', currentAssetsItems, y + 6);
       
       // Non-current assets
       const nonCurrentAssetsItems = [
@@ -697,13 +686,13 @@ export default function BalanceSheetPage() {
         ...processedData.nonCurrentAssets,
         { description: 'Total non-current assets', amount: nonCurrentAssetsTotal, isSubTotal: true }
       ];
-      y = addSection('', nonCurrentAssetsItems, y);
+      addSection('', nonCurrentAssetsItems, y + 24);
       
       // Total assets
       const totalAssetsItems = [
         { description: 'TOTAL ASSETS', amount: totalAssets, isTotal: true }
       ];
-      y = addSection('', totalAssetsItems, y);
+      addSection('', totalAssetsItems, y + 42);
 
       // Add footer note
       pdf.setFontSize(9);

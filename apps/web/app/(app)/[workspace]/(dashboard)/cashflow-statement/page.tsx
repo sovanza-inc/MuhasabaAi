@@ -356,7 +356,6 @@ export default function CashflowStatementPage() {
       const pageWidth = pdf.internal.pageSize.width;
       const pageHeight = pdf.internal.pageSize.height;
       const margin = 20;
-      const contentWidth = pageWidth - (2 * margin);
 
       // Helper function to format currency
       const formatAmount = (amount: number) => {
@@ -564,7 +563,7 @@ export default function CashflowStatementPage() {
       };
 
       // Start generating PDF
-      let y = await addHeader(1);
+      const y = await addHeader(1);
 
       // Get dynamic data
       const { operatingActivities, investingActivities, financingActivities } = processTransactions();
@@ -577,10 +576,10 @@ export default function CashflowStatementPage() {
                           investingActivities[2].amount2023 + 
                           financingActivities[2].amount2023;
 
-      // Add sections
-      y = addSection('Operating Activities', operatingActivities, y);
-      y = addSection('Investing Activities', investingActivities, y);
-      y = addSection('Financing Activities', financingActivities, y);
+      // Add sections with fixed spacing
+      addSection('Operating Activities', operatingActivities, y);
+      addSection('Investing Activities', investingActivities, y + 30);
+      addSection('Financing Activities', financingActivities, y + 60);
 
       // Add total
       const totalCashFlow = [
@@ -591,7 +590,7 @@ export default function CashflowStatementPage() {
           isTotal: true
         }
       ];
-      y = addSection('', totalCashFlow, y);
+      addSection('', totalCashFlow, y + 90);
 
       // Add footer note
       pdf.setFontSize(9);
