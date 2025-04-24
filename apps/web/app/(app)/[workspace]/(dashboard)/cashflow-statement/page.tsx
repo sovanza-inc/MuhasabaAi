@@ -28,7 +28,6 @@ import React from 'react'
 import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 
 interface BankTransaction {
   transaction_id: string;
@@ -565,7 +564,7 @@ export default function CashflowStatementPage() {
       };
 
       // Start generating PDF
-      let currentY = await addHeader(1);
+      let y = await addHeader(1);
 
       // Get dynamic data
       const { operatingActivities, investingActivities, financingActivities } = processTransactions();
@@ -579,9 +578,9 @@ export default function CashflowStatementPage() {
                           financingActivities[2].amount2023;
 
       // Add sections
-      currentY = addSection('Operating Activities', operatingActivities, currentY);
-      currentY = addSection('Investing Activities', investingActivities, currentY);
-      currentY = addSection('Financing Activities', financingActivities, currentY);
+      y = addSection('Operating Activities', operatingActivities, y);
+      y = addSection('Investing Activities', investingActivities, y);
+      y = addSection('Financing Activities', financingActivities, y);
 
       // Add total
       const totalCashFlow = [
@@ -592,7 +591,7 @@ export default function CashflowStatementPage() {
           isTotal: true
         }
       ];
-      currentY = addSection('', totalCashFlow, currentY);
+      y = addSection('', totalCashFlow, y);
 
       // Add footer note
       pdf.setFontSize(9);
@@ -603,13 +602,20 @@ export default function CashflowStatementPage() {
       // Save the PDF
       pdf.save('cash-flow-statement.pdf');
 
+      toast({
+        title: "Export successful",
+        description: "Your cash flow statement has been downloaded",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to generate PDF',
-        status: 'error',
-        duration: 5000,
+        title: "Export failed",
+        description: "There was an error exporting your report",
+        status: "error",
+        duration: 3000,
         isClosable: true,
       });
     }

@@ -7,7 +7,6 @@ import { useApiCache } from '#features/common/hooks/use-api-cache'
 import React from 'react'
 import { LuDownload } from 'react-icons/lu'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 
 interface BankAccount {
   id?: string;
@@ -65,9 +64,9 @@ interface Transaction {
 interface BalanceSheetItem {
   description: string;
   note?: string;
-  amount2024: string;
-  amount2023?: string;
+  amount: number;
   isTotal?: boolean;
+  isSubTotal?: boolean;
   indent?: boolean;
 }
 
@@ -521,107 +520,6 @@ export default function BalanceSheetPage() {
   }, [transactions, selectedAccount, bankAccounts])
 
   // Helper functions for PDF generation
-  const formatNumber = (amount: number): string => {
-    return amount.toLocaleString('en-US', {
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
-  };
-
-  const addHeader = (pdf: jsPDF, startY: number, lineHeight: number): number => {
-    const marginX = 15;
-    const pageWidth = pdf.internal.pageSize.width;
-    let currentY = startY;
-
-    // Add logo on the right
-    if (logoRef.current) {
-      pdf.addImage(logoRef.current.src, 'PNG', pageWidth - 65, currentY, 50, 25);
-    }
-
-    // Add company name (left-aligned)
-    pdf.setFontSize(11);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Muhasaba', marginX, currentY + 10);
-    currentY += 20;
-
-    // Add statement title
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('CONSOLIDATED STATEMENT OF FINANCIAL POSITION', marginX, currentY);
-    currentY += lineHeight;
-
-    // Add date
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`At 31 December 2024`, marginX, currentY);
-    currentY += lineHeight * 2;
-
-    // Add column headers with proper alignment
-    pdf.setFontSize(10);
-    const notesX = pageWidth * 0.45; // Position for Notes column
-    const amount2024X = pageWidth * 0.65; // Position for 2024 column
-    const amount2023X = pageWidth * 0.85; // Position for 2023 column
-
-    pdf.text('Notes', notesX, currentY);
-    pdf.text('2024', amount2024X, currentY);
-    pdf.text('2023', amount2023X, currentY);
-    pdf.text("AED'000", amount2024X, currentY + lineHeight);
-    pdf.text("AED'000", amount2023X, currentY + lineHeight);
-    currentY += lineHeight * 2;
-
-    return currentY;
-  };
-
-  const addSection = (
-    pdf: jsPDF,
-    title: string,
-    items: BalanceSheetItem[],
-    startY: number,
-    lineHeight: number,
-    marginX: number
-  ): number => {
-    let currentY = startY;
-    const pageWidth = pdf.internal.pageSize.width;
-    const notesX = pageWidth * 0.45;
-    const amount2024X = pageWidth * 0.65;
-    const amount2023X = pageWidth * 0.85;
-
-    // Add section title if provided
-    if (title) {
-      pdf.setFontSize(10);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text(title, marginX, currentY);
-      currentY += lineHeight;
-    }
-
-    // Add items
-    pdf.setFontSize(10);
-    items.forEach((item) => {
-      const xPos = item.indent ? marginX + 5 : marginX;
-      pdf.setFont('helvetica', item.isTotal ? 'bold' : 'normal');
-      
-      // Description
-      pdf.text(item.description, xPos, currentY);
-      
-      // Note number if exists
-      if (item.note) {
-        pdf.text(item.note, notesX, currentY);
-      }
-      
-      // 2024 Amount (right-aligned)
-      if (item.amount2024) {
-        pdf.text(item.amount2024, amount2024X, currentY);
-      }
-      
-      // 2023 Amount (right-aligned)
-      pdf.text(item.amount2023 || '-', amount2023X, currentY);
-      
-      currentY += lineHeight;
-    });
-
-    return currentY;
-  };
-
   const handleExportPDF = async () => {
     if (!contentRef.current || !logoRef.current) return;
 
@@ -630,7 +528,6 @@ export default function BalanceSheetPage() {
       const pageWidth = pdf.internal.pageSize.width;
       const pageHeight = pdf.internal.pageSize.height;
       const margin = 20;
-      const contentWidth = pageWidth - (2 * margin);
 
       // Helper function to format amounts consistently
       const formatAmount = (amount: number) => {
@@ -699,7 +596,7 @@ export default function BalanceSheetPage() {
       };
 
       // Helper function to add section with consistent styling
-      const addSection = (title: string, items: any[], startY: number) => {
+      const addSection = (title: string, items: BalanceSheetItem[], startY: number) => {
         let currentY = startY;
         
         // Section title with consistent styling
@@ -712,7 +609,7 @@ export default function BalanceSheetPage() {
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
         items.forEach(item => {
-          const xPos = margin + (item.indent || 0) * 5;
+          const xPos = margin + (item.indent ? 5 : 0);
           
           if (item.isTotal || item.isSubTotal) {
             pdf.setFont('helvetica', 'bold');
@@ -744,7 +641,6 @@ export default function BalanceSheetPage() {
         return currentY + 4;
       };
 
-      // Keep your existing data processing logic here
       // Process balance data into sections
       const processedData = balanceData.reduce((acc: any, item) => {
         const amount = parseFloat(item.amount.replace(/[^0-9.-]+/g, ''));
@@ -782,10 +678,10 @@ export default function BalanceSheetPage() {
       const nonCurrentAssetsTotal = processedData.nonCurrentAssets.reduce((sum: number, item: any) => sum + item.amount, 0);
       const totalAssets = currentAssetsTotal + nonCurrentAssetsTotal;
 
-      let currentY = await addHeader(1);
+      let y = await addHeader(1);
 
       // Assets section
-      currentY = addSection('ASSETS', [], currentY);
+      y = addSection('ASSETS', [], y);
       
       // Current assets
       const currentAssetsItems = [
@@ -793,7 +689,7 @@ export default function BalanceSheetPage() {
         ...processedData.currentAssets,
         { description: 'Total current assets', amount: currentAssetsTotal, isSubTotal: true }
       ];
-      currentY = addSection('', currentAssetsItems, currentY);
+      y = addSection('', currentAssetsItems, y);
       
       // Non-current assets
       const nonCurrentAssetsItems = [
@@ -801,13 +697,13 @@ export default function BalanceSheetPage() {
         ...processedData.nonCurrentAssets,
         { description: 'Total non-current assets', amount: nonCurrentAssetsTotal, isSubTotal: true }
       ];
-      currentY = addSection('', nonCurrentAssetsItems, currentY);
+      y = addSection('', nonCurrentAssetsItems, y);
       
       // Total assets
       const totalAssetsItems = [
         { description: 'TOTAL ASSETS', amount: totalAssets, isTotal: true }
       ];
-      currentY = addSection('', totalAssetsItems, currentY);
+      y = addSection('', totalAssetsItems, y);
 
       // Add footer note
       pdf.setFontSize(9);

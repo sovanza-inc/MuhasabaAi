@@ -29,7 +29,6 @@ import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
-import html2canvas from 'html2canvas'
 
 interface Bank {
   id: string;
@@ -245,7 +244,7 @@ export default function ProfitLossPage() {
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
         items.forEach(item => {
-          const xPos = margin + (item.indent || 0) * 5;
+          const xPos = margin + (item.indent ? 5 : 0);
           
           if (item.isTotal || item.isSubTotal) {
             pdf.setFont('helvetica', 'bold');
@@ -277,12 +276,11 @@ export default function ProfitLossPage() {
         return currentY + 4;
       };
 
-      // Keep your existing data processing logic here
-      let currentY = await addHeader(1);
-
       if (!data) {
         throw new Error('No data available for PDF generation');
       }
+
+      let y = await addHeader(1);
 
       // Process revenues data
       const revenuesItems = [
@@ -298,7 +296,7 @@ export default function ProfitLossPage() {
           isSubTotal: true 
         }
       ];
-      currentY = addSection('REVENUES', revenuesItems, currentY);
+      y = addSection('REVENUES', revenuesItems, y);
 
       // Process expenses data
       const expensesItems = [
@@ -314,7 +312,7 @@ export default function ProfitLossPage() {
           isSubTotal: true 
         }
       ];
-      currentY = addSection('EXPENSES', expensesItems, currentY);
+      y = addSection('EXPENSES', expensesItems, y);
 
       // Add net profit/loss
       const netProfitItems = [
@@ -324,7 +322,7 @@ export default function ProfitLossPage() {
           isTotal: true 
         }
       ];
-      currentY = addSection('', netProfitItems, currentY);
+      y = addSection('', netProfitItems, y);
 
       // Add footer note
       pdf.setFontSize(9);
