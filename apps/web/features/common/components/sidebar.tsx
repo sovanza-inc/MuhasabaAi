@@ -165,6 +165,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = (props) => {
                 hotkey="navigation.inbox"
               />
 
+              {/* Bank Integrations Item */}
               <AppSidebarLink
                 href={usePath('bank-integrations')}
                 isActive={useActivePath('bank-integrations', { end: false })}
