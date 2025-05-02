@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { db, questionnaireResponses } from '@acme/db'
 import { eq, desc } from 'drizzle-orm'
 import { getSession } from '@acme/better-auth'
-import { writeFile, mkdir } from 'fs/promises'
-import { join } from 'path'
 
 interface FixedAsset {
   name: string
@@ -70,9 +68,9 @@ interface QuestionnaireResponseRecord {
 
 // Function to generate a 24-character ID
 function generateId(): string {
-  const timestamp = Date.now().toString(36);
-  const randomStr = Math.random().toString(36).substring(2, 11);
-  return (timestamp + randomStr).padEnd(24, '0').slice(0, 24);
+  const timestamp = Date.now().toString(36)
+  const randomStr = Math.random().toString(36).substring(2, 11)
+  return (timestamp + randomStr).padEnd(24, '0').slice(0, 24)
 }
 
 export async function POST(request: NextRequest) {
@@ -80,48 +78,53 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     const workspaceId = formData.get('workspaceId') as string
     const responsesJson = formData.get('responses') as string
-    const responses = JSON.parse(responsesJson)
-    const session = await getSession()
-
-    if (!workspaceId || !responses) {
+    
+    if (!responsesJson) {
+      console.error('Missing responses in form data')
       return NextResponse.json(
-        { error: 'Missing required fields' },
+        { error: 'Missing responses data' },
         { status: 400 }
       )
     }
 
+    let responses
+    try {
+      responses = JSON.parse(responsesJson)
+    } catch (e) {
+      console.error('Failed to parse responses JSON:', e)
+      return NextResponse.json(
+        { error: 'Invalid responses format' },
+        { status: 400 }
+      )
+    }
+
+    if (!workspaceId) {
+      console.error('Missing workspaceId in form data')
+      return NextResponse.json(
+        { error: 'Missing workspaceId' },
+        { status: 400 }
+      )
+    }
+
+    const session = await getSession()
     if (!session?.user?.id) {
+      console.error('No authenticated user found')
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
       )
     }
 
-    // Handle file uploads
-    const uploadPath = join(process.cwd(), 'public', 'uploads', workspaceId)
-
-    // Ensure upload directory exists
-    try {
-      await mkdir(uploadPath, { recursive: true })
-    } catch (error) {
-      console.error('Error creating upload directory:', error)
-    }
-
     // Start with the existing files from the form submission
     const documents = { ...responses.documents }
 
-    // Process new file uploads
+    // Process new file uploads - just store the file names
     for (const [key, value] of formData.entries()) {
       if (key.startsWith('documents_') && value instanceof File) {
         const documentType = key.split('_')[1]
-        const fileName = value.name // Use original filename without timestamp
-        const filePath = join(uploadPath, fileName)
+        const fileName = value.name
         
-        const arrayBuffer = await value.arrayBuffer()
-        const uint8Array = new Uint8Array(arrayBuffer)
-        await writeFile(filePath, uint8Array)
-        
-        // Only add the file if it's not already in the documents array
+        // Store file reference in documents object
         if (!documents[documentType]) {
           documents[documentType] = []
         }
@@ -140,62 +143,69 @@ export async function POST(request: NextRequest) {
     // Convert numeric values to strings for storage
     const responsesForStorage = {
       ...mergedResponses,
-      beginningInventory: mergedResponses.beginningInventory.toString(),
-      purchases: mergedResponses.purchases.toString(),
-      endingInventory: mergedResponses.endingInventory.toString(),
-      operatingSince: mergedResponses.operatingSince.toString(),
-      fixedAssets: mergedResponses.fixedAssets.map((asset: FixedAsset) => ({
+      beginningInventory: mergedResponses.beginningInventory?.toString() || '0',
+      purchases: mergedResponses.purchases?.toString() || '0',
+      endingInventory: mergedResponses.endingInventory?.toString() || '0',
+      operatingSince: mergedResponses.operatingSince?.toString() || '',
+      fixedAssets: (mergedResponses.fixedAssets || []).map((asset: FixedAsset) => ({
         ...asset,
-        value: asset.value.toString(),
-        usefulLife: asset.usefulLife.toString()
+        value: asset.value?.toString() || '0',
+        usefulLife: asset.usefulLife?.toString() || '0'
       })),
-      loans: mergedResponses.loans.map((loan: Loan) => ({
+      loans: (mergedResponses.loans || []).map((loan: Loan) => ({
         ...loan,
-        amount: loan.amount.toString(),
-        interestRate: loan.interestRate.toString(),
-        monthlyPayment: loan.monthlyPayment.toString()
+        amount: loan.amount?.toString() || '0',
+        interestRate: loan.interestRate?.toString() || '0',
+        monthlyPayment: loan.monthlyPayment?.toString() || '0'
       })),
-      outstandingBalances: mergedResponses.outstandingBalances.map((balance: OutstandingBalance) => ({
+      outstandingBalances: (mergedResponses.outstandingBalances || []).map((balance: OutstandingBalance) => ({
         ...balance,
-        amount: balance.amount.toString()
+        amount: balance.amount?.toString() || '0'
       }))
     }
 
-    // Check if a record already exists for this workspace
-    const existingResponse = await db.query.questionnaireResponses.findFirst({
-      where: eq(questionnaireResponses.workspaceId, workspaceId),
-      orderBy: [desc(questionnaireResponses.createdAt)],
-    })
+    try {
+      // Check if a record already exists for this workspace
+      const existingResponse = await db.query.questionnaireResponses.findFirst({
+        where: eq(questionnaireResponses.workspaceId, workspaceId),
+        orderBy: [desc(questionnaireResponses.createdAt)],
+      })
 
-    if (existingResponse) {
-      // Update existing record
       const generatedPrompt = generateSystemPrompt(responsesForStorage)
-      await db.update(questionnaireResponses)
-        .set({
+
+      if (existingResponse) {
+        // Update existing record
+        await db.update(questionnaireResponses)
+          .set({
+            responses: responsesForStorage,
+            systemPrompt: generatedPrompt,
+            updatedAt: new Date(),
+          })
+          .where(eq(questionnaireResponses.id, existingResponse.id))
+      } else {
+        // Create new record
+        const newId = generateId()
+        await db.insert(questionnaireResponses).values({
+          id: newId,
+          workspaceId,
+          userId: session.user.id,
           responses: responsesForStorage,
           systemPrompt: generatedPrompt,
-          updatedAt: new Date(),
         })
-        .where(eq(questionnaireResponses.id, existingResponse.id))
-    } else {
-      // Create new record
-      const newId = generateId()
-      const generatedPrompt = generateSystemPrompt(responsesForStorage)
-      const newRecord = {
-        id: newId,
-        workspaceId,
-        userId: session.user.id,
-        responses: responsesForStorage,
-        systemPrompt: generatedPrompt,
       }
-      await db.insert(questionnaireResponses).values(newRecord)
-    }
 
-    return NextResponse.json({ success: true })
+      return NextResponse.json({ success: true })
+    } catch (error) {
+      console.error('Database operation failed:', error)
+      return NextResponse.json(
+        { error: 'Failed to save to database', details: error instanceof Error ? error.message : 'Unknown error' },
+        { status: 500 }
+      )
+    }
   } catch (error) {
-    console.error('Error saving questionnaire responses:', error)
+    console.error('Error in questionnaire POST handler:', error)
     return NextResponse.json(
-      { error: 'Failed to save questionnaire responses' },
+      { error: 'Internal server error', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 }
     )
   }
