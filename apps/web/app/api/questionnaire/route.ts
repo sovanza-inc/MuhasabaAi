@@ -73,8 +73,6 @@ function generateId(): string {
   return (timestamp + randomStr).padEnd(24, '0').slice(0, 24)
 }
 
-const isDevelopment = process.env.NODE_ENV === 'development'
-
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.formData()
