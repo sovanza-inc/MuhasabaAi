@@ -14,7 +14,7 @@ import {
   Td,
   Text,
 } from '@chakra-ui/react';
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu';
 
 interface ProfitLossData {
@@ -351,7 +351,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
                     borderBottom="1px"
                     borderColor="gray.200"
                   >
-                    {month.month} '{month.year}
+                    {month.month} &apos;{month.year}
                   </Th>
                 ))}
                 <Th
