@@ -136,7 +136,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     filteredRevenueTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
       const key = `${date.toLocaleString('default', { month: 'short' })}-${date.getFullYear().toString().slice(-2)}`;
-      if (revenuesByMonth.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(revenuesByMonth, key)) {
         revenuesByMonth[key] += parseFloat(transaction.amount.replace(/[^0-9.-]+/g, ''));
       }
     });
@@ -150,7 +150,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     filteredExpenseTransactions.forEach(transaction => {
       const date = new Date(transaction.date);
       const key = `${date.toLocaleString('default', { month: 'short' })}-${date.getFullYear().toString().slice(-2)}`;
-      if (expensesByMonth.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(expensesByMonth, key)) {
         expensesByMonth[key] += parseFloat(transaction.amount.replace(/[^0-9.-]+/g, ''));
       }
     });
@@ -216,7 +216,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     // Calculate totals
     const totalRevenue = monthKeys.map(key => revenuesByMonth[key] || 0);
     const totalExpenses = monthKeys.map(key => expensesByMonth[key] || 0);
-    const netProfit = monthKeys.map((key, i) => (revenuesByMonth[key] || 0) - (expensesByMonth[key] || 0));
+    const netProfit = monthKeys.map(key => (revenuesByMonth[key] || 0) - (expensesByMonth[key] || 0));
 
     return {
       revenueData,
@@ -378,7 +378,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
                 {monthsData.map((_, i) => <Td key={i}></Td>)}
                 <Td></Td>
               </Tr>
-              {displayData.revenueData.map((item, index) => (
+              {displayData.revenueData.map(item => (
                 <Tr key={item.name}>
                   <Td py="3" pl="10" color="gray.700">
                     {item.name}
@@ -441,7 +441,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
                 {monthsData.map((_, i) => <Td key={i}></Td>)}
                 <Td></Td>
               </Tr>
-              {displayData.expenseData.map((item, index) => (
+              {displayData.expenseData.map(item => (
                 <Tr key={item.name}>
                   <Td py="3" pl="10" color="gray.700">
                     {item.name}
@@ -528,6 +528,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
             </Tbody>
           </Table>
         </Box>
+        <Text>Don&apos;t forget to review before exporting</Text>
       </ModalContent>
     </Modal>
   );
