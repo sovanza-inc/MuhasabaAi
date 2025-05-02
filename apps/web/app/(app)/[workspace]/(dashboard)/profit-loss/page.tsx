@@ -22,18 +22,47 @@ import {
   useToast,
   Image
 } from '@chakra-ui/react'
-import React from 'react'
+import React, { useState } from 'react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useProfitLoss } from '#features/bank-integrations/hooks/use-profit-loss'
 import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
+import { EditablePdfPreview } from './components/EditablePdfPreview'
 
 interface Bank {
   id: string;
   bank_identifier: string;
   name: string;
+}
+
+interface FilteredProfitLossData {
+  revenues: {
+    projectCost: number;
+    totalSpending: number;
+    transactions: Array<{
+      date: string;
+      accountName: string;
+      description: string;
+      amount: number;
+    }>;
+  };
+  expenses: {
+    projectCost: number;
+    totalSpending: number;
+    transactions: Array<{
+      date: string;
+      accountName: string;
+      description: string;
+      amount: number;
+    }>;
+  };
+  netProfit: number;
+  period: {
+    startDate: Date;
+    endDate: Date;
+  };
 }
 
 export default function ProfitLossPage() {
@@ -47,6 +76,7 @@ export default function ProfitLossPage() {
   const contentRef = React.useRef<HTMLDivElement>(null);
   const toast = useToast();
   const logoRef = React.useRef<HTMLImageElement>(null);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   
   // Initialize auth token and customer ID
   React.useEffect(() => {
@@ -132,7 +162,11 @@ export default function ProfitLossPage() {
     selectBank(bankId);
   };
 
-  const handleExportPDF = async () => {
+  const handleExportClick = () => {
+    setIsPreviewOpen(true);
+  };
+
+  const handleExportPDF = async (filteredData: FilteredProfitLossData) => {
     if (!contentRef.current || !logoRef.current) return;
 
     try {
@@ -184,20 +218,20 @@ export default function ProfitLossPage() {
         
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
-        const currentDate = new Date();
-        const year = currentDate.getFullYear();
-        const month = currentDate.toLocaleString('default', { month: 'long' });
-        const day = currentDate.getDate();
-        pdf.text(`For the Period Ended ${month} ${day}, ${year}`, margin, margin + 18);
+        const periodStart = filteredData.period.startDate;
+        const periodEnd = filteredData.period.endDate;
+        pdf.text(
+          `For the Period ${periodStart.toLocaleString('default', { month: 'long', year: 'numeric' })} to ${periodEnd.toLocaleString('default', { month: 'long', year: 'numeric' })}`,
+          margin,
+          margin + 18
+        );
         
         // Add column headers with consistent styling
         const startY = margin + 30;
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'bold');
         
-        // Column headers with consistent alignment
         pdf.text('Description', margin, startY);
-        pdf.text('Note', pageWidth - margin - 60, startY);
         pdf.text('Amount', pageWidth - margin, startY, { align: 'right' });
         
         // Consistent header underline
@@ -229,9 +263,6 @@ export default function ProfitLossPage() {
           
           // Consistent text alignment
           pdf.text(item.description, xPos, currentY);
-          if (item.note) {
-            pdf.text(item.note, pageWidth - margin - 60, currentY);
-          }
           
           const amountText = formatAmount(item.amount);
           pdf.text(amountText, pageWidth - margin, currentY, { align: 'right' });
@@ -251,49 +282,45 @@ export default function ProfitLossPage() {
         });
       };
 
-      if (!data) {
-        throw new Error('No data available for PDF generation');
-      }
-
       const startY = await addHeader(1);
 
-      // Process revenues data
+      // Process revenues data using filtered data
       const revenuesItems = [
         { description: 'Revenue', amount: 0 },
         { 
           description: 'Project Revenue', 
-          amount: parseFloat(data.revenues.projectCost.replace(/[^0-9.-]+/g, '')), 
+          amount: filteredData.revenues.projectCost,
           indent: true 
         },
         { 
           description: 'Total Revenue', 
-          amount: parseFloat(data.revenues.totalSpending.replace(/[^0-9.-]+/g, '')),
+          amount: filteredData.revenues.totalSpending,
           isSubTotal: true 
         }
       ];
       addSection('REVENUES', revenuesItems, startY);
 
-      // Process expenses data
+      // Process expenses data using filtered data
       const expensesItems = [
         { description: 'Expenses', amount: 0 },
         { 
           description: 'Project Expenses', 
-          amount: -parseFloat(data.expenses.projectCost.replace(/[^0-9.-]+/g, '')), 
+          amount: -filteredData.expenses.projectCost,
           indent: true 
         },
         { 
           description: 'Total Expenses', 
-          amount: -parseFloat(data.expenses.totalSpending.replace(/[^0-9.-]+/g, '')),
+          amount: -filteredData.expenses.totalSpending,
           isSubTotal: true 
         }
       ];
       addSection('EXPENSES', expensesItems, startY + 30);
 
-      // Add net profit/loss
+      // Add net profit/loss using filtered data
       const netProfitItems = [
         { 
           description: 'NET PROFIT/(LOSS)', 
-          amount: parseFloat(data.netProfit.replace(/[^0-9.-]+/g, '')), 
+          amount: filteredData.netProfit,
           isTotal: true 
         }
       ];
@@ -387,7 +414,7 @@ export default function ProfitLossPage() {
                 <Button
                   leftIcon={<LuDownload />}
                   colorScheme="green"
-                  onClick={handleExportPDF}
+                  onClick={handleExportClick}
                   isLoading={isLoading}
                 >
                   Export as PDF
@@ -599,6 +626,28 @@ export default function ProfitLossPage() {
           </Box>
         </Box>
       </Box>
+
+      <EditablePdfPreview
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        onExport={handleExportPDF}
+        data={data || {
+          revenues: {
+            projectCost: '0',
+            totalSpending: '0',
+            thisMonth: '0%',
+            transactions: []
+          },
+          expenses: {
+            projectCost: '0',
+            totalSpending: '0',
+            thisMonth: '0%',
+            transactions: []
+          },
+          netProfit: '0'
+        }}
+      />
+
       {/* Summary Footer */}
       <Box 
         bg="teal.700" 
