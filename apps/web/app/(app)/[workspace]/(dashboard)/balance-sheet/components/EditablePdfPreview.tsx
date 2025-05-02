@@ -651,7 +651,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
               </Tr>
 
               <Tr>
-                <Td py="3" pl="14" color="gray.700">Owner's Equity</Td>
+                <Td py="3" pl="14" color="gray.700">Owner&apos;s Equity</Td>
                 {displayData.monthKeys.map(month => (
                   <Td key={month} isNumeric py="3">
                     {formatAmount(displayData.equityData.ownerEquity[month])}

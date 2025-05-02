@@ -62,15 +62,6 @@ interface Transaction {
   bank_name?: string;
 }
 
-interface BalanceSheetItem {
-  description: string;
-  note?: string;
-  amount: number;
-  isTotal?: boolean;
-  isSubTotal?: boolean;
-  indent?: boolean;
-}
-
 export default function BalanceSheetPage() {
   const [workspace] = useCurrentWorkspace()
   const { CACHE_KEYS, prefetchData } = useApiCache()
