@@ -161,9 +161,6 @@ export async function POST(request: NextRequest) {
       }))
     }
 
-    // Generate system prompt based on merged responses
-    const systemPrompt = generateSystemPrompt(responsesForStorage)
-
     // Check if a record already exists for this workspace
     const existingResponse = await db.query.questionnaireResponses.findFirst({
       where: eq(questionnaireResponses.workspaceId, workspaceId),
