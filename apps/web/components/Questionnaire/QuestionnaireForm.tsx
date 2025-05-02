@@ -30,6 +30,7 @@ import {
   AlertDialogContent,
   AlertDialogOverlay,
   useDisclosure,
+  Container,
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
@@ -216,6 +217,11 @@ const FileList = ({
   )
 }
 
+// Helper function to normalize filenames
+const normalizeFileName = (filename: string): string => {
+  return filename.replace(/[_\s-]+/g, ' ').toLowerCase().trim()
+}
+
 export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireFormProps) {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
@@ -225,16 +231,24 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
   // Form state
   const [formData, setFormData] = React.useState<FormData>(() => {
     if (initialData) {
-      // Convert stored document strings to the correct format
       const documents = Object.keys(initialData.documents || {}).reduce((acc, key) => {
         const section = key as keyof FormData['documents']
         const files = initialData.documents[section] || []
-        // Ensure files is always an array and contains strings for existing files
-        acc[section] = Array.isArray(files) ? files.map(file => typeof file === 'string' ? file : file.name) : []
+        
+        // Deduplicate based on normalized names
+        const uniqueFiles = Array.from(
+          files.reduce((map, file) => {
+            const normalizedName = normalizeFileName(typeof file === 'string' ? file : file.name)
+            if (!map.has(normalizedName)) {
+              map.set(normalizedName, file)
+            }
+            return map
+          }, new Map()).values()
+        )
+        
+        acc[section] = uniqueFiles
         return acc
       }, {} as FormData['documents'])
-
-      console.log('Initializing form with documents:', documents)
 
       return {
         ...initialData,
@@ -436,20 +450,22 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       const formDataForJson = {
         ...formData,
         documents: Object.entries(formData.documents).reduce((acc, [key, files]) => {
-          // Include both existing filenames and new file names
-          acc[key] = files.map(file => typeof file === 'string' ? file : file.name)
+          // Only include filenames, no duplicates
+          const uniqueFiles = Array.from(new Set(
+            files.map(file => typeof file === 'string' ? file : file.name)
+          ))
+          acc[key] = uniqueFiles
           return acc
         }, {} as Record<string, string[]>)
       }
 
       submitData.append('responses', JSON.stringify(formDataForJson))
 
-      // Handle file uploads - both new and existing files
+      // Only append new File objects for upload
       Object.entries(formData.documents).forEach(([section, files]) => {
         files.forEach(file => {
           if (file instanceof File) {
-            const safeFileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`
-            submitData.append(`documents_${section}`, file, safeFileName)
+            submitData.append(`documents_${section}`, file)
           }
         })
       })
@@ -545,20 +561,19 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
   const handleFileUpload = (section: keyof FormData['documents'], files: FileList | null) => {
     if (!files || files.length === 0) return
 
-    console.log(`Handling file upload for ${section}:`, files)
-
     setFormData(prev => {
       const existingFiles = prev.documents[section] || []
-      console.log('Existing files:', existingFiles)
-      
       const newFiles = Array.from(files)
-      console.log('New files:', newFiles)
       
-      // Check for duplicate filenames
-      const existingFilenames = new Set(existingFiles.map(f => typeof f === 'string' ? f : f.name))
-      const uniqueNewFiles = newFiles.filter(file => !existingFilenames.has(file.name))
-      
-      console.log('Unique new files:', uniqueNewFiles)
+      // Normalize filenames for comparison
+      const existingNormalizedNames = new Set(
+        existingFiles.map(f => normalizeFileName(typeof f === 'string' ? f : f.name))
+      )
+
+      // Filter out duplicates based on normalized names
+      const uniqueNewFiles = newFiles.filter(file => 
+        !existingNormalizedNames.has(normalizeFileName(file.name))
+      )
 
       if (uniqueNewFiles.length !== newFiles.length) {
         toast({
@@ -570,14 +585,11 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
         })
       }
 
-      const updatedFiles = [...existingFiles, ...uniqueNewFiles]
-      console.log('Updated files array:', updatedFiles)
-
       return {
         ...prev,
         documents: {
           ...prev.documents,
-          [section]: updatedFiles
+          [section]: [...existingFiles, ...uniqueNewFiles]
         }
       }
     })
@@ -1599,84 +1611,124 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
   }
 
   return (
-    <Box p={8} bg="white" borderRadius="xl">
-      <VStack spacing={8} align="stretch">
-        <Box>
-          <Heading size="lg" mb={2}>AI Bookkeeping Onboarding</Heading>
-          <Text color="gray.600">
-            Welcome to your AI-powered accounting assistant. This short onboarding will help generate accurate IFRS financial reports using your bank transactions.
-          </Text>
-        </Box>
-
-        <Progress
-          value={(currentStep / (steps.length - 1)) * 100}
-          mb={4}
-          colorScheme="green"
-        />
-
-        <HStack spacing={8} align="flex-start">
-          <VStack spacing={4} minW="200px" align="stretch">
-            {steps.map((step, index) => (
-              <Button
-                key={index}
-                onClick={() => setCurrentStep(index)}
-                variant={currentStep === index ? 'solid' : 'ghost'}
-                colorScheme={currentStep === index ? 'green' : 'gray'}
-                size="lg"
-                justifyContent="flex-start"
-                leftIcon={
-                  <Box
-                    w="24px"
-                    h="24px"
-                    borderRadius="full"
-                    bg={currentStep === index ? 'white' : 'gray.200'}
-                    color={currentStep === index ? 'green.500' : 'gray.600'}
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    fontSize="sm"
-                    fontWeight="bold"
-                  >
-                    {index + 1}
-                  </Box>
-                }
-                isDisabled={!steps.slice(0, index).every(step => step.isComplete())}
-              >
-                <VStack align="flex-start" spacing={0}>
-                  <Text>{step.title}</Text>
-                  <Text fontSize="xs" color={currentStep === index ? 'whiteAlpha.800' : 'gray.500'}>
-                    {step.description}
-                  </Text>
-                </VStack>
-              </Button>
-            ))}
-          </VStack>
-
-          <Box flex={1}>
-            <form onSubmit={handleSubmit}>
-              {renderStep()}
-
-              <HStack mt={4} spacing={4}>
-                <Button
-                  onClick={prevStep}
-                  isDisabled={currentStep === 0}
-                  variant="outline"
-                  colorScheme="green"
-                >
-                  Previous
-                </Button>
-                <Button
-                  colorScheme="green"
-                  onClick={currentStep === steps.length - 1 ? handleSubmit : nextStep}
-                  isLoading={isSubmitting}
-                >
-                  {currentStep === steps.length - 1 ? 'Submit' : 'Next'}
-                </Button>
-              </HStack>
-            </form>
+    <Container maxW="8xl" p={8}>
+      <Box bg="white" borderRadius="xl" shadow="lg" p={8}>
+        <VStack spacing={8} align="stretch">
+          <Box>
+            <Heading size="xl" mb={3}>AI Bookkeeping Onboarding</Heading>
+            <Text color="gray.600" fontSize="lg">
+              Welcome to your AI-powered accounting assistant. This short onboarding will help generate accurate IFRS financial reports using your bank transactions.
+            </Text>
           </Box>
-        </HStack>
-      </VStack>
-    </Box>
+
+          <Progress
+            value={(currentStep / (steps.length - 1)) * 100}
+            mb={6}
+            colorScheme="green"
+            size="lg"
+            borderRadius="full"
+          />
+
+          <Stack
+            direction={{ base: 'column', md: 'row' }}
+            spacing={{ base: 4, md: 12 }}
+            align={{ base: 'stretch', md: 'flex-start' }}
+          >
+            <Box
+              minW={{ base: 'full', md: '250px' }}
+              overflowX={{ base: 'auto', md: 'visible' }}
+              py={{ base: 2, md: 0 }}
+            >
+              <Stack
+                direction={{ base: 'row', md: 'column' }}
+                spacing={{ base: 2, md: 4 }}
+                align="stretch"
+                minW={{ base: 'fit-content', md: 'auto' }}
+              >
+                {steps.map((step, index) => (
+                  <Button
+                    key={index}
+                    onClick={() => setCurrentStep(index)}
+                    variant={currentStep === index ? 'solid' : 'ghost'}
+                    colorScheme={currentStep === index ? 'green' : 'gray'}
+                    size="lg"
+                    justifyContent={{ base: 'center', md: 'flex-start' }}
+                    p={{ base: 4, md: 6 }}
+                    minW={{ base: '100px', md: 'auto' }}
+                    leftIcon={
+                      <Box
+                        w={{ base: '24px', md: '32px' }}
+                        h={{ base: '24px', md: '32px' }}
+                        borderRadius="full"
+                        bg={currentStep === index ? 'white' : 'gray.200'}
+                        color={currentStep === index ? 'green.500' : 'gray.600'}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        fontSize={{ base: 'sm', md: 'md' }}
+                        fontWeight="bold"
+                      >
+                        {index + 1}
+                      </Box>
+                    }
+                    isDisabled={!steps.slice(0, index).every(step => step.isComplete())}
+                  >
+                    <VStack
+                      align={{ base: 'center', md: 'flex-start' }}
+                      spacing={{ base: 0, md: 1 }}
+                      display={{ base: 'none', md: 'flex' }}
+                    >
+                      <Text fontSize="lg">{step.title}</Text>
+                      <Text fontSize="sm" color={currentStep === index ? 'whiteAlpha.800' : 'gray.500'}>
+                        {step.description}
+                      </Text>
+                    </VStack>
+                    <Text
+                      display={{ base: 'block', md: 'none' }}
+                      fontSize="sm"
+                      fontWeight="medium"
+                    >
+                      {step.title.split(' ')[0]}
+                    </Text>
+                  </Button>
+                ))}
+              </Stack>
+            </Box>
+
+            <Box flex={1}>
+              <form onSubmit={handleSubmit}>
+                <Card variant="outline" size="lg" p={6}>
+                  <CardBody>
+                    {renderStep()}
+                  </CardBody>
+                </Card>
+
+                <HStack mt={6} spacing={4} justify="flex-end">
+                  <Button
+                    onClick={prevStep}
+                    isDisabled={currentStep === 0}
+                    variant="outline"
+                    colorScheme="green"
+                    size="lg"
+                    px={8}
+                  >
+                    Previous
+                  </Button>
+                  <Button
+                    colorScheme="green"
+                    onClick={currentStep === steps.length - 1 ? handleSubmit : nextStep}
+                    isLoading={isSubmitting}
+                    size="lg"
+                    px={8}
+                  >
+                    {currentStep === steps.length - 1 ? 'Submit' : 'Next'}
+                  </Button>
+                </HStack>
+              </form>
+            </Box>
+          </Stack>
+        </VStack>
+      </Box>
+    </Container>
   )
 } 
