@@ -358,7 +358,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="6xl">
       <ModalOverlay bg="whiteAlpha.800" backdropFilter="blur(2px)" />
-      <ModalContent maxW="1200px" mx="4" rounded="lg" overflow="hidden">
+      <ModalContent maxW="95vw" mx="4" rounded="lg" overflow="hidden">
         <Box bg="white" px="6" py="4" borderBottom="1px" borderColor="gray.100">
           <HStack justify="space-between">
             <HStack spacing="4">
@@ -424,27 +424,42 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
           </HStack>
         </Box>
 
-        <Box p="6">
-          <Table variant="simple" size="sm">
-            <Thead>
-              <Tr>
-                <Th 
-                  py="4" 
-                  pl="6" 
-                  color="gray.600" 
-                  fontSize="xs" 
-                  textTransform="uppercase" 
-                  fontWeight="medium"
-                  borderBottom="1px"
-                  borderColor="gray.200"
-                >
-                  Account
-                </Th>
-                {monthsData.map((month) => (
+        <Box p="6" overflowX="auto" maxW="100%">
+          <Box minW="fit-content">
+            <Table variant="simple" size="sm">
+              <Thead>
+                <Tr>
+                  <Th 
+                    py="4" 
+                    pl="6" 
+                    color="gray.600" 
+                    fontSize="xs" 
+                    textTransform="uppercase" 
+                    fontWeight="medium"
+                    borderBottom="1px"
+                    borderColor="gray.200"
+                  >
+                    Account
+                  </Th>
+                  {monthsData.map((month) => (
+                    <Th
+                      key={`${month.month}-${month.year}`}
+                      isNumeric
+                      py="4"
+                      color="gray.600"
+                      fontSize="xs"
+                      textTransform="uppercase"
+                      fontWeight="medium"
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                    >
+                      {month.month} &apos;{month.year}
+                    </Th>
+                  ))}
                   <Th
-                    key={`${month.month}-${month.year}`}
                     isNumeric
                     py="4"
+                    pr="6"
                     color="gray.600"
                     fontSize="xs"
                     textTransform="uppercase"
@@ -452,235 +467,222 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
                     borderBottom="1px"
                     borderColor="gray.200"
                   >
-                    {month.month} &apos;{month.year}
+                    Δ Avg (%)
                   </Th>
-                ))}
-                <Th
-                  isNumeric
-                  py="4"
-                  pr="6"
-                  color="gray.600"
-                  fontSize="xs"
-                  textTransform="uppercase"
-                  fontWeight="medium"
-                  borderBottom="1px"
-                  borderColor="gray.200"
-                >
-                  Δ Avg (%)
-                </Th>
-              </Tr>
-            </Thead>
-            <Tbody>
-              {/* Assets Section */}
-              <Tr>
-                <Td py="3" pl="6" fontWeight="semibold" color="gray.700">
-                  ASSETS
-                </Td>
-                {monthsData.map(() => <Td key={Math.random()}></Td>)}
-                <Td></Td>
-              </Tr>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {/* Assets Section */}
+                <Tr>
+                  <Td py="3" pl="6" fontWeight="semibold" color="gray.700">
+                    ASSETS
+                  </Td>
+                  {monthsData.map(() => <Td key={Math.random()}></Td>)}
+                  <Td></Td>
+                </Tr>
 
-              {/* Current Assets */}
-              <Tr>
-                <Td py="3" pl="10" color="gray.700">Current Assets</Td>
-                {monthsData.map(() => <Td key={Math.random()}></Td>)}
-                <Td></Td>
-              </Tr>
+                {/* Current Assets */}
+                <Tr>
+                  <Td py="3" pl="10" color="gray.700">Current Assets</Td>
+                  {monthsData.map(() => <Td key={Math.random()}></Td>)}
+                  <Td></Td>
+                </Tr>
 
-              {Object.entries(displayData.currentAssetsData).map(([key, monthlyData]) => (
-                <Tr key={key}>
-                  <Td py="3" pl="14" color="gray.700">{key.charAt(0).toUpperCase() + key.slice(1)}</Td>
-                  {displayData.monthKeys.map(month => (
+                {Object.entries(displayData.currentAssetsData).map(([key, monthlyData]) => (
+                  <Tr key={key}>
+                    <Td py="3" pl="14" color="gray.700">{key.charAt(0).toUpperCase() + key.slice(1)}</Td>
+                    {displayData.monthKeys.map(month => (
+                      <Td
+                        key={month}
+                        isNumeric
+                        py="3"
+                        color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      >
+                        {formatAmount(monthlyData[month])}
+                      </Td>
+                    ))}
                     <Td
-                      key={month}
                       isNumeric
                       py="3"
-                      color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      pr="6"
+                      color={calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ) < 0 ? "red.500" : "green.500"}
+                      fontWeight="medium"
                     >
-                      {formatAmount(monthlyData[month])}
+                      {calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ).toFixed(0)}%
                     </Td>
-                  ))}
-                  <Td
-                    isNumeric
-                    py="3"
-                    pr="6"
-                    color={calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ) < 0 ? "red.500" : "green.500"}
-                    fontWeight="medium"
-                  >
-                    {calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ).toFixed(0)}%
-                  </Td>
+                  </Tr>
+                ))}
+
+                {/* Non-Current Assets */}
+                <Tr>
+                  <Td py="3" pl="10" color="gray.700">Non-Current Assets</Td>
+                  {monthsData.map(() => <Td key={Math.random()}></Td>)}
+                  <Td></Td>
                 </Tr>
-              ))}
 
-              {/* Non-Current Assets */}
-              <Tr>
-                <Td py="3" pl="10" color="gray.700">Non-Current Assets</Td>
-                {monthsData.map(() => <Td key={Math.random()}></Td>)}
-                <Td></Td>
-              </Tr>
-
-              {Object.entries(displayData.nonCurrentAssetsData).map(([key, monthlyData]) => (
-                <Tr key={key}>
-                  <Td py="3" pl="14" color="gray.700">{key.charAt(0).toUpperCase() + key.slice(1)}</Td>
-                  {displayData.monthKeys.map(month => (
+                {Object.entries(displayData.nonCurrentAssetsData).map(([key, monthlyData]) => (
+                  <Tr key={key}>
+                    <Td py="3" pl="14" color="gray.700">{key.charAt(0).toUpperCase() + key.slice(1)}</Td>
+                    {displayData.monthKeys.map(month => (
+                      <Td
+                        key={month}
+                        isNumeric
+                        py="3"
+                        color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      >
+                        {formatAmount(monthlyData[month])}
+                      </Td>
+                    ))}
                     <Td
-                      key={month}
                       isNumeric
                       py="3"
-                      color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      pr="6"
+                      color={calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ) < 0 ? "red.500" : "green.500"}
+                      fontWeight="medium"
                     >
-                      {formatAmount(monthlyData[month])}
+                      {calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ).toFixed(0)}%
                     </Td>
-                  ))}
-                  <Td
-                    isNumeric
-                    py="3"
-                    pr="6"
-                    color={calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ) < 0 ? "red.500" : "green.500"}
-                    fontWeight="medium"
-                  >
-                    {calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ).toFixed(0)}%
+                  </Tr>
+                ))}
+
+                {/* Liabilities Section */}
+                <Tr>
+                  <Td py="3" pl="6" fontWeight="semibold" color="gray.700">
+                    LIABILITIES
                   </Td>
+                  {monthsData.map(() => <Td key={Math.random()}></Td>)}
+                  <Td></Td>
                 </Tr>
-              ))}
 
-              {/* Liabilities Section */}
-              <Tr>
-                <Td py="3" pl="6" fontWeight="semibold" color="gray.700">
-                  LIABILITIES
-                </Td>
-                {monthsData.map(() => <Td key={Math.random()}></Td>)}
-                <Td></Td>
-              </Tr>
+                {/* Current Liabilities */}
+                <Tr>
+                  <Td py="3" pl="10" color="gray.700">Current Liabilities</Td>
+                  {monthsData.map(() => <Td key={Math.random()}></Td>)}
+                  <Td></Td>
+                </Tr>
 
-              {/* Current Liabilities */}
-              <Tr>
-                <Td py="3" pl="10" color="gray.700">Current Liabilities</Td>
-                {monthsData.map(() => <Td key={Math.random()}></Td>)}
-                <Td></Td>
-              </Tr>
-
-              {Object.entries(displayData.currentLiabilitiesData).map(([key, monthlyData]) => (
-                <Tr key={key}>
-                  <Td py="3" pl="14" color="gray.700">{key.split(/(?=[A-Z])/).join(' ')}</Td>
-                  {displayData.monthKeys.map(month => (
+                {Object.entries(displayData.currentLiabilitiesData).map(([key, monthlyData]) => (
+                  <Tr key={key}>
+                    <Td py="3" pl="14" color="gray.700">{key.split(/(?=[A-Z])/).join(' ')}</Td>
+                    {displayData.monthKeys.map(month => (
+                      <Td
+                        key={month}
+                        isNumeric
+                        py="3"
+                        color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      >
+                        {formatAmount(monthlyData[month])}
+                      </Td>
+                    ))}
                     <Td
-                      key={month}
                       isNumeric
                       py="3"
-                      color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      pr="6"
+                      color={calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ) < 0 ? "red.500" : "green.500"}
+                      fontWeight="medium"
                     >
-                      {formatAmount(monthlyData[month])}
+                      {calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ).toFixed(0)}%
                     </Td>
-                  ))}
-                  <Td
-                    isNumeric
-                    py="3"
-                    pr="6"
-                    color={calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ) < 0 ? "red.500" : "green.500"}
-                    fontWeight="medium"
-                  >
-                    {calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ).toFixed(0)}%
-                  </Td>
+                  </Tr>
+                ))}
+
+                {/* Non-Current Liabilities */}
+                <Tr>
+                  <Td py="3" pl="10" color="gray.700">Non-Current Liabilities</Td>
+                  {monthsData.map(() => <Td key={Math.random()}></Td>)}
+                  <Td></Td>
                 </Tr>
-              ))}
 
-              {/* Non-Current Liabilities */}
-              <Tr>
-                <Td py="3" pl="10" color="gray.700">Non-Current Liabilities</Td>
-                {monthsData.map(() => <Td key={Math.random()}></Td>)}
-                <Td></Td>
-              </Tr>
-
-              {Object.entries(displayData.nonCurrentLiabilitiesData).map(([key, monthlyData]) => (
-                <Tr key={key}>
-                  <Td py="3" pl="14" color="gray.700">{key.split(/(?=[A-Z])/).join(' ')}</Td>
-                  {displayData.monthKeys.map(month => (
+                {Object.entries(displayData.nonCurrentLiabilitiesData).map(([key, monthlyData]) => (
+                  <Tr key={key}>
+                    <Td py="3" pl="14" color="gray.700">{key.split(/(?=[A-Z])/).join(' ')}</Td>
+                    {displayData.monthKeys.map(month => (
+                      <Td
+                        key={month}
+                        isNumeric
+                        py="3"
+                        color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      >
+                        {formatAmount(monthlyData[month])}
+                      </Td>
+                    ))}
                     <Td
-                      key={month}
                       isNumeric
                       py="3"
-                      color={monthlyData[month] < 0 ? "red.500" : "gray.700"}
+                      pr="6"
+                      color={calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ) < 0 ? "red.500" : "green.500"}
+                      fontWeight="medium"
                     >
-                      {formatAmount(monthlyData[month])}
+                      {calculateDelta(
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
+                        monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
+                      ).toFixed(0)}%
+                    </Td>
+                  </Tr>
+                ))}
+
+                {/* Equity Section */}
+                <Tr>
+                  <Td py="3" pl="6" fontWeight="semibold" color="gray.700">
+                    EQUITY
+                  </Td>
+                  {monthsData.map(() => <Td key={Math.random()}></Td>)}
+                  <Td></Td>
+                </Tr>
+
+                <Tr>
+                  <Td py="3" pl="14" color="gray.700">Owner&apos;s Equity</Td>
+                  {displayData.monthKeys.map(month => (
+                    <Td key={month} isNumeric py="3">
+                      {formatAmount(displayData.equityData.ownerEquity[month])}
                     </Td>
                   ))}
-                  <Td
-                    isNumeric
-                    py="3"
-                    pr="6"
-                    color={calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ) < 0 ? "red.500" : "green.500"}
-                    fontWeight="medium"
-                  >
-                    {calculateDelta(
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 1]],
-                      monthlyData[displayData.monthKeys[displayData.monthKeys.length - 2]]
-                    ).toFixed(0)}%
-                  </Td>
+                  <Td isNumeric py="3" pr="6">0%</Td>
                 </Tr>
-              ))}
 
-              {/* Equity Section */}
-              <Tr>
-                <Td py="3" pl="6" fontWeight="semibold" color="gray.700">
-                  EQUITY
-                </Td>
-                {monthsData.map(() => <Td key={Math.random()}></Td>)}
-                <Td></Td>
-              </Tr>
+                <Tr>
+                  <Td py="3" pl="14" color="gray.700">Retained Earnings</Td>
+                  {displayData.monthKeys.map(month => (
+                    <Td key={month} isNumeric py="3">
+                      {formatAmount(displayData.equityData.retainedEarnings[month])}
+                    </Td>
+                  ))}
+                  <Td isNumeric py="3" pr="6">0%</Td>
+                </Tr>
 
-              <Tr>
-                <Td py="3" pl="14" color="gray.700">Owner&apos;s Equity</Td>
-                {displayData.monthKeys.map(month => (
-                  <Td key={month} isNumeric py="3">
-                    {formatAmount(displayData.equityData.ownerEquity[month])}
-                  </Td>
-                ))}
-                <Td isNumeric py="3" pr="6">0%</Td>
-              </Tr>
-
-              <Tr>
-                <Td py="3" pl="14" color="gray.700">Retained Earnings</Td>
-                {displayData.monthKeys.map(month => (
-                  <Td key={month} isNumeric py="3">
-                    {formatAmount(displayData.equityData.retainedEarnings[month])}
-                  </Td>
-                ))}
-                <Td isNumeric py="3" pr="6">0%</Td>
-              </Tr>
-
-              <Tr>
-                <Td py="3" pl="6" fontWeight="semibold" color="gray.700">TOTAL EQUITY</Td>
-                {displayData.monthKeys.map(month => (
-                  <Td key={month} isNumeric py="3" fontWeight="semibold">
-                    {formatAmount(displayData.equityData.totalEquity[month])}
-                  </Td>
-                ))}
-                <Td isNumeric py="3" pr="6" fontWeight="semibold">0%</Td>
-              </Tr>
-            </Tbody>
-          </Table>
+                <Tr>
+                  <Td py="3" pl="6" fontWeight="semibold" color="gray.700">TOTAL EQUITY</Td>
+                  {displayData.monthKeys.map(month => (
+                    <Td key={month} isNumeric py="3" fontWeight="semibold">
+                      {formatAmount(displayData.equityData.totalEquity[month])}
+                    </Td>
+                  ))}
+                  <Td isNumeric py="3" pr="6" fontWeight="semibold">0%</Td>
+                </Tr>
+              </Tbody>
+            </Table>
+          </Box>
         </Box>
         <Text p="4" color="gray.600" fontSize="sm">Don&apos;t forget to review before exporting</Text>
       </ModalContent>

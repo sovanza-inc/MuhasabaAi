@@ -801,7 +801,7 @@ export default function BalanceSheetPage() {
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'italic');
       const footerNote = 'The accompanying notes are an integral part of these financial statements.';
-      pdf.text(footerNote, margin, pageHeight - margin);
+      pdf.text(footerNote, margin, Math.min(currentY + 20, pageHeight - margin));
 
       // Save the PDF
       pdf.save('balance-sheet.pdf');
