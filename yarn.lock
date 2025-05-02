@@ -2446,6 +2446,16 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@chakra-ui/icons@npm:2.2.4":
+  version: 2.2.4
+  resolution: "@chakra-ui/icons@npm:2.2.4"
+  peerDependencies:
+    "@chakra-ui/react": ">=2.0.0"
+    react: ">=18"
+  checksum: 10c0/db1aa925e9e22efe12d2417df2b21337f4cb6e6de0a2ba641bc4c3c36dbebb39ec6e6ce9b82f79f3a5d85e988779784468f8b604614170dee1b57c66ea400f9e
+  languageName: node
+  linkType: hard
+
 "@chakra-ui/react@npm:^2.10.4":
   version: 2.10.4
   resolution: "@chakra-ui/react@npm:2.10.4"
@@ -16755,6 +16765,7 @@ __metadata:
   resolution: "muhasaba-ai@workspace:."
   dependencies:
     "@chakra-ui/cli": "npm:^2.5.6"
+    "@chakra-ui/icons": "npm:2.2.4"
     "@changesets/cli": "npm:^2.27.11"
     "@eslint/js": "npm:^9.18.0"
     "@fontsource/lato": "npm:^5.1.1"

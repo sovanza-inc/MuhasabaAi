@@ -4,6 +4,7 @@ import { AppShell, AppShellProps } from '@saas-ui/react'
 
 import { PaymentOverdueBanner } from '#features/billing/components/payment-overdue-banner'
 import { BankConnectionModal } from '../components/BankConnectionModal'
+import { QuestionnaireProvider } from '#components/Questionnaire/QuestionnaireProvider'
 
 export interface AppLayoutProps extends AppShellProps {}
 
@@ -24,6 +25,7 @@ export const AppLayout: React.FC<AppLayoutProps> = ({
     >
       {children}
       <BankConnectionModal />
+      <QuestionnaireProvider />
     </AppShell>
   )
 }

@@ -98,7 +98,6 @@ export async function POST(request: NextRequest) {
     }
 
     // Handle file uploads
-    const documents: Record<string, string[]> = {}
     const uploadPath = join(process.cwd(), 'public', 'uploads', workspaceId)
 
     // Ensure upload directory exists
@@ -108,29 +107,27 @@ export async function POST(request: NextRequest) {
       console.error('Error creating upload directory:', error)
     }
 
-    // Initialize documents with the current state from the form submission
-    // This ensures removed files are not kept
-    Object.entries(responses.documents || {}).forEach(([key, files]) => {
-      if (Array.isArray(files)) {
-        documents[key] = [...files]
-      }
-    })
+    // Start with the existing files from the form submission
+    const documents = { ...responses.documents }
 
     // Process new file uploads
     for (const [key, value] of formData.entries()) {
       if (key.startsWith('documents_') && value instanceof File) {
         const documentType = key.split('_')[1]
-        const fileName = `${Date.now()}-${value.name}`
+        const fileName = value.name // Use original filename without timestamp
         const filePath = join(uploadPath, fileName)
         
         const arrayBuffer = await value.arrayBuffer()
         const uint8Array = new Uint8Array(arrayBuffer)
         await writeFile(filePath, uint8Array)
         
+        // Only add the file if it's not already in the documents array
         if (!documents[documentType]) {
           documents[documentType] = []
         }
-        documents[documentType].push(fileName)
+        if (!documents[documentType].includes(fileName)) {
+          documents[documentType].push(fileName)
+        }
       }
     }
 
@@ -165,32 +162,36 @@ export async function POST(request: NextRequest) {
     }
 
     // Generate system prompt based on merged responses
-    const systemPrompt = generateSystemPrompt(mergedResponses)
+    const systemPrompt = generateSystemPrompt(responsesForStorage)
 
     // Check if a record already exists for this workspace
     const existingResponse = await db.query.questionnaireResponses.findFirst({
       where: eq(questionnaireResponses.workspaceId, workspaceId),
       orderBy: [desc(questionnaireResponses.createdAt)],
-    }) as QuestionnaireResponseRecord | undefined
+    })
 
     if (existingResponse) {
       // Update existing record
+      const generatedPrompt = generateSystemPrompt(responsesForStorage)
       await db.update(questionnaireResponses)
         .set({
           responses: responsesForStorage,
-          systemPrompt,
+          systemPrompt: generatedPrompt,
           updatedAt: new Date(),
         })
         .where(eq(questionnaireResponses.id, existingResponse.id))
     } else {
       // Create new record
-      await db.insert(questionnaireResponses).values({
-        id: generateId(),
+      const newId = generateId()
+      const generatedPrompt = generateSystemPrompt(responsesForStorage)
+      const newRecord = {
+        id: newId,
         workspaceId,
         userId: session.user.id,
         responses: responsesForStorage,
-        systemPrompt,
-      })
+        systemPrompt: generatedPrompt,
+      }
+      await db.insert(questionnaireResponses).values(newRecord)
     }
 
     return NextResponse.json({ success: true })
@@ -238,7 +239,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function generateSystemPrompt(responses: QuestionnaireResponseRecord['responses']) {
+function generateSystemPrompt(responses: QuestionnaireResponseRecord['responses']): string {
   let prompt = `You are an AI bookkeeping assistant for a ${responses.industry} business named "${responses.businessName}" that has been operating since ${responses.operatingSince}.\n\n`
 
   // Add product/service info
@@ -250,22 +251,50 @@ function generateSystemPrompt(responses: QuestionnaireResponseRecord['responses'
     prompt += `- Beginning Inventory: AED ${responses.beginningInventory}\n`
     prompt += `- Purchases: AED ${responses.purchases}\n`
     prompt += `- Ending Inventory: AED ${responses.endingInventory}\n`
+    
+    if (responses.cogsCategories.length > 0) {
+      prompt += `\nCOGS Categories:\n`
+      responses.cogsCategories.forEach(category => {
+        prompt += `- ${category.type}${category.description ? `: ${category.description}` : ''}\n`
+      })
+    }
   }
 
-  // Add fixed assets info
-  if (responses.hasFixedAssets && responses.fixedAssets.length > 0) {
+  // Add Fixed Assets info
+  if (responses.hasFixedAssets) {
     prompt += `\nFixed Assets:\n`
-    responses.fixedAssets.forEach((asset) => {
-      prompt += `- ${asset.name} (${asset.type}): AED ${asset.value}, purchased on ${asset.purchaseDate}, using ${asset.depreciationMethod} depreciation over ${asset.usefulLife} years\n`
+    responses.fixedAssets.forEach(asset => {
+      prompt += `- ${asset.name} (${asset.type}): AED ${asset.value}, purchased on ${asset.purchaseDate}\n`
+      prompt += `  Depreciation: ${asset.depreciationMethod} method over ${asset.usefulLife} years\n`
+    })
+  }
+
+  // Add Loans info
+  if (responses.hasLoans) {
+    prompt += `\nLoans:\n`
+    responses.loans.forEach(loan => {
+      prompt += `- ${loan.purpose}: AED ${loan.amount} at ${loan.interestRate}% interest\n`
+      prompt += `  Monthly payment: AED ${loan.monthlyPayment}, started on ${loan.startDate}\n`
     })
   }
 
   // Add VAT info
   if (responses.isVatRegistered) {
-    prompt += `\nVAT Information:\n`
+    prompt += `\nVAT Registration:\n`
     prompt += `- TRN: ${responses.trn}\n`
     prompt += `- Filing Frequency: ${responses.vatFrequency}\n`
-    prompt += `- VAT Tracking: ${responses.trackVat ? 'Required' : 'Not Required'}\n`
+    prompt += `- VAT Tracking: ${responses.trackVat ? 'Enabled' : 'Disabled'}\n`
+  }
+
+  // Add Outstanding Balances info
+  if (responses.outstandingBalances.length > 0) {
+    prompt += `\nOutstanding Balances:\n`
+    responses.outstandingBalances.forEach(balance => {
+      prompt += `- ${balance.partyName} (${balance.type}): AED ${balance.amount} due on ${balance.dueDate}\n`
+      if (balance.description) {
+        prompt += `  Description: ${balance.description}\n`
+      }
+    })
   }
 
   return prompt
