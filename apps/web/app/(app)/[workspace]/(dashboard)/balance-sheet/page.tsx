@@ -4,9 +4,10 @@ import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
-import React from 'react'
+import React, { useRef, useState } from 'react'
 import { LuDownload } from 'react-icons/lu'
 import jsPDF from 'jspdf'
+import { EditablePdfPreview, FilteredBalanceSheetData } from './components/EditablePdfPreview'
 
 interface BankAccount {
   id?: string;
@@ -73,14 +74,16 @@ interface BalanceSheetItem {
 export default function BalanceSheetPage() {
   const [workspace] = useCurrentWorkspace()
   const { CACHE_KEYS, prefetchData } = useApiCache()
-  const [selectedAccount, setSelectedAccount] = React.useState('all')
-  const [isLoading, setIsLoading] = React.useState(true)
-  const [authToken, setAuthToken] = React.useState<string | null>(null)
-  const [customerId, setCustomerId] = React.useState<string | null>(null)
-  const [bankAccounts, setBankAccounts] = React.useState<BankWithAccounts[]>([])
-  const [transactions, setTransactions] = React.useState<Transaction[]>([])
-  const contentRef = React.useRef<HTMLDivElement>(null)
-  const logoRef = React.useRef<HTMLImageElement>(null)
+  const [selectedAccount, setSelectedAccount] = useState('all')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [authToken, setAuthToken] = useState<string | null>(null)
+  const [customerId, setCustomerId] = useState<string | null>(null)
+  const [bankAccounts, setBankAccounts] = useState<BankWithAccounts[]>([])
+  const [transactions, setTransactions] = useState<Transaction[]>([])
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const contentRef = useRef<HTMLDivElement>(null)
+  const logoRef = useRef<HTMLImageElement>(null)
   const toast = useToast()
 
   // Initialize auth token and customer ID
@@ -301,8 +304,9 @@ export default function BalanceSheetPage() {
 
         setBankAccounts(banksWithAccounts)
         setTransactions(allTransactions)
-      } catch (error) {
-        console.error('Error fetching data:', error)
+      } catch (err) {
+        console.error('Error fetching data:', err)
+        setError('Failed to fetch balance sheet data')
       } finally {
         setIsLoading(false)
       }
@@ -508,8 +512,97 @@ export default function BalanceSheetPage() {
     }
   }, [transactions, selectedAccount, bankAccounts])
 
-  // Helper functions for PDF generation
-  const handleExportPDF = async () => {
+  // Process data for the editable PDF preview
+  const processDataForPreview = () => {
+    const calculateTotal = (amounts: number[]) => {
+      return amounts.reduce((sum, amount) => sum + amount, 0);
+    };
+
+    // Calculate current assets
+    const currentAssets = {
+      cash: balanceData[0]?.amount || '$ 0',
+      bank: balanceData[2]?.amount || '$ 0',
+      savings: balanceData[1]?.amount || '$ 0',
+      totalCurrent: '$ ' + calculateTotal([
+        parseFloat((balanceData[0]?.amount || '$ 0').replace(/[^0-9.-]+/g, '')),
+        parseFloat((balanceData[1]?.amount || '$ 0').replace(/[^0-9.-]+/g, '')),
+        parseFloat((balanceData[2]?.amount || '$ 0').replace(/[^0-9.-]+/g, ''))
+      ]).toString(),
+      transactions: transactions.filter(t => t.credit_debit_indicator === 'CREDIT').map(t => ({
+        date: new Date(t.booking_date_time).toLocaleDateString(),
+        accountName: t.account_id,
+        description: t.transaction_information,
+        amount: t.amount.amount.toString(),
+        bankId: '',
+        bankName: t.bank_name || ''
+      }))
+    };
+
+    // Non-current assets (placeholder values)
+    const nonCurrentAssets = {
+      fixedAssets: '$ 0',
+      investments: '$ 0',
+      totalNonCurrent: '$ 0',
+      transactions: []
+    };
+
+    // Calculate total assets
+    const totalAssets = '$ ' + (
+      parseFloat(currentAssets.totalCurrent.replace(/[^0-9.-]+/g, '')) +
+      parseFloat(nonCurrentAssets.totalNonCurrent.replace(/[^0-9.-]+/g, ''))
+    ).toString();
+
+    // Current liabilities (placeholder values)
+    const currentLiabilities = {
+      accountsPayable: '$ 0',
+      shortTermLoans: '$ 0',
+      totalCurrent: '$ 0',
+      transactions: transactions.filter(t => t.credit_debit_indicator === 'DEBIT').map(t => ({
+        date: new Date(t.booking_date_time).toLocaleDateString(),
+        accountName: t.account_id,
+        description: t.transaction_information,
+        amount: t.amount.amount.toString(),
+        bankId: '',
+        bankName: t.bank_name || ''
+      }))
+    };
+
+    // Non-current liabilities (placeholder values)
+    const nonCurrentLiabilities = {
+      longTermLoans: '$ 0',
+      totalNonCurrent: '$ 0',
+      transactions: []
+    };
+
+    // Calculate total liabilities
+    const totalLiabilities = '$ ' + (
+      parseFloat(currentLiabilities.totalCurrent.replace(/[^0-9.-]+/g, '')) +
+      parseFloat(nonCurrentLiabilities.totalNonCurrent.replace(/[^0-9.-]+/g, ''))
+    ).toString();
+
+    // Equity (placeholder values)
+    const equity = {
+      ownerEquity: '$ 0',
+      retainedEarnings: totalAssets,
+      totalEquity: totalAssets
+    };
+
+    return {
+      assets: {
+        currentAssets,
+        nonCurrentAssets,
+        totalAssets
+      },
+      liabilities: {
+        currentLiabilities,
+        nonCurrentLiabilities,
+        totalLiabilities
+      },
+      equity
+    };
+  };
+
+  const handleExportPDF = async (filteredData: FilteredBalanceSheetData) => {
     if (!contentRef.current || !logoRef.current) return;
 
     try {
@@ -561,20 +654,20 @@ export default function BalanceSheetPage() {
         
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'normal');
-        const currentDate = new Date();
-        const year = currentDate.getFullYear();
-        const month = currentDate.toLocaleString('default', { month: 'long' });
-        const day = currentDate.getDate();
-        pdf.text(`As of ${month} ${day}, ${year}`, margin, margin + 18);
+        const periodStart = filteredData.period.startDate;
+        const periodEnd = filteredData.period.endDate;
+        pdf.text(
+          `For the Period ${periodStart.toLocaleString('default', { month: 'long', year: 'numeric' })} to ${periodEnd.toLocaleString('default', { month: 'long', year: 'numeric' })}`,
+          margin,
+          margin + 18
+        );
         
         // Add column headers with consistent styling
         const startY = margin + 30;
         pdf.setFontSize(10);
         pdf.setFont('helvetica', 'bold');
         
-        // Column headers with consistent alignment
         pdf.text('Description', margin, startY);
-        pdf.text('Note', pageWidth - margin - 60, startY);
         pdf.text('Amount', pageWidth - margin, startY, { align: 'right' });
         
         // Consistent header underline
@@ -585,14 +678,14 @@ export default function BalanceSheetPage() {
       };
 
       // Helper function to add section with consistent styling
-      const addSection = (title: string, items: BalanceSheetItem[], startY: number) => {
+      const addSection = (title: string, items: any[], startY: number) => {
         let currentY = startY;
         
         // Section title with consistent styling
         pdf.setFont('helvetica', 'bold');
         pdf.setFontSize(11);
         pdf.text(title, margin, currentY);
-        currentY += 4;
+        currentY += 6;
         
         // Items with consistent styling
         pdf.setFontSize(10);
@@ -606,9 +699,6 @@ export default function BalanceSheetPage() {
           
           // Consistent text alignment
           pdf.text(item.description, xPos, currentY);
-          if (item.note) {
-            pdf.text(item.note, pageWidth - margin - 60, currentY);
-          }
           
           const amountText = formatAmount(item.amount);
           pdf.text(amountText, pageWidth - margin, currentY, { align: 'right' });
@@ -624,81 +714,103 @@ export default function BalanceSheetPage() {
           }
           
           pdf.setFont('helvetica', 'normal');
-          currentY += 5;
+          currentY += 6;
         });
-        
-        return currentY + 2;
+
+        return currentY + 4;
       };
 
-      // Process balance data into sections
-      const processedData = balanceData.reduce((acc: any, item) => {
-        const amount = parseFloat(item.amount.replace(/[^0-9.-]+/g, ''));
-        
-        if (item.title.toLowerCase().includes('cash')) {
-          acc.currentAssets.push({
-            description: item.title,
-            amount: amount,
-            indent: true
-          });
-        } else if (item.title.toLowerCase().includes('bank')) {
-          acc.currentAssets.push({
-            description: item.title,
-            amount: amount,
-            indent: true
-          });
-        } else if (item.title.toLowerCase().includes('savings')) {
-          acc.currentAssets.push({
-            description: item.title,
-            amount: amount,
-            indent: true
-          });
-        }
-        return acc;
-      }, {
-        currentAssets: [],
-        nonCurrentAssets: [],
-        currentLiabilities: [],
-        nonCurrentLiabilities: [],
-        equity: []
-      });
+      const startY = await addHeader(1);
 
-      // Calculate totals
-      const currentAssetsTotal = processedData.currentAssets.reduce((sum: number, item: any) => sum + item.amount, 0);
-      const nonCurrentAssetsTotal = processedData.nonCurrentAssets.reduce((sum: number, item: any) => sum + item.amount, 0);
-      const totalAssets = currentAssetsTotal + nonCurrentAssetsTotal;
-
-      const y = await addHeader(1);
-
-      // Assets section
-      let currentY = addSection('ASSETS', [], y);
-      
-      // Current assets
+      // Process assets data using filtered data
       const currentAssetsItems = [
-        { description: 'Current assets', amount: 0 },
-        ...processedData.currentAssets,
-        { description: 'Total current assets', amount: currentAssetsTotal, isSubTotal: true }
+        { description: 'Current Assets', amount: 0 },
+        { description: 'Cash', amount: filteredData.assets.currentAssets.cash, indent: true },
+        { description: 'Bank', amount: filteredData.assets.currentAssets.bank, indent: true },
+        { description: 'Savings', amount: filteredData.assets.currentAssets.savings, indent: true },
+        { 
+          description: 'Total Current Assets', 
+          amount: filteredData.assets.currentAssets.totalCurrent,
+          isSubTotal: true 
+        }
       ];
-      currentY = addSection('', currentAssetsItems, currentY + 4);
-      
-      // Non-current assets
-      const nonCurrentAssetsItems = [
-        { description: 'Non-current assets', amount: 0 },
-        ...processedData.nonCurrentAssets,
-        { description: 'Total non-current assets', amount: nonCurrentAssetsTotal, isSubTotal: true }
-      ];
-      currentY = addSection('', nonCurrentAssetsItems, currentY + 6);
-      
-      // Total assets
-      const totalAssetsItems = [
-        { description: 'TOTAL ASSETS', amount: totalAssets, isTotal: true }
-      ];
-      currentY = addSection('', totalAssetsItems, currentY + 6);
 
-      // Add footer note with proper spacing from the last content
+      const nonCurrentAssetsItems = [
+        { description: 'Non-Current Assets', amount: 0 },
+        { description: 'Fixed Assets', amount: filteredData.assets.nonCurrentAssets.fixedAssets, indent: true },
+        { description: 'Investments', amount: filteredData.assets.nonCurrentAssets.investments, indent: true },
+        { 
+          description: 'Total Non-Current Assets', 
+          amount: filteredData.assets.nonCurrentAssets.totalNonCurrent,
+          isSubTotal: true 
+        }
+      ];
+
+      const totalAssetsItems = [
+        { 
+          description: 'TOTAL ASSETS', 
+          amount: filteredData.assets.totalAssets,
+          isTotal: true 
+        }
+      ];
+
+      let currentY = startY;
+      currentY = addSection('ASSETS', currentAssetsItems, currentY);
+      currentY = addSection('', nonCurrentAssetsItems, currentY);
+      currentY = addSection('', totalAssetsItems, currentY);
+
+      // Process liabilities data using filtered data
+      const currentLiabilitiesItems = [
+        { description: 'Current Liabilities', amount: 0 },
+        { description: 'Accounts Payable', amount: filteredData.liabilities.currentLiabilities.accountsPayable, indent: true },
+        { description: 'Short-term Loans', amount: filteredData.liabilities.currentLiabilities.shortTermLoans, indent: true },
+        { 
+          description: 'Total Current Liabilities', 
+          amount: filteredData.liabilities.currentLiabilities.totalCurrent,
+          isSubTotal: true 
+        }
+      ];
+
+      const nonCurrentLiabilitiesItems = [
+        { description: 'Non-Current Liabilities', amount: 0 },
+        { description: 'Long-term Loans', amount: filteredData.liabilities.nonCurrentLiabilities.longTermLoans, indent: true },
+        { 
+          description: 'Total Non-Current Liabilities', 
+          amount: filteredData.liabilities.nonCurrentLiabilities.totalNonCurrent,
+          isSubTotal: true 
+        }
+      ];
+
+      const totalLiabilitiesItems = [
+        { 
+          description: 'TOTAL LIABILITIES', 
+          amount: filteredData.liabilities.totalLiabilities,
+          isTotal: true 
+        }
+      ];
+
+      currentY = addSection('LIABILITIES', currentLiabilitiesItems, currentY);
+      currentY = addSection('', nonCurrentLiabilitiesItems, currentY);
+      currentY = addSection('', totalLiabilitiesItems, currentY);
+
+      // Process equity data using filtered data
+      const equityItems = [
+        { description: "Owner's Equity", amount: filteredData.equity.ownerEquity, indent: true },
+        { description: 'Retained Earnings', amount: filteredData.equity.retainedEarnings, indent: true },
+        { 
+          description: 'TOTAL EQUITY', 
+          amount: filteredData.equity.totalEquity,
+          isTotal: true 
+        }
+      ];
+
+      currentY = addSection('EQUITY', equityItems, currentY);
+
+      // Add footer note
       pdf.setFontSize(9);
       pdf.setFont('helvetica', 'italic');
       const footerNote = 'The accompanying notes are an integral part of these financial statements.';
-      pdf.text(footerNote, margin, Math.min(currentY + 15, pageHeight - margin));
+      pdf.text(footerNote, margin, pageHeight - margin);
 
       // Save the PDF
       pdf.save('balance-sheet.pdf');
@@ -713,14 +825,26 @@ export default function BalanceSheetPage() {
     } catch (error) {
       console.error('Error generating PDF:', error);
       toast({
-        title: 'Error',
-        description: 'Failed to generate PDF',
-        status: 'error',
-        duration: 5000,
+        title: "Export failed",
+        description: "There was an error generating the PDF",
+        status: "error",
+        duration: 3000,
         isClosable: true,
       });
     }
   };
+
+  const handleExportClick = () => {
+    setIsPreviewOpen(true);
+  };
+
+  if (error) {
+    return (
+      <Box p={8}>
+        <Text color="red.500">Error loading balance sheet data: {error}</Text>
+      </Box>
+    );
+  }
 
   return (
     <Box>
@@ -730,11 +854,11 @@ export default function BalanceSheetPage() {
         <Image
           ref={logoRef}
           src="/img/onboarding/muhasaba-logo.png"
-          alt="Muhasaba Logo"
+          alt="Muhasaba"
           style={{ display: 'none' }}
           crossOrigin="anonymous"
-          width="120px"
-          height="auto"
+          width="30px"
+          height="15px"
         />
         
         <Box 
@@ -774,7 +898,7 @@ export default function BalanceSheetPage() {
                 <Button
                   leftIcon={<LuDownload />}
                   colorScheme="green"
-                  onClick={handleExportPDF}
+                  onClick={handleExportClick}
                   isLoading={isLoading}
                 >
                   Export as PDF
@@ -879,6 +1003,14 @@ export default function BalanceSheetPage() {
           </Box>
         </Box>
       </Box>
+
+      <EditablePdfPreview
+        isOpen={isPreviewOpen}
+        onClose={() => setIsPreviewOpen(false)}
+        onExport={handleExportPDF}
+        data={processDataForPreview()}
+      />
+
       {/* Summary Footer */}
       <Box 
         bg="teal.700" 
@@ -898,5 +1030,5 @@ export default function BalanceSheetPage() {
         </HStack>
       </Box>
     </Box>
-  )
+  );
 }
