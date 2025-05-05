@@ -194,56 +194,6 @@ const calculateBurnRate = (transactions: Transaction[], period: string) => {
   }));
 };
 
-const calculateExpenseBreakdown = (transactions: Transaction[]) => {
-  const categories: Record<string, number> = {
-    'Cost of Goods Sold': 0,
-    'Salaries & Wages': 0,
-    'Rent & Utilities': 0,
-    'Marketing & Advertising': 0,
-    'Admin & Other': 0
-  };
-
-  let totalExpenses = 0;
-
-  transactions.forEach(transaction => {
-    if (transaction.credit_debit_indicator === 'DEBIT') {
-      const amount = Math.abs(transaction.amount.amount);
-      totalExpenses += amount;
-
-      const info = (transaction.transaction_information || '').toLowerCase();
-      
-      // More comprehensive keyword matching
-      if (info.match(/cogs|inventory|goods|product|merchandise|stock/)) {
-        categories['Cost of Goods Sold'] += amount;
-      } else if (info.match(/salary|wage|payroll|compensation|bonus|employee/)) {
-        categories['Salaries & Wages'] += amount;
-      } else if (info.match(/rent|utility|electricity|water|gas|maintenance|repair/)) {
-        categories['Rent & Utilities'] += amount;
-      } else if (info.match(/marketing|advertising|promotion|campaign|media|pr|branding/)) {
-        categories['Marketing & Advertising'] += amount;
-      } else {
-        categories['Admin & Other'] += amount;
-      }
-    }
-  });
-
-  // Ensure we have at least some data to show
-  if (totalExpenses === 0 && transactions.length > 0) {
-    // If we have transactions but no categorization, put everything in Admin & Other
-    categories['Admin & Other'] = transactions
-      .filter(t => t.credit_debit_indicator === 'DEBIT')
-      .reduce((sum, t) => sum + Math.abs(t.amount.amount), 0);
-    totalExpenses = categories['Admin & Other'];
-  }
-
-  return Object.entries(categories)
-    .map(([category, amount]) => ({
-      category,
-      value: totalExpenses === 0 ? 0 : (amount / totalExpenses) * 100
-    }))
-    .sort((a, b) => b.value - a.value); // Sort by value descending
-};
-
 // Helper function to identify investing or financing transactions
 const isInvestingOrFinancingTransaction = (transaction: Transaction) => {
   const info = transaction.transaction_information?.toLowerCase() || '';
