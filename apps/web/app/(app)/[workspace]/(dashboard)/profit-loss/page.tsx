@@ -8,13 +8,13 @@ import {
   SimpleGrid, 
   HStack,
   Table,
-  Thead,
+  // Thead,
   Tbody,
   Tr,
-  Th,
+  // Th,
   Td,
   TableContainer,
-  Icon,
+  // Icon,
   Card,
   CardBody,
   Spinner,
@@ -25,7 +25,7 @@ import {
 import React, { useState } from 'react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useProfitLoss } from '#features/bank-integrations/hooks/use-profit-loss'
-import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
+import { LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
