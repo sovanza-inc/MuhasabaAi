@@ -17,16 +17,22 @@ import { AreaChart, LineChart } from '@saas-ui/charts';
 import { MetricsCard } from './metrics-card';
 
 interface Transaction {
+  transaction_id: string;
+  account_id: string;
+  transaction_information: string;
+  transaction_reference?: string | null;
   amount: {
     amount: number;
     currency: string;
   };
   credit_debit_indicator: string;
-  booking_date_time: string;
-  transaction_information: string;
-  bank_name: string;
   status: string;
-  transaction_id: string;
+  booking_date_time: string;
+  value_date_time?: string;
+  bank_name?: string;
+  bank_id?: string;
+  account_type?: string;
+  account_name?: string;
 }
 
 interface FinancialKPIsProps {
