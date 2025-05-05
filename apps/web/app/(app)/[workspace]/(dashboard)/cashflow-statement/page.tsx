@@ -25,7 +25,7 @@ import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { AreaChart } from '@saas-ui/charts'
 import React, { useState } from 'react'
-import { LuChevronsUpDown, LuDownload, LuFileText } from 'react-icons/lu'
+import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { EditablePdfPreview, FilteredCashFlowData } from './components/EditablePdfPreview'
 import { processTransactions } from './utils/processTransactions'
@@ -846,14 +846,14 @@ export default function CashflowStatementPage() {
         </Box>
 
         {/* Add Export PDF button */}
-        <Button
+        {/* <Button
           leftIcon={<LuFileText />}
           colorScheme="blue"
           size="sm"
           onClick={handleExportPDF}
         >
           Export PDF
-        </Button>
+        </Button> */}
 
         {/* Add EditablePdfPreview component */}
         <EditablePdfPreview
