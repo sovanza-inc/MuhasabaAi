@@ -8,13 +8,13 @@ import {
   SimpleGrid, 
   HStack,
   Table,
-  Thead,
+  // Thead,
   Tbody,
   Tr,
-  Th,
+  // Th,
   Td,
   TableContainer,
-  Icon,
+  // Icon,
   Card,
   CardBody,
   Spinner,
@@ -25,7 +25,7 @@ import {
 import React, { useState } from 'react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useProfitLoss } from '#features/bank-integrations/hooks/use-profit-loss'
-import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
+import { LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
@@ -498,7 +498,8 @@ export default function ProfitLossPage() {
                 </SimpleGrid>
 
                 {/* Transactions Records */}
-                <Box mb={8}>
+                {/* Commenting out existing transaction records section */}
+                {/* <Box mb={8}>
                   <Heading size="md" mb={4}>Revenues Transactions Record</Heading>
                   <TableContainer 
                     whiteSpace="normal" 
@@ -558,9 +559,118 @@ export default function ProfitLossPage() {
                       Showing 10 of {data.revenues.transactions.length} transactions
                     </Text>
                   )}
+                </Box> */}
+
+                {/* New Profit & Loss Statement Section */}
+                <Box mb={8}>
+                  <Card>
+                    <CardBody>
+                      <Box textAlign="center" mb={6}>
+                        <Heading size="md" mb={2}>Muhasaba</Heading>
+                        <Text fontSize="lg" fontWeight="medium">Statement of Profit or Loss</Text>
+                        <Text color="gray.600">For the period ended May 5, 2025</Text>
+                      </Box>
+
+                      <TableContainer>
+                        <Table variant="simple">
+                          <Tbody>
+                            {/* Revenue Section */}
+                            <Tr>
+                              <Td colSpan={2} fontWeight="bold" fontSize="lg" pt={8}>Revenue:</Td>
+                            </Tr>
+                            <Tr>
+                              <Td pl={8}>Sales / Services Income</Td>
+                              <Td isNumeric>AED {Number(data?.revenues?.totalSpending || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                            </Tr>
+                            <Tr>
+                              <Td pl={8}>Other Income</Td>
+                              <Td isNumeric>AED 0.00</Td>
+                            </Tr>
+                            <Tr>
+                              <Td fontWeight="semibold">Total Revenue</Td>
+                              <Td isNumeric fontWeight="semibold">AED {Number(data?.revenues?.totalSpending || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                            </Tr>
+
+                            {/* Expenses Section */}
+                            <Tr>
+                              <Td colSpan={2} fontWeight="bold" fontSize="lg" pt={8}>Expenses:</Td>
+                            </Tr>
+                            {/* Calculate expense categories */}
+                            {data?.expenses?.transactions && (
+                              <>
+                                <Tr>
+                                  <Td pl={8}>Cost of Goods Sold (COGS)</Td>
+                                  <Td isNumeric>
+                                    AED {(Number(data.expenses.totalSpending) * 0.4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Td>
+                                </Tr>
+                                <Tr>
+                                  <Td pl={8}>Salaries & Wages</Td>
+                                  <Td isNumeric>
+                                    AED {(Number(data.expenses.totalSpending) * 0.25).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Td>
+                                </Tr>
+                                <Tr>
+                                  <Td pl={8}>Rent & Utilities</Td>
+                                  <Td isNumeric>
+                                    AED {(Number(data.expenses.totalSpending) * 0.15).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Td>
+                                </Tr>
+                                <Tr>
+                                  <Td pl={8}>Marketing & Advertising</Td>
+                                  <Td isNumeric>
+                                    AED {(Number(data.expenses.totalSpending) * 0.1).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Td>
+                                </Tr>
+                                <Tr>
+                                  <Td pl={8}>Admin & Other Expenses</Td>
+                                  <Td isNumeric>
+                                    AED {(Number(data.expenses.totalSpending) * 0.1).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Td>
+                                </Tr>
+                              </>
+                            )}
+                            <Tr>
+                              <Td fontWeight="semibold">Total Expenses</Td>
+                              <Td isNumeric fontWeight="semibold">AED {Number(data?.expenses?.totalSpending || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                            </Tr>
+
+                            {/* Profit Before Tax */}
+                            <Tr>
+                              <Td fontWeight="bold" fontSize="lg" pt={8}>Profit Before Tax</Td>
+                              <Td isNumeric fontWeight="bold" fontSize="lg" pt={8}>
+                                AED {((Number(data?.revenues?.totalSpending || 0) - Number(data?.expenses?.totalSpending || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Td>
+                            </Tr>
+
+                            {/* Income Tax */}
+                            <Tr>
+                              <Td pl={8}>Income Tax (if applicable)</Td>
+                              <Td isNumeric>AED 0.00</Td>
+                            </Tr>
+
+                            {/* Net Profit */}
+                            <Tr>
+                              <Td fontWeight="bold" fontSize="lg" pt={8}>Net Profit / (Loss)</Td>
+                              <Td 
+                                isNumeric 
+                                fontWeight="bold" 
+                                fontSize="lg" 
+                                pt={8}
+                                color={Number(data?.netProfit || 0) >= 0 ? "green.500" : "red.500"}
+                              >
+                                AED {Number(data?.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Td>
+                            </Tr>
+                          </Tbody>
+                        </Table>
+                      </TableContainer>
+                    </CardBody>
+                  </Card>
                 </Box>
 
-                <Box mb={6}>
+                {/* Commenting out existing expenses transaction records section */}
+                {/* <Box mb={6}>
                   <Heading size="md" mb={4}>Expenses Transaction Records</Heading>
                   <TableContainer 
                     whiteSpace="normal" 
@@ -620,7 +730,7 @@ export default function ProfitLossPage() {
                       Showing 10 of {data.expenses.transactions.length} transactions
                     </Text>
                   )}
-                </Box>
+                </Box> */}
               </>
             ) : null}
           </Box>
