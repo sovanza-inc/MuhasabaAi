@@ -24,10 +24,11 @@ import {
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { AreaChart } from '@saas-ui/charts'
-import React from 'react'
-import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
+import React, { useState } from 'react'
+import { LuChevronsUpDown, LuDownload, LuFileText } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
-import jsPDF from 'jspdf'
+import { EditablePdfPreview, FilteredCashFlowData } from './components/EditablePdfPreview'
+import { processTransactions } from './utils/processTransactions'
 
 interface BankTransaction {
   transaction_id: string;
@@ -54,16 +55,6 @@ interface Bank {
   name: string;
 }
 
-interface CashFlowItem {
-  description: string;
-  note?: string;
-  amount2024: number;
-  amount2023: number;
-  indent?: number;
-  isTotal?: boolean;
-  isSubTotal?: boolean;
-}
-
 export default function CashflowStatementPage() {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
@@ -78,6 +69,7 @@ export default function CashflowStatementPage() {
   const [selectedType, setSelectedType] = React.useState('All')
   const contentRef = React.useRef<HTMLDivElement>(null)
   const logoRef = React.useRef<HTMLImageElement>(null)
+  const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
 
   // Initialize auth token and customer ID
   React.useEffect(() => {
@@ -349,272 +341,54 @@ export default function CashflowStatementPage() {
   }
 
   const handleExportPDF = async () => {
-    if (!contentRef.current || !logoRef.current) return;
+    setIsPdfPreviewOpen(true);
+  };
 
+  const handleExportPdfData = async (filteredData: FilteredCashFlowData) => {
     try {
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      const pageWidth = pdf.internal.pageSize.width;
-      const pageHeight = pdf.internal.pageSize.height;
-      const margin = 20;
+      const cashFlowData = processTransactions(filteredTransactions);
 
-      // Helper function to format currency
-      const formatAmount = (amount: number) => {
-        const absAmount = Math.abs(amount);
-        const formatted = absAmount.toLocaleString('en-US', {
-          minimumFractionDigits: 2,
-          maximumFractionDigits: 2
-        });
-        return amount < 0 ? `(${formatted})` : formatted;
-      };
+      // Call the API to generate and download the PDF
+      const response = await fetch('/api/reports/cash-flow-statement', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authToken}`
+        },
+        body: JSON.stringify({
+          data: filteredData,
+          cashFlowData
+        })
+      });
 
-      // Helper function to add header with logo
-      const addHeader = async (pageNum: number) => {
-        pdf.setPage(pageNum);
+      if (!response.ok) {
+        throw new Error('Failed to generate PDF');
+      }
 
-        // Add title and date first (on the left)
-        pdf.setFontSize(18);
-        pdf.setFont('helvetica', 'bold');
-        pdf.text('Muhasaba', margin, margin + 5);
-        
-        pdf.setFontSize(14);
-        pdf.text('STATEMENT OF CASH FLOWS', margin, margin + 12);
-        
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'normal');
-        const currentDate = new Date();
-        const year = currentDate.getFullYear();
-        const month = currentDate.toLocaleString('default', { month: 'long' });
-        const day = currentDate.getDate();
-        pdf.text(`For the Period Ended ${month} ${day}, ${year}`, margin, margin + 18);
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'cash-flow-statement.pdf';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
 
-        // Add logo on the right
-        try {
-          const logoCanvas = document.createElement('canvas');
-          const logoCtx = logoCanvas.getContext('2d');
-          if (logoCtx && logoRef.current) {
-            logoCanvas.width = logoRef.current.naturalWidth;
-            logoCanvas.height = logoRef.current.naturalHeight;
-            logoCtx.drawImage(logoRef.current, 0, 0);
-            const logoData = logoCanvas.toDataURL('image/png');
-            const logoWidth = 40;
-            const aspectRatio = logoRef.current.naturalWidth / logoRef.current.naturalHeight;
-            const logoHeight = logoWidth / aspectRatio;
-            // Position logo on the right side
-            const logoX = pageWidth - margin - logoWidth;
-            pdf.addImage(logoData, 'PNG', logoX, margin - 5, logoWidth, logoHeight);
-          }
-        } catch (error) {
-          console.error('Error adding logo:', error);
-        }
-        
-        // Add column headers
-        const startY = margin + 30;
-        pdf.setFontSize(10);
-        pdf.setFont('helvetica', 'bold');
-        
-        // Column headers
-        pdf.text('Description', margin, startY);
-        pdf.text('Note', pageWidth - margin - 60, startY);
-        pdf.text('2024', pageWidth - margin - 35, startY, { align: 'right' });
-        pdf.text('2023', pageWidth - margin, startY, { align: 'right' });
-        
-        // Underline headers
-        pdf.setLineWidth(0.2);
-        pdf.line(margin, startY + 1, pageWidth - margin, startY + 1);
-        
-        return startY + 8;
-      };
-
-      // Process transactions into cash flow categories
-      const processTransactions = () => {
-        const currentYear = new Date().getFullYear();
-        const lastYear = currentYear - 1;
-        
-        // Filter transactions by year
-        const currentYearTransactions = filteredTransactions.filter(t => 
-          new Date(t.booking_date_time).getFullYear() === currentYear
-        );
-        const lastYearTransactions = filteredTransactions.filter(t => 
-          new Date(t.booking_date_time).getFullYear() === lastYear
-        );
-
-        // Calculate totals for each category
-        const calculateYearlyTotals = (transactions: BankTransaction[]) => {
-          const totals = {
-            operatingIncome: 0,
-            operatingExpenses: 0,
-            investingIncome: 0,
-            investingExpenses: 0,
-            financingIncome: 0,
-            financingExpenses: 0
-          };
-
-          transactions.forEach(transaction => {
-            const amount = transaction.amount.amount;
-            const isCredit = transaction.credit_debit_indicator === 'CREDIT';
-            const info = transaction.transaction_information?.toLowerCase() || '';
-
-            // Categorize based on transaction information
-            if (info.includes('salary') || info.includes('revenue') || info.includes('sales')) {
-              if (isCredit) totals.operatingIncome += amount;
-              else totals.operatingExpenses += amount;
-            }
-            else if (info.includes('equipment') || info.includes('investment') || info.includes('asset')) {
-              if (isCredit) totals.investingIncome += amount;
-              else totals.investingExpenses += amount;
-            }
-            else if (info.includes('loan') || info.includes('dividend') || info.includes('capital')) {
-              if (isCredit) totals.financingIncome += amount;
-              else totals.financingExpenses += amount;
-            }
-            else {
-              // Default to operating activities
-              if (isCredit) totals.operatingIncome += amount;
-              else totals.operatingExpenses += amount;
-            }
-          });
-
-          return totals;
-        };
-
-        const currentYearTotals = calculateYearlyTotals(currentYearTransactions);
-        const lastYearTotals = calculateYearlyTotals(lastYearTransactions);
-
-        return {
-          operatingActivities: [
-            { description: 'Cash received from operations', amount2024: currentYearTotals.operatingIncome, amount2023: lastYearTotals.operatingIncome },
-            { description: 'Cash paid for operations', amount2024: -currentYearTotals.operatingExpenses, amount2023: -lastYearTotals.operatingExpenses, indent: 1 },
-            { description: 'Net cash from operating activities', 
-              amount2024: currentYearTotals.operatingIncome - currentYearTotals.operatingExpenses,
-              amount2023: lastYearTotals.operatingIncome - lastYearTotals.operatingExpenses,
-              isSubTotal: true 
-            }
-          ],
-          investingActivities: [
-            { description: 'Proceeds from sale of investments', amount2024: currentYearTotals.investingIncome, amount2023: lastYearTotals.investingIncome },
-            { description: 'Purchase of investments and equipment', amount2024: -currentYearTotals.investingExpenses, amount2023: -lastYearTotals.investingExpenses },
-            { description: 'Net cash used in investing activities',
-              amount2024: currentYearTotals.investingIncome - currentYearTotals.investingExpenses,
-              amount2023: lastYearTotals.investingIncome - lastYearTotals.investingExpenses,
-              isSubTotal: true
-            }
-          ],
-          financingActivities: [
-            { description: 'Proceeds from loans and capital', amount2024: currentYearTotals.financingIncome, amount2023: lastYearTotals.financingIncome },
-            { description: 'Repayment of loans and dividends', amount2024: -currentYearTotals.financingExpenses, amount2023: -lastYearTotals.financingExpenses },
-            { description: 'Net cash from financing activities',
-              amount2024: currentYearTotals.financingIncome - currentYearTotals.financingExpenses,
-              amount2023: lastYearTotals.financingIncome - lastYearTotals.financingExpenses,
-              isSubTotal: true
-            }
-          ]
-        };
-      };
-
-      // Helper function to add section
-      const addSection = (title: string, items: CashFlowItem[], startY: number) => {
-        let currentY = startY;
-        
-        // Add section title
-        pdf.setFont('helvetica', 'bold');
-        pdf.text(title, margin, currentY);
-        currentY += 6;
-        
-        // Add items
-        pdf.setFont('helvetica', 'normal');
-        items.forEach(item => {
-          // Indent based on level
-          const xPos = margin + (item.indent || 0) * 5;
-          
-          // Description
-          if (item.isTotal || item.isSubTotal) {
-            pdf.setFont('helvetica', 'bold');
-          }
-          pdf.text(item.description, xPos, currentY);
-          
-          // Note (if any)
-          if (item.note) {
-            pdf.text(item.note, pageWidth - margin - 60, currentY);
-          }
-          
-          // Amounts
-          const amount2024Text = formatAmount(item.amount2024);
-          const amount2023Text = formatAmount(item.amount2023);
-          
-          pdf.text(amount2024Text, pageWidth - margin - 35, currentY, { align: 'right' });
-          pdf.text(amount2023Text, pageWidth - margin, currentY, { align: 'right' });
-          
-          if (item.isTotal) {
-            // Double underline for totals
-            pdf.setLineWidth(0.2);
-            pdf.line(pageWidth - margin - 70, currentY + 1, pageWidth - margin, currentY + 1);
-            pdf.line(pageWidth - margin - 70, currentY + 2, pageWidth - margin, currentY + 2);
-          } else if (item.isSubTotal) {
-            // Single underline for subtotals
-            pdf.setLineWidth(0.2);
-            pdf.line(pageWidth - margin - 70, currentY + 1, pageWidth - margin, currentY + 1);
-          }
-          
-          pdf.setFont('helvetica', 'normal');
-          currentY += 6;
-        });
-        
-        return currentY + 4;
-      };
-
-      // Start generating PDF
-      const y = await addHeader(1);
-
-      // Get dynamic data
-      const { operatingActivities, investingActivities, financingActivities } = processTransactions();
-
-      // Calculate total net change in cash
-      const totalNet2024 = operatingActivities[2].amount2024 + 
-                          investingActivities[2].amount2024 + 
-                          financingActivities[2].amount2024;
-      const totalNet2023 = operatingActivities[2].amount2023 + 
-                          investingActivities[2].amount2023 + 
-                          financingActivities[2].amount2023;
-
-      // Add sections with fixed spacing
-      addSection('Operating Activities', operatingActivities, y);
-      addSection('Investing Activities', investingActivities, y + 30);
-      addSection('Financing Activities', financingActivities, y + 60);
-
-      // Add total
-      const totalCashFlow = [
-        { 
-          description: 'Net increase (decrease) in cash and cash equivalents',
-          amount2024: totalNet2024,
-          amount2023: totalNet2023,
-          isTotal: true
-        }
-      ];
-      addSection('', totalCashFlow, y + 90);
-
-      // Add footer note
-      pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'italic');
-      const footerNote = 'The accompanying notes are an integral part of these financial statements.';
-      pdf.text(footerNote, margin, pageHeight - margin);
-
-      // Save the PDF
-      pdf.save('cash-flow-statement.pdf');
-
+      setIsPdfPreviewOpen(false);
       toast({
-        title: "Export successful",
-        description: "Your cash flow statement has been downloaded",
-        status: "success",
+        title: 'PDF exported successfully',
+        status: 'success',
         duration: 3000,
         isClosable: true,
       });
     } catch (error) {
-      console.error('Error generating PDF:', error);
+      console.error('Error exporting PDF:', error);
       toast({
-        title: "Export failed",
-        description: "There was an error exporting your report",
-        status: "error",
-        duration: 3000,
+        title: 'Failed to export PDF',
+        description: error instanceof Error ? error.message : 'An error occurred',
+        status: 'error',
+        duration: 5000,
         isClosable: true,
       });
     }
@@ -1071,7 +845,23 @@ export default function CashflowStatementPage() {
           </Box>
         </Box>
 
+        {/* Add Export PDF button */}
+        <Button
+          leftIcon={<LuFileText />}
+          colorScheme="blue"
+          size="sm"
+          onClick={handleExportPDF}
+        >
+          Export PDF
+        </Button>
 
+        {/* Add EditablePdfPreview component */}
+        <EditablePdfPreview
+          isOpen={isPdfPreviewOpen}
+          onClose={() => setIsPdfPreviewOpen(false)}
+          onExport={handleExportPdfData}
+          data={processTransactions(filteredTransactions)}
+        />
       </Box>
       {/* Summary Footer */}
       <Box

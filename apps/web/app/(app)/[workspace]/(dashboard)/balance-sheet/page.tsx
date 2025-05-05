@@ -707,7 +707,7 @@ export default function BalanceSheetPage() {
           pdf.setFont('helvetica', 'normal');
           currentY += 6;
         });
-
+        
         return currentY + 4;
       };
 
@@ -749,7 +749,7 @@ export default function BalanceSheetPage() {
       currentY = addSection('ASSETS', currentAssetsItems, currentY);
       currentY = addSection('', nonCurrentAssetsItems, currentY);
       currentY = addSection('', totalAssetsItems, currentY);
-
+      
       // Process liabilities data using filtered data
       const currentLiabilitiesItems = [
         { description: 'Current Liabilities', amount: 0 },
@@ -783,7 +783,7 @@ export default function BalanceSheetPage() {
       currentY = addSection('LIABILITIES', currentLiabilitiesItems, currentY);
       currentY = addSection('', nonCurrentLiabilitiesItems, currentY);
       currentY = addSection('', totalLiabilitiesItems, currentY);
-
+      
       // Process equity data using filtered data
       const equityItems = [
         { description: "Owner's Equity", amount: filteredData.equity.ownerEquity, indent: true },
