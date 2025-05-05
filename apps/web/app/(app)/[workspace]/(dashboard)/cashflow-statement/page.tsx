@@ -27,7 +27,6 @@ import { AreaChart } from '@saas-ui/charts'
 import React, { useState } from 'react'
 import { LuChevronsUpDown, LuDownload, LuFileText } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
-import jsPDF from 'jspdf'
 import { EditablePdfPreview, FilteredCashFlowData } from './components/EditablePdfPreview'
 import { processTransactions } from './utils/processTransactions'
 
@@ -54,16 +53,6 @@ interface Bank {
   id: string;
   bank_identifier: string;
   name: string;
-}
-
-interface CashFlowItem {
-  description: string;
-  note?: string;
-  amount2024: number;
-  amount2023: number;
-  indent?: number;
-  isTotal?: boolean;
-  isSubTotal?: boolean;
 }
 
 export default function CashflowStatementPage() {
