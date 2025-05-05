@@ -12,9 +12,8 @@ import {
   Tbody,
   Td,
   HStack,
-  Badge,
 } from '@chakra-ui/react';
-import { AreaChart, LineChart, BarChart } from '@saas-ui/charts';
+import { AreaChart, LineChart } from '@saas-ui/charts';
 import { MetricsCard } from './metrics-card';
 
 interface Transaction {
@@ -359,13 +358,6 @@ export const FinancialKPIs: React.FC<FinancialKPIsProps> = ({ transactions, time
     console.log('Burn Rate Calculation:', result);
     return result;
   }, [transactions, selectedTimeframe]);
-
-  const expenseBreakdown = React.useMemo(() => {
-    if (!transactions?.length) return [];
-    const result = calculateExpenseBreakdown(transactions);
-    console.log('Expense Breakdown Calculation:', result);
-    return result;
-  }, [transactions]);
 
   // Get current period's values (monthly or quarterly)
   const getCurrentPeriodMetrics = React.useMemo(() => {
