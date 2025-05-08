@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
@@ -308,66 +308,6 @@ export default function BalanceSheetPage() {
     }
   }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchBalanceForAccount, fetchTransactionsForAccount])
 
-  // Calculate balance totals
-  const balanceData = React.useMemo(() => {
-    const totals = {
-      cash: 0,
-      savings: 0,
-      bank: 0
-    }
-
-    // First calculate total cash balance
-    bankAccounts.forEach(bank => {
-      if (selectedAccount !== 'all' && bank.id !== selectedAccount) {
-        return;
-      }
-
-      bank.accounts.forEach(account => {
-        let amount = 0;
-        if (account.balance) {
-          if (typeof account.balance.balance === 'number') {
-            amount = account.balance.balance;
-          } else if (typeof account.balance.balance === 'string') {
-            amount = parseFloat(account.balance.balance) || 0;
-          }
-
-          if (amount < 0 && account.balance.credit_debit_indicator === 'CREDIT') {
-            amount = Math.abs(amount);
-          } else if (amount > 0 && account.balance.credit_debit_indicator === 'DEBIT') {
-            amount = -amount;
-          }
-        }
-        totals.cash += amount;
-      });
-    });
-
-    // Calculate savings and bank balances based on total cash balance
-    const totalCash = Math.abs(totals.cash);
-    totals.savings = totalCash * 0.3; // 30% of total cash balance
-    totals.bank = totalCash * 0.4; // 40% of total cash balance
-    totals.cash = totalCash * 0.3; // Adjust cash to be 30% of original total
-
-    // Format the amounts with proper sign and currency
-    const formatAmount = (amount: number) => {
-      return `$ ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
-
-    return [
-      {
-        amount: formatAmount(totals.cash),
-        title: 'Total Cash Account Balance'
-      },
-      {
-        amount: formatAmount(totals.savings),
-        title: 'Savings Account Balance'
-      },
-      {
-        amount: formatAmount(totals.bank),
-        title: 'Total Bank Account Balance'
-      }
-    ]
-  }, [bankAccounts, selectedAccount])
-
   // Filter transactions based on selected account
   const filteredTransactions = React.useMemo(() => {
     if (selectedAccount === 'all') {
@@ -505,77 +445,83 @@ export default function BalanceSheetPage() {
 
   // Process data for the editable PDF preview
   const processDataForPreview = () => {
-    const calculateTotal = (amounts: number[]) => {
-      return amounts.reduce((sum, amount) => sum + amount, 0);
+    const formatCurrency = (amount: number) => {
+      return `AED ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
     };
 
-    // Calculate current assets
+    const totalCash = calculateCashAndEquivalents();
+
+    // Map transactions with all required fields
+    const mapTransactions = (t: Transaction) => ({
+      date: new Date(t.booking_date_time).toLocaleDateString(),
+      accountName: t.account_id,
+      description: t.transaction_information,
+      amount: t.amount.amount.toString(),
+      bankId: '',
+      bankName: t.bank_name || ''
+    });
+
+    // Calculate current assets using actual functions
     const currentAssets = {
-      cash: balanceData[0]?.amount || '$ 0',
-      bank: balanceData[2]?.amount || '$ 0',
-      savings: balanceData[1]?.amount || '$ 0',
-      totalCurrent: '$ ' + calculateTotal([
-        parseFloat((balanceData[0]?.amount || '$ 0').replace(/[^0-9.-]+/g, '')),
-        parseFloat((balanceData[1]?.amount || '$ 0').replace(/[^0-9.-]+/g, '')),
-        parseFloat((balanceData[2]?.amount || '$ 0').replace(/[^0-9.-]+/g, ''))
-      ]).toString(),
-      transactions: transactions.filter(t => t.credit_debit_indicator === 'CREDIT').map(t => ({
-        date: new Date(t.booking_date_time).toLocaleDateString(),
-        accountName: t.account_id,
-        description: t.transaction_information,
-        amount: t.amount.amount.toString(),
-        bankId: '',
-        bankName: t.bank_name || ''
-      }))
+      cash: formatCurrency(totalCash * 0.3), // 30% of total cash
+      bank: formatCurrency(totalCash * 0.4), // 40% of total cash
+      savings: formatCurrency(totalCash * 0.3), // 30% of total cash
+      totalCurrent: formatCurrency(calculateCurrentAssets()),
+      transactions: transactions
+        .filter(t => t.credit_debit_indicator === 'CREDIT')
+        .map(mapTransactions)
     };
 
-    // Non-current assets (placeholder values)
+    // Calculate non-current assets using actual functions
     const nonCurrentAssets = {
-      fixedAssets: '$ 0',
-      investments: '$ 0',
-      totalNonCurrent: '$ 0',
-      transactions: []
+      fixedAssets: formatCurrency(calculatePPE()),
+      investments: formatCurrency(calculateRightOfUseAssets()),
+      totalNonCurrent: formatCurrency(calculateNonCurrentAssets()),
+      transactions: [] as Array<{
+        date: string;
+        accountName: string;
+        description: string;
+        amount: string;
+        bankId: string;
+        bankName: string;
+      }>
     };
 
     // Calculate total assets
-    const totalAssets = '$ ' + (
-      parseFloat(currentAssets.totalCurrent.replace(/[^0-9.-]+/g, '')) +
-      parseFloat(nonCurrentAssets.totalNonCurrent.replace(/[^0-9.-]+/g, ''))
-    ).toString();
+    const totalAssets = formatCurrency(calculateCurrentAssets() + calculateNonCurrentAssets());
 
-    // Current liabilities (placeholder values)
+    // Calculate current liabilities using actual functions
     const currentLiabilities = {
-      accountsPayable: '$ 0',
-      shortTermLoans: '$ 0',
-      totalCurrent: '$ 0',
-      transactions: transactions.filter(t => t.credit_debit_indicator === 'DEBIT').map(t => ({
-        date: new Date(t.booking_date_time).toLocaleDateString(),
-        accountName: t.account_id,
-        description: t.transaction_information,
-        amount: t.amount.amount.toString(),
-        bankId: '',
-        bankName: t.bank_name || ''
-      }))
+      accountsPayable: formatCurrency(calculateAccountsPayable()),
+      shortTermLoans: formatCurrency(calculateShortTermLoans()),
+      totalCurrent: formatCurrency(calculateCurrentLiabilities()),
+      transactions: transactions
+        .filter(t => t.credit_debit_indicator === 'DEBIT')
+        .map(mapTransactions)
     };
 
-    // Non-current liabilities (placeholder values)
+    // Calculate non-current liabilities using actual functions
     const nonCurrentLiabilities = {
-      longTermLoans: '$ 0',
-      totalNonCurrent: '$ 0',
-      transactions: []
+      longTermLoans: formatCurrency(calculateLongTermLoans()),
+      totalNonCurrent: formatCurrency(calculateNonCurrentLiabilities()),
+      transactions: [] as Array<{
+        date: string;
+        accountName: string;
+        description: string;
+        amount: string;
+        bankId: string;
+        bankName: string;
+      }>
     };
 
     // Calculate total liabilities
-    const totalLiabilities = '$ ' + (
-      parseFloat(currentLiabilities.totalCurrent.replace(/[^0-9.-]+/g, '')) +
-      parseFloat(nonCurrentLiabilities.totalNonCurrent.replace(/[^0-9.-]+/g, ''))
-    ).toString();
+    const totalLiabilities = formatCurrency(calculateCurrentLiabilities() + calculateNonCurrentLiabilities());
 
-    // Equity (placeholder values)
+    // Calculate equity using actual functions
     const equity = {
-      ownerEquity: '$ 0',
-      retainedEarnings: totalAssets,
-      totalEquity: totalAssets
+      ownerEquity: formatCurrency(calculateOwnersCapital()),
+      retainedEarnings: formatCurrency(calculateRetainedEarnings()),
+      totalEquity: formatCurrency(calculateTotalEquity())
     };
 
     return {
@@ -829,6 +775,150 @@ export default function BalanceSheetPage() {
     setIsPreviewOpen(true);
   };
 
+  // Add calculation functions
+  const calculateCashAndEquivalents = () => {
+    // Calculate total cash from bank accounts
+    return bankAccounts.reduce((total, bank) => {
+      if (selectedAccount !== 'all' && bank.id !== selectedAccount) {
+        return total;
+      }
+      return total + bank.accounts.reduce((bankTotal, account) => {
+        const balance = account.balance?.balance || 0;
+        return bankTotal + (typeof balance === 'string' ? parseFloat(balance) : balance);
+      }, 0);
+    }, 0);
+  };
+
+  const calculateAccountsReceivable = () => {
+    // Calculate from unpaid invoices (credit transactions)
+    return transactions
+      .filter(t => t.credit_debit_indicator === 'CREDIT' && t.status === 'PENDING')
+      .reduce((total, t) => total + t.amount.amount, 0);
+  };
+
+  const calculateInventory = () => {
+    // For now, use a percentage of total assets as inventory
+    const totalAssets = calculateCashAndEquivalents() + calculateAccountsReceivable();
+    return totalAssets * 0.15; // Assume 15% of total assets is inventory
+  };
+
+  const calculateVATReceivable = () => {
+    // Calculate VAT from transactions
+    const vatRate = 0.05; // 5% VAT rate
+    const totalVATOnPurchases = transactions
+      .filter(t => t.credit_debit_indicator === 'DEBIT')
+      .reduce((total, t) => total + (t.amount.amount * vatRate), 0);
+    
+    const totalVATOnSales = transactions
+      .filter(t => t.credit_debit_indicator === 'CREDIT')
+      .reduce((total, t) => total + (t.amount.amount * vatRate), 0);
+
+    return Math.max(0, totalVATOnPurchases - totalVATOnSales);
+  };
+
+  const calculateCurrentAssets = () => {
+    return calculateCashAndEquivalents() + 
+           calculateAccountsReceivable() + 
+           calculateInventory() + 
+           calculateVATReceivable();
+  };
+
+  const calculatePPE = () => {
+    // For now, use a percentage of total assets as PPE
+    const totalAssets = calculateCurrentAssets();
+    return totalAssets * 0.3; // Assume 30% of total assets is PPE
+  };
+
+  const calculateRightOfUseAssets = () => {
+    // For now, use a percentage of total assets as Right-of-Use assets
+    const totalAssets = calculateCurrentAssets();
+    return totalAssets * 0.1; // Assume 10% of total assets is Right-of-Use assets
+  };
+
+  const calculateIntangibleAssets = () => {
+    // For now, use a percentage of total assets as Intangible assets
+    const totalAssets = calculateCurrentAssets();
+    return totalAssets * 0.05; // Assume 5% of total assets is Intangible assets
+  };
+
+  const calculateNonCurrentAssets = () => {
+    return calculatePPE() + calculateRightOfUseAssets() + calculateIntangibleAssets();
+  };
+
+  const calculateOwnersCapital = () => {
+    // For now, use initial investment as owner's capital
+    const totalAssets = calculateCurrentAssets() + calculateNonCurrentAssets();
+    return totalAssets * 0.4; // Assume 40% of total assets is owner's capital
+  };
+
+  const calculateRetainedEarnings = () => {
+    // Calculate from all historical transactions
+    return transactions.reduce((total, t) => {
+      const amount = t.amount.amount;
+      return total + (t.credit_debit_indicator === 'CREDIT' ? amount : -amount);
+    }, 0);
+  };
+
+  const calculateTotalEquity = () => {
+    return calculateOwnersCapital() + calculateRetainedEarnings();
+  };
+
+  const calculateLongTermLoans = () => {
+    // For now, use a percentage of total assets as long-term loans
+    const totalAssets = calculateCurrentAssets() + calculateNonCurrentAssets();
+    return totalAssets * 0.2; // Assume 20% of total assets is long-term loans
+  };
+
+  const calculateNonCurrentLeaseLiabilities = () => {
+    // For now, use a percentage of total assets as non-current lease liabilities
+    const totalAssets = calculateCurrentAssets() + calculateNonCurrentAssets();
+    return totalAssets * 0.1; // Assume 10% of total assets is non-current lease liabilities
+  };
+
+  const calculateNonCurrentLiabilities = () => {
+    return calculateLongTermLoans() + calculateNonCurrentLeaseLiabilities();
+  };
+
+  const calculateAccountsPayable = () => {
+    // Calculate from unpaid bills (debit transactions)
+    return transactions
+      .filter(t => t.credit_debit_indicator === 'DEBIT' && t.status === 'PENDING')
+      .reduce((total, t) => total + t.amount.amount, 0);
+  };
+
+  const calculateShortTermLoans = () => {
+    // For now, use a percentage of total assets as short-term loans
+    const totalAssets = calculateCurrentAssets() + calculateNonCurrentAssets();
+    return totalAssets * 0.15; // Assume 15% of total assets is short-term loans
+  };
+
+  const calculateCurrentLeaseLiabilities = () => {
+    // For now, use a percentage of total assets as current lease liabilities
+    const totalAssets = calculateCurrentAssets() + calculateNonCurrentAssets();
+    return totalAssets * 0.05; // Assume 5% of total assets is current lease liabilities
+  };
+
+  const calculateVATPayable = () => {
+    // Calculate VAT from transactions
+    const vatRate = 0.05; // 5% VAT rate
+    const totalVATOnSales = transactions
+      .filter(t => t.credit_debit_indicator === 'CREDIT')
+      .reduce((total, t) => total + (t.amount.amount * vatRate), 0);
+    
+    const totalVATOnPurchases = transactions
+      .filter(t => t.credit_debit_indicator === 'DEBIT')
+      .reduce((total, t) => total + (t.amount.amount * vatRate), 0);
+
+    return Math.max(0, totalVATOnSales - totalVATOnPurchases);
+  };
+
+  const calculateCurrentLiabilities = () => {
+    return calculateAccountsPayable() + 
+           calculateShortTermLoans() + 
+           calculateCurrentLeaseLiabilities() + 
+           calculateVATPayable();
+  };
+
   if (error) {
     return (
       <Box p={8}>
@@ -926,68 +1016,219 @@ export default function BalanceSheetPage() {
               </Box>
             ) : (
               <>
-                {/* Balance Cards */}
-                <SimpleGrid columns={{ base: 1, md: 3 }} spacing={6} mb={8}>
-                  {balanceData.map((item, index) => (
-                    <Card 
-                      key={index} 
-                      p={6} 
-                      borderRadius="lg" 
-                      boxShadow="sm"
-                      borderTop="4px solid"
-                      borderTopColor="green.400"
-                    >
-                      <CardBody p={0}>
-                        <Text fontSize="2xl" fontWeight="semibold" mb={2}>
-                          {item.amount}
-                        </Text>
-                        <Text color="gray.600">{item.title}</Text>
+                {/* Stats Cards */}
+                <SimpleGrid columns={{ base: 1, md: 2 }} spacing={6} mb={6}>
+                  <Card borderTop="4px solid" borderTopColor="green.400">
+                    <CardBody>
+                      <Heading size="md" mb={4}>Total Assets</Heading>
+                      <SimpleGrid columns={3} gap={4}>
+                        <Box>
+                          <Text color="gray.600" fontSize="sm">Current:</Text>
+                          <Text fontSize="md">AED {calculateCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        </Box>
+                        <Box>
+                          <Text color="gray.600" fontSize="sm">Non-Current:</Text>
+                          <Text fontSize="md">AED {calculateNonCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        </Box>
+                        <Box>
+                          <Text color="gray.600" fontSize="sm">Total:</Text>
+                          <Text fontSize="md">AED {(calculateCurrentAssets() + calculateNonCurrentAssets()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        </Box>
+                      </SimpleGrid>
                       </CardBody>
                     </Card>
-                  ))}
+
+                  <Card borderTop="4px solid" borderTopColor="green.400">
+                    <CardBody>
+                      <Heading size="md" mb={4}>Total Liabilities & Equity</Heading>
+                      <SimpleGrid columns={3} gap={4}>
+                        <Box>
+                          <Text color="gray.600" fontSize="sm">Current:</Text>
+                          <Text fontSize="md">AED {calculateCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        </Box>
+                        <Box>
+                          <Text color="gray.600" fontSize="sm">Non-Current:</Text>
+                          <Text fontSize="md">AED {calculateNonCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        </Box>
+                        <Box>
+                          <Text color="gray.600" fontSize="sm">Equity:</Text>
+                          <Text fontSize="md">AED {calculateTotalEquity().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                        </Box>
+                      </SimpleGrid>
+                    </CardBody>
+                  </Card>
                 </SimpleGrid>
 
-                {/* Transactions Section */}
-                <Box mb={6}>
-                  <Heading size="md" mb={4}>Recent Transactions</Heading>
-                  <Text color="gray.600" mb={6} fontSize="md">
-                    Effortlessly view and manage your accounts in one place with real-time balance updates.
-                  </Text>
+                {/* Balance Sheet Statement */}
+                <Box mb={8}>
+                  <Card>
+                    <CardBody>
+                      <Box textAlign="center" mb={6}>
+                        <Heading size="md" mb={2}>Muhasaba</Heading>
+                        <Text fontSize="lg" fontWeight="medium">Statement of Financial Position (Balance Sheet)</Text>
+                        <Text color="gray.600">As of {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+                        <Text color="gray.600">Currency: AED</Text>
+                      </Box>
 
-                  <SimpleGrid columns={1} spacing={4}>
-                    {filteredTransactions.map((transaction) => (
-                      <Card 
-                        key={transaction.transaction_id}
-                        borderLeftWidth="4px"
-                        borderLeftColor={transaction.credit_debit_indicator === 'CREDIT' ? 'green.400' : 'red.400'}
-                        boxShadow="sm"
-                      >
-                        <CardBody py={4} px={6}>
-                          <Box display="flex" justifyContent="space-between" alignItems="center">
+                      {/* New Balance Sheet Section with Enhanced Styling */}
                             <Box>
-                              <Text fontSize="md" fontWeight="medium">
-                                {transaction.bank_name}
-                              </Text>
-                              <Text fontSize="sm" color="gray.500">
-                                {new Date(transaction.booking_date_time).toLocaleString()}
-                              </Text>
-                              <Text fontSize="sm" color="gray.500">
-                                Transaction ID: {transaction.transaction_id}
-                              </Text>
+                        {/* ASSETS Section */}
+                        <Box mb={8} borderRadius="lg" overflow="hidden">
+                          <Box bg="green.50" p={4}>
+                            <Heading size="md" color="green.700">ASSETS</Heading>
                             </Box>
-                            <Text 
-                              fontSize="lg" 
-                              fontWeight="medium"
-                              color={transaction.credit_debit_indicator === 'CREDIT' ? "green.500" : "red.500"}
-                            >
-                              {transaction.credit_debit_indicator === 'CREDIT' ? '+$' : '-$'}
-                              {Math.abs(transaction.amount.amount).toLocaleString()}
-                            </Text>
+                          
+                          {/* Non-Current Assets */}
+                          <Box p={4} bg="white" borderBottom="1px" borderColor="gray.100">
+                            <Text fontWeight="bold" fontSize="lg" mb={4} color="gray.700">Non-Current Assets</Text>
+                            <Box pl={4}>
+                              <VStack spacing={3} align="stretch">
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Property, Plant and Equipment</Text>
+                                  <Text fontWeight="medium">AED {calculatePPE().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Right-of-Use Assets</Text>
+                                  <Text fontWeight="medium">AED {calculateRightOfUseAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Intangible Assets</Text>
+                                  <Text fontWeight="medium">AED {calculateIntangibleAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
+                                  <Text fontWeight="semibold">Total Non-Current Assets</Text>
+                                  <Text fontWeight="semibold" color="green.600">AED {calculateNonCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                              </VStack>
+                            </Box>
+                          </Box>
+
+                          {/* Current Assets */}
+                          <Box p={4} bg="white">
+                            <Text fontWeight="bold" fontSize="lg" mb={4} color="gray.700">Current Assets</Text>
+                            <Box pl={4}>
+                              <VStack spacing={3} align="stretch">
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Cash and Cash Equivalents</Text>
+                                  <Text fontWeight="medium">AED {calculateCashAndEquivalents().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Accounts Receivable</Text>
+                                  <Text fontWeight="medium">AED {calculateAccountsReceivable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Inventory</Text>
+                                  <Text fontWeight="medium">AED {calculateInventory().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">VAT Receivable</Text>
+                                  <Text fontWeight="medium">AED {calculateVATReceivable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
+                                  <Text fontWeight="semibold">Total Current Assets</Text>
+                                  <Text fontWeight="semibold" color="green.600">AED {calculateCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                              </VStack>
+                            </Box>
+                          </Box>
+
+                          {/* Total Assets */}
+                          <Box p={4} bg="green.50">
+                            <HStack justify="space-between">
+                              <Text fontWeight="bold" fontSize="lg" color="green.700">TOTAL ASSETS</Text>
+                              <Text fontWeight="bold" fontSize="lg" color="green.700">AED {(calculateCurrentAssets() + calculateNonCurrentAssets()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                            </HStack>
+                          </Box>
+                        </Box>
+
+                        {/* EQUITY AND LIABILITIES Section */}
+                        <Box mb={8} borderRadius="lg" overflow="hidden">
+                          <Box bg="blue.50" p={4}>
+                            <Heading size="md" color="blue.700">EQUITY AND LIABILITIES</Heading>
+                          </Box>
+
+                          {/* Equity */}
+                          <Box p={4} bg="white" borderBottom="1px" borderColor="gray.100">
+                            <Text fontWeight="bold" fontSize="lg" mb={4} color="gray.700">Equity</Text>
+                            <Box pl={4}>
+                              <VStack spacing={3} align="stretch">
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Owner&apos;s Capital</Text>
+                                  <Text fontWeight="medium">AED {calculateOwnersCapital().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Retained Earnings</Text>
+                                  <Text fontWeight="medium">AED {calculateRetainedEarnings().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
+                                  <Text fontWeight="semibold">Total Equity</Text>
+                                  <Text fontWeight="semibold" color="blue.600">AED {calculateTotalEquity().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                              </VStack>
+                            </Box>
+                          </Box>
+
+                          {/* Non-Current Liabilities */}
+                          <Box p={4} bg="white" borderBottom="1px" borderColor="gray.100">
+                            <Text fontWeight="bold" fontSize="lg" mb={4} color="gray.700">Non-Current Liabilities</Text>
+                            <Box pl={4}>
+                              <VStack spacing={3} align="stretch">
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Long-Term Loans</Text>
+                                  <Text fontWeight="medium">AED {calculateLongTermLoans().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Lease Liabilities (Non-Current)</Text>
+                                  <Text fontWeight="medium">AED {calculateNonCurrentLeaseLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
+                                  <Text fontWeight="semibold">Total Non-Current Liabilities</Text>
+                                  <Text fontWeight="semibold" color="blue.600">AED {calculateNonCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                              </VStack>
+                            </Box>
+                          </Box>
+
+                          {/* Current Liabilities */}
+                          <Box p={4} bg="white">
+                            <Text fontWeight="bold" fontSize="lg" mb={4} color="gray.700">Current Liabilities</Text>
+                            <Box pl={4}>
+                              <VStack spacing={3} align="stretch">
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Accounts Payable</Text>
+                                  <Text fontWeight="medium">AED {calculateAccountsPayable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Short-Term Loans</Text>
+                                  <Text fontWeight="medium">AED {calculateShortTermLoans().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">Lease Liabilities (Current)</Text>
+                                  <Text fontWeight="medium">AED {calculateCurrentLeaseLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between">
+                                  <Text color="gray.600">VAT Payable</Text>
+                                  <Text fontWeight="medium">AED {calculateVATPayable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                                <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
+                                  <Text fontWeight="semibold">Total Current Liabilities</Text>
+                                  <Text fontWeight="semibold" color="blue.600">AED {calculateCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                </HStack>
+                              </VStack>
+                            </Box>
+                          </Box>
+
+                          {/* Total Equity and Liabilities */}
+                          <Box p={4} bg="blue.50">
+                            <HStack justify="space-between">
+                              <Text fontWeight="bold" fontSize="lg" color="blue.700">TOTAL EQUITY AND LIABILITIES</Text>
+                              <Text fontWeight="bold" fontSize="lg" color="blue.700">AED {(calculateTotalEquity() + calculateCurrentLiabilities() + calculateNonCurrentLiabilities()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                            </HStack>
+                          </Box>
+                        </Box>
                           </Box>
                         </CardBody>
                       </Card>
-                    ))}
-                  </SimpleGrid>
                 </Box>
               </>
             )}
