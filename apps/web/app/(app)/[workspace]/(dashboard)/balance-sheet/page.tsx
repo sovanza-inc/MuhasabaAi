@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, Table, Thead, Tbody, Tr, Td, TableContainer, VStack } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
@@ -307,66 +307,6 @@ export default function BalanceSheetPage() {
       fetchAllData()
     }
   }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchBalanceForAccount, fetchTransactionsForAccount])
-
-  // Calculate balance totals
-  const balanceData = React.useMemo(() => {
-    const totals = {
-      cash: 0,
-      savings: 0,
-      bank: 0
-    }
-
-    // First calculate total cash balance
-    bankAccounts.forEach(bank => {
-      if (selectedAccount !== 'all' && bank.id !== selectedAccount) {
-        return;
-      }
-
-      bank.accounts.forEach(account => {
-        let amount = 0;
-        if (account.balance) {
-          if (typeof account.balance.balance === 'number') {
-            amount = account.balance.balance;
-          } else if (typeof account.balance.balance === 'string') {
-            amount = parseFloat(account.balance.balance) || 0;
-          }
-
-          if (amount < 0 && account.balance.credit_debit_indicator === 'CREDIT') {
-            amount = Math.abs(amount);
-          } else if (amount > 0 && account.balance.credit_debit_indicator === 'DEBIT') {
-            amount = -amount;
-          }
-        }
-        totals.cash += amount;
-      });
-    });
-
-    // Calculate savings and bank balances based on total cash balance
-    const totalCash = Math.abs(totals.cash);
-    totals.savings = totalCash * 0.3; // 30% of total cash balance
-    totals.bank = totalCash * 0.4; // 40% of total cash balance
-    totals.cash = totalCash * 0.3; // Adjust cash to be 30% of original total
-
-    // Format the amounts with proper sign and currency
-    const formatAmount = (amount: number) => {
-      return `$ ${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-    };
-
-    return [
-      {
-        amount: formatAmount(totals.cash),
-        title: 'Total Cash Account Balance'
-      },
-      {
-        amount: formatAmount(totals.savings),
-        title: 'Savings Account Balance'
-      },
-      {
-        amount: formatAmount(totals.bank),
-        title: 'Total Bank Account Balance'
-      }
-    ]
-  }, [bankAccounts, selectedAccount])
 
   // Filter transactions based on selected account
   const filteredTransactions = React.useMemo(() => {
@@ -1213,7 +1153,7 @@ export default function BalanceSheetPage() {
                             <Box pl={4}>
                               <VStack spacing={3} align="stretch">
                                 <HStack justify="space-between">
-                                  <Text color="gray.600">Owner's Capital</Text>
+                                  <Text color="gray.600">Owner&apos;s Capital</Text>
                                   <Text fontWeight="medium">AED {calculateOwnersCapital().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
                                 <HStack justify="space-between">
