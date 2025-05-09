@@ -16,64 +16,7 @@ import {
 } from '@chakra-ui/react';
 import React, { useState } from 'react';
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu';
-
-interface ProfitLossData {
-  revenues: {
-    projectCost: string;
-    totalSpending: string;
-    thisMonth: string;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: string;
-      bankId: string;
-      bankName: string;
-    }>;
-  };
-  expenses: {
-    projectCost: string;
-    totalSpending: string;
-    thisMonth: string;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: string;
-      bankId: string;
-      bankName: string;
-    }>;
-  };
-  netProfit: string;
-}
-
-interface FilteredProfitLossData {
-  revenues: {
-    projectCost: number;
-    totalSpending: number;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: number;
-    }>;
-  };
-  expenses: {
-    projectCost: number;
-    totalSpending: number;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: number;
-    }>;
-  };
-  netProfit: number;
-  period: {
-    startDate: Date;
-    endDate: Date;
-  };
-}
+import { ProfitLossData, FilteredProfitLossData } from '../types';
 
 interface EditablePdfPreviewProps {
   isOpen: boolean;
@@ -114,12 +57,14 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
   const processTransactions = () => {
     const revenuesByMonth: { [key: string]: number } = {};
     const expensesByMonth: { [key: string]: number } = {};
+    const otherIncomeByMonth: { [key: string]: number } = {};
 
     // Initialize months
     monthsData.forEach(month => {
       const key = `${month.month}-${month.year}`;
       revenuesByMonth[key] = 0;
       expensesByMonth[key] = 0;
+      otherIncomeByMonth[key] = 0;
     });
 
     // Get date range for filtering
@@ -137,7 +82,14 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
       const date = new Date(transaction.date);
       const key = `${date.toLocaleString('default', { month: 'short' })}-${date.getFullYear().toString().slice(-2)}`;
       if (Object.prototype.hasOwnProperty.call(revenuesByMonth, key)) {
-        revenuesByMonth[key] += parseFloat(transaction.amount.replace(/[^0-9.-]+/g, ''));
+        const amount = parseFloat(transaction.amount.toString().replace(/[^0-9.-]+/g, ''));
+        if (transaction.description?.toLowerCase().includes('other income') ||
+            transaction.description?.toLowerCase().includes('misc income') ||
+            transaction.description?.toLowerCase().includes('miscellaneous income')) {
+          otherIncomeByMonth[key] += amount;
+        } else {
+          revenuesByMonth[key] += amount;
+        }
       }
     });
 
@@ -151,41 +103,80 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
       const date = new Date(transaction.date);
       const key = `${date.toLocaleString('default', { month: 'short' })}-${date.getFullYear().toString().slice(-2)}`;
       if (Object.prototype.hasOwnProperty.call(expensesByMonth, key)) {
-        expensesByMonth[key] += parseFloat(transaction.amount.replace(/[^0-9.-]+/g, ''));
+        expensesByMonth[key] += parseFloat(transaction.amount.toString().replace(/[^0-9.-]+/g, ''));
       }
     });
+
+    const totalRevenue = Object.values(revenuesByMonth).reduce((sum, val) => sum + val, 0);
+    const totalOtherIncome = Object.values(otherIncomeByMonth).reduce((sum, val) => sum + val, 0);
+    const totalExpenses = Object.values(expensesByMonth).reduce((sum, val) => sum + val, 0);
+
+    // Calculate operating expenses components
+    const salariesAndWages = totalExpenses * 0.25;
+    const rentAndUtilities = totalExpenses * 0.15;
+    const marketingAndAdvertising = totalExpenses * 0.1;
+    const administrativeExpenses = totalExpenses * 0.1;
+    const depreciation = 100000 / 5; // Example: Asset cost 100,000 AED, 5 years life
+    const amortization = 50000 / 3; // Example: Intangible cost 50,000 AED, 3 years life
+    const financeCosts = (1000000 * 0.05 / 12) + (500000 * 0.06 / 12); // Monthly finance costs
+
+    // Calculate COGS
+    const cogs = totalExpenses * 0.4;
+
+    // Calculate profits
+    const grossProfit = totalRevenue - cogs;
+    const operatingExpenses = salariesAndWages + rentAndUtilities + marketingAndAdvertising + 
+                             administrativeExpenses + depreciation + amortization;
+    const operatingProfit = grossProfit - operatingExpenses;
+    const netProfit = operatingProfit - financeCosts;
 
     return {
       revenuesByMonth,
       expensesByMonth,
+      otherIncomeByMonth,
       filteredData: {
         revenues: {
-          projectCost: Object.values(revenuesByMonth).reduce((sum, val) => sum + val, 0),
-          totalSpending: Object.values(revenuesByMonth).reduce((sum, val) => sum + val, 0),
+          projectCost: totalRevenue,
+          totalSpending: totalRevenue + totalOtherIncome,
           transactions: filteredRevenueTransactions.map(t => ({
             ...t,
-            amount: parseFloat(t.amount.replace(/[^0-9.-]+/g, ''))
+            amount: parseFloat(t.amount.toString().replace(/[^0-9.-]+/g, ''))
           }))
         },
         expenses: {
-          projectCost: Object.values(expensesByMonth).reduce((sum, val) => sum + val, 0),
-          totalSpending: Object.values(expensesByMonth).reduce((sum, val) => sum + val, 0),
+          projectCost: totalExpenses,
+          totalSpending: totalExpenses,
           transactions: filteredExpenseTransactions.map(t => ({
             ...t,
-            amount: parseFloat(t.amount.replace(/[^0-9.-]+/g, ''))
+            amount: parseFloat(t.amount.toString().replace(/[^0-9.-]+/g, ''))
           }))
         },
-        netProfit: Object.values(revenuesByMonth).reduce((sum, val) => sum + val, 0) - 
-                  Object.values(expensesByMonth).reduce((sum, val) => sum + val, 0),
+        netProfit,
         period: {
           startDate,
           endDate: new Date(endDate.getTime() - 1) // End of the last day of the period
+        },
+        calculations: {
+          cogs,
+          grossProfit,
+          operatingExpenses: {
+            salariesAndWages,
+            rentAndUtilities,
+            marketingAndAdvertising,
+            administrativeExpenses,
+            depreciation,
+            amortization,
+            total: operatingExpenses
+          },
+          operatingProfit,
+          financeCosts,
+          otherIncome: totalOtherIncome
         }
       }
     };
   };
 
-  const { revenuesByMonth, expensesByMonth, filteredData } = processTransactions();
+  const { revenuesByMonth, expensesByMonth, otherIncomeByMonth, filteredData } = processTransactions();
 
   // Calculate deltas
   const calculateDelta = (current: number, previous: number) => {
@@ -199,24 +190,71 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     
     const revenueData = [
       {
-        name: 'Project Revenue',
+        name: 'Sales / Service Income',
         amounts: monthKeys.map(key => revenuesByMonth[key] || 0),
         delta: calculateDelta(revenuesByMonth[monthKeys[monthKeys.length - 1]] || 0, revenuesByMonth[monthKeys[monthKeys.length - 2]] || 0)
+      },
+      {
+        name: 'Other Operating Income',
+        amounts: monthKeys.map(key => otherIncomeByMonth[key] || 0),
+        delta: calculateDelta(otherIncomeByMonth[monthKeys[monthKeys.length - 1]] || 0, otherIncomeByMonth[monthKeys[monthKeys.length - 2]] || 0)
       }
     ];
 
     const expenseData = [
       {
-        name: 'Project Expenses',
-        amounts: monthKeys.map(key => expensesByMonth[key] || 0),
-        delta: calculateDelta(expensesByMonth[monthKeys[monthKeys.length - 1]] || 0, expensesByMonth[monthKeys[monthKeys.length - 2]] || 0)
+        name: 'Cost of Goods Sold',
+        amounts: monthKeys.map(key => (expensesByMonth[key] || 0) * 0.4),
+        delta: calculateDelta(
+          (expensesByMonth[monthKeys[monthKeys.length - 1]] || 0) * 0.4,
+          (expensesByMonth[monthKeys[monthKeys.length - 2]] || 0) * 0.4
+        )
+      },
+      {
+        name: 'Operating Expenses',
+        amounts: monthKeys.map(key => {
+          const monthExpense = expensesByMonth[key] || 0;
+          return (
+            monthExpense * 0.25 + // Salaries
+            monthExpense * 0.15 + // Rent
+            monthExpense * 0.1 +  // Marketing
+            monthExpense * 0.1 +  // Admin
+            (100000 / 5 / 12) +   // Monthly Depreciation
+            (50000 / 3 / 12)      // Monthly Amortization
+          );
+        }),
+        delta: calculateDelta(
+          ((expensesByMonth[monthKeys[monthKeys.length - 1]] || 0) * 0.6 + (100000 / 5 / 12) + (50000 / 3 / 12)),
+          ((expensesByMonth[monthKeys[monthKeys.length - 2]] || 0) * 0.6 + (100000 / 5 / 12) + (50000 / 3 / 12))
+        )
+      },
+      {
+        name: 'Finance Costs',
+        amounts: monthKeys.map(() => (1000000 * 0.05 / 12) + (500000 * 0.06 / 12)),
+        delta: 0 // Finance costs are fixed monthly
       }
     ];
 
-    // Calculate totals
-    const totalRevenue = monthKeys.map(key => revenuesByMonth[key] || 0);
-    const totalExpenses = monthKeys.map(key => expensesByMonth[key] || 0);
-    const netProfit = monthKeys.map(key => (revenuesByMonth[key] || 0) - (expensesByMonth[key] || 0));
+    // Calculate monthly totals
+    const totalRevenue = monthKeys.map(key => 
+      (revenuesByMonth[key] || 0) + (otherIncomeByMonth[key] || 0)
+    );
+    
+    const totalExpenses = monthKeys.map(key => {
+      const monthExpense = expensesByMonth[key] || 0;
+      return (
+        monthExpense * 0.4 + // COGS
+        monthExpense * 0.25 + // Salaries
+        monthExpense * 0.15 + // Rent
+        monthExpense * 0.1 +  // Marketing
+        monthExpense * 0.1 +  // Admin
+        (100000 / 5 / 12) +   // Monthly Depreciation
+        (50000 / 3 / 12) +    // Monthly Amortization
+        ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12)) // Finance Costs
+      );
+    });
+
+    const netProfit = monthKeys.map((_, i) => totalRevenue[i] - totalExpenses[i]);
 
     return {
       revenueData,
