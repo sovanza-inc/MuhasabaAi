@@ -18,7 +18,7 @@ export async function POST(request: Request) {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2
       });
-      return amount < 0 ? `(${formatted})` : formatted;
+      return formatted;
     };
 
     // Helper function to add header
@@ -33,9 +33,15 @@ export async function POST(request: Request) {
       
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
-      const startDate = new Date(data.period.startDate);
-      const endDate = new Date(data.period.endDate);
-      pdf.text(`For the Period ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`, margin, margin + 18);
+      
+      // Handle date range display with fallback
+      let dateRangeText = 'For the Current Period';
+      if (data.period?.startDate && data.period?.endDate) {
+        const startDate = new Date(data.period.startDate);
+        const endDate = new Date(data.period.endDate);
+        dateRangeText = `For the Period ${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}`;
+      }
+      pdf.text(dateRangeText, margin, margin + 18);
       
       // Add column headers
       const startY = margin + 30;
