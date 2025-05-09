@@ -30,39 +30,12 @@ import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspac
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
 import { EditablePdfPreview } from './components/EditablePdfPreview'
+import { FilteredProfitLossData } from './types'
 
 interface Bank {
   id: string;
   bank_identifier: string;
   name: string;
-}
-
-interface FilteredProfitLossData {
-  revenues: {
-    projectCost: number;
-    totalSpending: number;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: number;
-    }>;
-  };
-  expenses: {
-    projectCost: number;
-    totalSpending: number;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: number;
-    }>;
-  };
-  netProfit: number;
-  period: {
-    startDate: Date;
-    endDate: Date;
-  };
 }
 
 export default function ProfitLossPage() {
@@ -288,33 +261,92 @@ export default function ProfitLossPage() {
       const revenuesItems = [
         { description: 'Revenue', amount: 0 },
         { 
-          description: 'Project Revenue', 
-          amount: filteredData.revenues.projectCost,
+          description: 'Sales / Service Income', 
+          amount: filteredData.revenues.totalSpending,
           indent: true 
         },
+        {
+          description: 'Other Operating Income',
+          amount: filteredData.calculations.otherIncome,
+          indent: true
+        },
         { 
-          description: 'Total Revenue', 
-          amount: filteredData.revenues.totalSpending,
+          description: 'Total Income', 
+          amount: filteredData.revenues.totalSpending + filteredData.calculations.otherIncome,
           isSubTotal: true 
         }
       ];
       addSection('REVENUES', revenuesItems, startY);
 
+      // Calculate next section Y position based on number of items
+      const expensesStartY = startY + (revenuesItems.length * 6) + 10;
+
       // Process expenses data using filtered data
       const expensesItems = [
-        { description: 'Expenses', amount: 0 },
+        { description: 'Cost of Goods Sold (COGS)', amount: filteredData.calculations.cogs },
         { 
-          description: 'Project Expenses', 
-          amount: -filteredData.expenses.projectCost,
-          indent: true 
+          description: 'Gross Profit', 
+          amount: filteredData.calculations.grossProfit,
+          isSubTotal: true 
+        },
+        { description: 'Operating Expenses:', amount: 0 },
+        {
+          description: 'Salaries & Wages',
+          amount: filteredData.calculations.operatingExpenses.salariesAndWages,
+          indent: true
+        },
+        {
+          description: 'Rent & Utilities',
+          amount: filteredData.calculations.operatingExpenses.rentAndUtilities,
+          indent: true
+        },
+        {
+          description: 'Marketing & Advertising',
+          amount: filteredData.calculations.operatingExpenses.marketingAndAdvertising,
+          indent: true
+        },
+        {
+          description: 'Administrative Expenses',
+          amount: filteredData.calculations.operatingExpenses.administrativeExpenses,
+          indent: true
+        },
+        {
+          description: 'Depreciation',
+          amount: filteredData.calculations.operatingExpenses.depreciation,
+          indent: true
+        },
+        {
+          description: 'Amortization',
+          amount: filteredData.calculations.operatingExpenses.amortization,
+          indent: true
+        },
+        {
+          description: 'Total Operating Expenses',
+          amount: filteredData.calculations.operatingExpenses.total,
+          isSubTotal: true
+        },
+        {
+          description: 'Operating Profit',
+          amount: filteredData.calculations.operatingProfit,
+          isSubTotal: true
+        },
+        {
+          description: 'Finance Costs',
+          amount: filteredData.calculations.financeCosts,
+          indent: true
         },
         { 
           description: 'Total Expenses', 
-          amount: -filteredData.expenses.totalSpending,
+          amount: -(filteredData.calculations.cogs + 
+                   filteredData.calculations.operatingExpenses.total + 
+                   filteredData.calculations.financeCosts),
           isSubTotal: true 
         }
       ];
-      addSection('EXPENSES', expensesItems, startY + 30);
+      addSection('EXPENSES', expensesItems, expensesStartY);
+
+      // Calculate next section Y position based on number of items
+      const netProfitStartY = expensesStartY + (expensesItems.length * 6) + 10;
 
       // Add net profit/loss using filtered data
       const netProfitItems = [
@@ -324,7 +356,7 @@ export default function ProfitLossPage() {
           isTotal: true 
         }
       ];
-      addSection('', netProfitItems, startY + 60);
+      addSection('', netProfitItems, netProfitStartY);
 
       // Add footer note
       pdf.setFontSize(9);
@@ -497,113 +529,102 @@ export default function ProfitLossPage() {
                   </Card>
                 </SimpleGrid>
 
-                {/* Transactions Records */}
-                {/* Commenting out existing transaction records section */}
-                {/* <Box mb={8}>
-                  <Heading size="md" mb={4}>Revenues Transactions Record</Heading>
-                  <TableContainer 
-                    whiteSpace="normal" 
-                    overflowX="hidden"
-                    sx={{
-                      '@media screen and (min-width: 321px) and (max-width: 777px)': {
-                        overflowX: 'auto',
-                        '.chakra-table': {
-                          minWidth: '800px'
-                        }
-                      }
-                    }}
-                  >
-                    <Table variant="simple" layout="fixed" width="100%">
-                      <Thead>
-                        <Tr borderBottom="1px" borderColor="gray.200">
-                          <Th width="15%">
-                            <HStack spacing={1}>
-                              <Text>Date</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                          <Th width="20%">
-                            <HStack spacing={1}>
-                              <Text>Account name</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                          <Th width="50%">
-                            <HStack spacing={1}>
-                              <Text>Description</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                          <Th width="15%" isNumeric>
-                            <HStack spacing={1} justify="flex-end">
-                              <Text>Ammount</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {data?.revenues?.transactions?.slice(0, 10).map((transaction, index) => (
-                          <Tr key={index}>
-                            <Td>{transaction.date}</Td>
-                            <Td>{transaction.accountName}</Td>
-                            <Td noOfLines={1}>{transaction.description}</Td>
-                            <Td isNumeric>{transaction.amount}</Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </TableContainer>
-                  {data?.revenues?.transactions && data.revenues.transactions.length > 10 && (
-                    <Text mt={2} color="gray.600" fontSize="sm" textAlign="center">
-                      Showing 10 of {data.revenues.transactions.length} transactions
-                    </Text>
-                  )}
-                </Box> */}
-
                 {/* New Profit & Loss Statement Section */}
-                <Box mb={8}>
                   <Card>
                     <CardBody>
                       <Box textAlign="center" mb={6}>
                         <Heading size="md" mb={2}>Muhasaba</Heading>
                         <Text fontSize="lg" fontWeight="medium">Statement of Profit or Loss</Text>
-                        <Text color="gray.600">For the period ended May 5, 2025</Text>
-                      </Box>
+                      <Text color="gray.600">For the period ended {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+                    </Box>
 
+                    {/* Revenue Section */}
+                    <Box mb={8} borderRadius="lg" overflow="hidden">
+                      <Box bg="blue.50" p={4}>
+                        <Heading size="md" color="blue.700">INCOME</Heading>
+                      </Box>
+                      <Box p={4} bg="white">
                       <TableContainer>
                         <Table variant="simple">
                           <Tbody>
-                            {/* Revenue Section */}
                             <Tr>
-                              <Td colSpan={2} fontWeight="bold" fontSize="lg" pt={8}>Revenue:</Td>
-                            </Tr>
-                            <Tr>
-                              <Td pl={8}>Sales / Services Income</Td>
+                                <Td pl={8}>Sales / Service Income</Td>
                               <Td isNumeric>AED {Number(data?.revenues?.totalSpending || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
                             </Tr>
                             <Tr>
-                              <Td pl={8}>Other Income</Td>
-                              <Td isNumeric>AED 0.00</Td>
+                                <Td pl={8}>
+                                  <HStack>
+                                    <Text>Other Operating Income</Text>
+                                    <Text fontSize="xs" color="gray.500">(Optional)</Text>
+                                  </HStack>
+                                </Td>
+                                <Td isNumeric>AED {(data?.revenues?.transactions?.reduce((total: number, transaction) => {
+                                  // Sum up transactions marked as other operating income
+                                  if (transaction.description?.toLowerCase().includes('other income') ||
+                                      transaction.description?.toLowerCase().includes('misc income') ||
+                                      transaction.description?.toLowerCase().includes('miscellaneous income')) {
+                                    return total + Number(transaction.amount);
+                                  }
+                                  return total;
+                                }, 0) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
                             </Tr>
-                            <Tr>
-                              <Td fontWeight="semibold">Total Revenue</Td>
-                              <Td isNumeric fontWeight="semibold">AED {Number(data?.revenues?.totalSpending || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                              <Tr borderTop="1px" borderColor="gray.100">
+                                <Td fontWeight="bold" color="blue.700">Total Income</Td>
+                                <Td isNumeric fontWeight="bold" color="blue.700">
+                                  AED {(
+                                    Number(data?.revenues?.totalSpending || 0) +
+                                    (data?.revenues?.transactions?.reduce((total: number, transaction) => {
+                                      if (transaction.description?.toLowerCase().includes('other income') ||
+                                          transaction.description?.toLowerCase().includes('misc income') ||
+                                          transaction.description?.toLowerCase().includes('miscellaneous income')) {
+                                        return total + Number(transaction.amount);
+                                      }
+                                      return total;
+                                    }, 0) || 0)
+                                  ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </Td>
                             </Tr>
+                            </Tbody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    </Box>
 
                             {/* Expenses Section */}
-                            <Tr>
-                              <Td colSpan={2} fontWeight="bold" fontSize="lg" pt={8}>Expenses:</Td>
-                            </Tr>
-                            {/* Calculate expense categories */}
+                    <Box mb={8} borderRadius="lg" overflow="hidden">
+                      <Box bg="red.50" p={4}>
+                        <Heading size="md" color="red.700">EXPENSES</Heading>
+                      </Box>
+                      <Box p={4} bg="white">
+                        <TableContainer>
+                          <Table variant="simple">
+                            <Tbody>
                             {data?.expenses?.transactions && (
                               <>
+                                  {/* COGS */}
                                 <Tr>
                                   <Td pl={8}>Cost of Goods Sold (COGS)</Td>
                                   <Td isNumeric>
                                     AED {(Number(data.expenses.totalSpending) * 0.4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </Td>
                                 </Tr>
+
+                                  {/* Gross Profit Calculation */}
+                                  <Tr borderTop="1px" borderColor="gray.100" bg="gray.50">
+                                    <Td fontWeight="bold" color="blue.700">Gross Profit</Td>
+                                    <Td isNumeric fontWeight="bold" color="blue.700">
+                                      AED {(
+                                        Number(data?.revenues?.totalSpending || 0) - 
+                                        (Number(data.expenses.totalSpending) * 0.4)
+                                      ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Td>
+                                  </Tr>
+
+                                  {/* Operating Expenses */}
+                                  <Tr>
+                                    <Td pl={8} fontWeight="medium" pt={6}>Operating Expenses:</Td>
+                                    <Td></Td>
+                                  </Tr>
                                 <Tr>
                                   <Td pl={8}>Salaries & Wages</Td>
                                   <Td isNumeric>
@@ -623,114 +644,151 @@ export default function ProfitLossPage() {
                                   </Td>
                                 </Tr>
                                 <Tr>
-                                  <Td pl={8}>Admin & Other Expenses</Td>
+                                    <Td pl={8}>Administrative Expenses</Td>
                                   <Td isNumeric>
                                     AED {(Number(data.expenses.totalSpending) * 0.1).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </Td>
                                 </Tr>
-                              </>
-                            )}
-                            <Tr>
-                              <Td fontWeight="semibold">Total Expenses</Td>
-                              <Td isNumeric fontWeight="semibold">AED {Number(data?.expenses?.totalSpending || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+
+                                  {/* Depreciation Section */}
+                                  <Tr>
+                                    <Td pl={8}>
+                                      <HStack>
+                                        <Text>Depreciation</Text>
+                                        <Text fontSize="xs" color="gray.500">(Cost of Asset ÷ Useful Life)</Text>
+                                      </HStack>
+                                    </Td>
+                                    <Td isNumeric>
+                                      AED {(
+                                        // This should come from backend, using placeholder values
+                                        (100000 / 5) // Example: Asset cost 100,000 AED, 5 years life
+                                      ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Td>
                             </Tr>
 
-                            {/* Profit Before Tax */}
-                            <Tr>
-                              <Td fontWeight="bold" fontSize="lg" pt={8}>Profit Before Tax</Td>
-                              <Td isNumeric fontWeight="bold" fontSize="lg" pt={8}>
-                                AED {((Number(data?.revenues?.totalSpending || 0) - Number(data?.expenses?.totalSpending || 0))).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  {/* Amortization Section */}
+                                  <Tr>
+                                    <Td pl={8}>
+                                      <HStack>
+                                        <Text>Amortization</Text>
+                                        <Text fontSize="xs" color="gray.500">(Intangible Cost ÷ Useful Life)</Text>
+                                      </HStack>
+                                    </Td>
+                                    <Td isNumeric>
+                                      AED {(
+                                        // This should come from backend, using placeholder values
+                                        (50000 / 3) // Example: Intangible cost 50,000 AED, 3 years life
+                                      ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Td>
+                                  </Tr>
+
+                                  {/* Total Operating Expenses */}
+                                  <Tr borderTop="1px" borderColor="gray.100">
+                                    <Td pl={8} fontWeight="semibold">Total Operating Expenses</Td>
+                                    <Td isNumeric fontWeight="semibold">
+                                      AED {(
+                                        (Number(data.expenses.totalSpending) * 0.25) + // Salaries
+                                        (Number(data.expenses.totalSpending) * 0.15) + // Rent
+                                        (Number(data.expenses.totalSpending) * 0.1) +  // Marketing
+                                        (Number(data.expenses.totalSpending) * 0.1) +  // Admin
+                                        (100000 / 5) + // Depreciation
+                                        (50000 / 3)    // Amortization
+                                      ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Td>
+                                  </Tr>
+
+                                  {/* Operating Profit */}
+                                  <Tr borderTop="1px" borderColor="gray.100" bg="gray.50">
+                                    <Td fontWeight="bold" color="blue.700">Operating Profit</Td>
+                                    <Td isNumeric fontWeight="bold" color="blue.700">
+                                      AED {(
+                                        // Gross Profit
+                                        (Number(data?.revenues?.totalSpending || 0) - (Number(data.expenses.totalSpending) * 0.4)) -
+                                        // Minus Operating Expenses
+                                        ((Number(data.expenses.totalSpending) * 0.25) + // Salaries
+                                        (Number(data.expenses.totalSpending) * 0.15) + // Rent
+                                        (Number(data.expenses.totalSpending) * 0.1) +  // Marketing
+                                        (Number(data.expenses.totalSpending) * 0.1) +  // Admin
+                                        (100000 / 5) + // Depreciation
+                                        (50000 / 3))   // Amortization
+                                      ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </Td>
                             </Tr>
 
-                            {/* Income Tax */}
-                            <Tr>
-                              <Td pl={8}>Income Tax (if applicable)</Td>
-                              <Td isNumeric>AED 0.00</Td>
+                                  {/* Finance Costs Section */}
+                                  <Tr>
+                                    <Td pl={8}>
+                                      <HStack>
+                                        <Text>Finance Costs</Text>
+                                        <Text fontSize="xs" color="gray.500">(Loan × Rate ÷ 12)</Text>
+                                      </HStack>
+                                    </Td>
+                                    <Td isNumeric>
+                                      AED {(
+                                        // This should come from backend, using placeholder values
+                                        (1000000 * 0.05 / 12) + // Loan: 1M AED at 5% annual rate
+                                        (500000 * 0.06 / 12)    // Lease: 500K AED at 6% annual rate
+                                      ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Td>
                             </Tr>
 
-                            {/* Net Profit */}
+                                  {/* Total Expenses */}
+                                  <Tr borderTop="1px" borderColor="gray.100">
+                                    <Td fontWeight="bold" color="red.700">Total Expenses</Td>
+                                    <Td isNumeric fontWeight="bold" color="red.700">
+                                      AED {(
+                                        (Number(data.expenses.totalSpending) * 0.4) + // COGS
+                                        (Number(data.expenses.totalSpending) * 0.25) + // Salaries
+                                        (Number(data.expenses.totalSpending) * 0.15) + // Rent
+                                        (Number(data.expenses.totalSpending) * 0.1) +  // Marketing
+                                        (Number(data.expenses.totalSpending) * 0.1) +  // Admin
+                                        (100000 / 5) + // Depreciation
+                                        (50000 / 3) + // Amortization
+                                        ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12)) // Finance Costs
+                                      ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                    </Td>
+                                  </Tr>
+                                </>
+                              )}
+                            </Tbody>
+                          </Table>
+                        </TableContainer>
+                      </Box>
+                    </Box>
+
+                    {/* Net Profit/Loss Section */}
+                    <Box p={4} bg="gray.50" borderRadius="lg">
+                      <TableContainer>
+                        <Table variant="simple">
+                          <Tbody>
                             <Tr>
-                              <Td fontWeight="bold" fontSize="lg" pt={8}>Net Profit / (Loss)</Td>
+                              <Td fontWeight="bold" fontSize="lg" color="gray.700">NET PROFIT/(LOSS)</Td>
                               <Td 
                                 isNumeric 
                                 fontWeight="bold" 
                                 fontSize="lg" 
-                                pt={8}
-                                color={Number(data?.netProfit || 0) >= 0 ? "green.500" : "red.500"}
+                                color={Number(data?.netProfit || 0) >= 0 ? "green.600" : "red.600"}
                               >
-                                AED {Number(data?.netProfit || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                AED {(
+                                  // Operating Profit
+                                  ((Number(data?.revenues?.totalSpending || 0) - (Number(data.expenses.totalSpending) * 0.4)) -
+                                  ((Number(data.expenses.totalSpending) * 0.25) + // Salaries
+                                  (Number(data.expenses.totalSpending) * 0.15) + // Rent
+                                  (Number(data.expenses.totalSpending) * 0.1) +  // Marketing
+                                  (Number(data.expenses.totalSpending) * 0.1) +  // Admin
+                                  (100000 / 5) + // Depreciation
+                                  (50000 / 3))) - // Amortization
+                                  // Minus Finance Costs
+                                  ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12))
+                                ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </Td>
                             </Tr>
                           </Tbody>
                         </Table>
                       </TableContainer>
+                    </Box>
                     </CardBody>
                   </Card>
-                </Box>
-
-                {/* Commenting out existing expenses transaction records section */}
-                {/* <Box mb={6}>
-                  <Heading size="md" mb={4}>Expenses Transaction Records</Heading>
-                  <TableContainer 
-                    whiteSpace="normal" 
-                    overflowX="hidden"
-                    sx={{
-                      '@media screen and (min-width: 321px) and (max-width: 777px)': {
-                        overflowX: 'auto',
-                        '.chakra-table': {
-                          minWidth: '800px'
-                        }
-                      }
-                    }}
-                  >
-                    <Table variant="simple" layout="fixed" width="100%">
-                      <Thead>
-                        <Tr borderBottom="1px" borderColor="gray.200">
-                          <Th width="15%">
-                            <HStack spacing={1}>
-                              <Text>Date</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                          <Th width="20%">
-                            <HStack spacing={1}>
-                              <Text>Account name</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                          <Th width="50%">
-                            <HStack spacing={1}>
-                              <Text>Description</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                          <Th width="15%" isNumeric>
-                            <HStack spacing={1} justify="flex-end">
-                              <Text>Ammount</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
-                            </HStack>
-                          </Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {data?.expenses?.transactions?.slice(0, 10).map((transaction, index) => (
-                          <Tr key={index}>
-                            <Td>{transaction.date}</Td>
-                            <Td>{transaction.accountName}</Td>
-                            <Td noOfLines={1}>{transaction.description}</Td>
-                            <Td isNumeric>{transaction.amount}</Td>
-                          </Tr>
-                        ))}
-                      </Tbody>
-                    </Table>
-                  </TableContainer>
-                  {data?.expenses?.transactions && data.expenses.transactions.length > 10 && (
-                    <Text mt={2} color="gray.600" fontSize="sm" textAlign="center">
-                      Showing 10 of {data.expenses.transactions.length} transactions
-                    </Text>
-                  )}
-                </Box> */}
               </>
             ) : null}
           </Box>
