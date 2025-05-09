@@ -235,7 +235,7 @@ export default function CashflowStatementPage() {
     fetchAllTransactions();
   }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchTransactionsForAccount, toast]);
 
-  // Filter transactions based on selected bank, month, status, and type
+  // Filter transactions based on selected bank and month
   const filteredTransactions = React.useMemo(() => {
     return transactions.filter((transaction: BankTransaction) => {
       // Filter by bank
@@ -251,30 +251,9 @@ export default function CashflowStatementPage() {
         }
       }
 
-      // Filter by status
-      if (selectedStatus !== 'All' && transaction.status !== selectedStatus.toUpperCase()) {
-        return false;
-      }
-
-      // Filter by type
-      if (selectedType !== 'All') {
-        const isCredit = transaction.credit_debit_indicator === 'CREDIT' ||
-          transaction.credit_debit_indicator === 'C' ||
-          transaction.transaction_information?.includes('SALARY') ||
-          transaction.transaction_information?.includes('CREDIT') ||
-          transaction.transaction_information?.includes('DEPOSIT');
-
-        if (selectedType === 'Income' && !isCredit) {
-          return false;
-        }
-        if (selectedType === 'Expenses' && isCredit) {
-          return false;
-        }
-      }
-
       return true;
     });
-  }, [transactions, selectedBankId, selectedMonth, selectedStatus, selectedType]);
+  }, [transactions, selectedBankId, selectedMonth]);
 
   // Calculate daily cash flow data for the chart
   const chartData = React.useMemo(() => {
