@@ -6,16 +6,6 @@ import {
   Text,
   HStack,
   Select,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  TableContainer,
-  Icon,
-  Badge,
-  ButtonGroup,
   Button,
   Spinner,
   useToast,
@@ -26,7 +16,7 @@ import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { AreaChart } from '@saas-ui/charts'
 import React, { useState } from 'react'
-import { LuChevronsUpDown, LuDownload } from 'react-icons/lu'
+import { LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { EditablePdfPreview, FilteredCashFlowData } from './components/EditablePdfPreview'
 import { processTransactions } from './utils/processTransactions'
@@ -566,7 +556,7 @@ export default function CashflowStatementPage() {
                           <HStack justify="space-between">
                             <Text color="gray.700">Net Profit</Text>
                             <Text fontWeight="medium">{(processedData.indirectMethod?.netProfit ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
-                  </HStack>
+                          </HStack>
 
                           {/* Adjustments */}
                           <Text fontWeight="bold" color="gray.700" mt={4}>Adjustments:</Text>
@@ -633,7 +623,7 @@ export default function CashflowStatementPage() {
                                 (processedData.indirectMethod?.workingCapital?.vatPayable ?? 0)
                               ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                             </Text>
-                            </HStack>
+                          </HStack>
                         </VStack>
                       </Box>
                     </Box>
@@ -661,7 +651,7 @@ export default function CashflowStatementPage() {
                     <Box mb={8} borderRadius="lg" overflow="hidden">
                       <Box bg="purple.50" p={4}>
                         <Heading size="md" color="purple.700">CASH FLOWS FROM FINANCING ACTIVITIES</Heading>
-                                        </Box>
+                      </Box>
                       <Box p={4} bg="white">
                         <VStack spacing={3} align="stretch">
                           {processedData.financingActivities.map((item, index) => (
@@ -669,12 +659,12 @@ export default function CashflowStatementPage() {
                               <Text color="gray.600" pl={item.indent ? 4 : 0}>{item.description}</Text>
                               <Text fontWeight={item.isSubTotal ? "bold" : "medium"} color={item.isSubTotal ? "purple.600" : "gray.700"}>
                                 {Math.abs(item.amount2024).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                                        </Text>
-                                      </HStack>
+                              </Text>
+                            </HStack>
                           ))}
                         </VStack>
                       </Box>
-                                    </Box>
+                    </Box>
 
                     {/* Net Change in Cash */}
                     <Box p={4} bg="gray.50" borderRadius="lg">
@@ -686,9 +676,9 @@ export default function CashflowStatementPage() {
                             (processedData.investingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
                             (processedData.financingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0)
                           ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                                    </Text>
-                                  </HStack>
-                </Box>
+                        </Text>
+                      </HStack>
+                    </Box>
                   </CardBody>
                 </Card>
               </>
