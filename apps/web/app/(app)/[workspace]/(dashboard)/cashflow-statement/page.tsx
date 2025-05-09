@@ -56,8 +56,6 @@ export default function CashflowStatementPage() {
   const [connectedBanks, setConnectedBanks] = React.useState<Bank[]>([])
   const [selectedBankId, setSelectedBankId] = React.useState<string>('all')
   const [selectedMonth, setSelectedMonth] = React.useState('all')
-  const [selectedStatus, setSelectedStatus] = React.useState('All')
-  const [selectedType, setSelectedType] = React.useState('All')
   const contentRef = React.useRef<HTMLDivElement>(null)
   const logoRef = React.useRef<HTMLImageElement>(null)
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
