@@ -19,7 +19,8 @@ import {
   Button,
   Spinner,
   useToast,
-  Image
+  Image,
+  VStack
 } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
@@ -394,6 +395,9 @@ export default function CashflowStatementPage() {
     }
   };
 
+  // Inside the component, add this memoized value for processed transactions
+  const processedData = React.useMemo(() => processTransactions(filteredTransactions), [filteredTransactions]);
+
   return (
     <Box>
       <PageHeader />
@@ -542,304 +546,151 @@ export default function CashflowStatementPage() {
                   </CardBody>
                 </Card>
 
-                {/* Transactions Table */}
-                <Box>
-                  {/* Filters */}
-                  <HStack mb={4} spacing={4}>
-                    <ButtonGroup size="sm" isAttached variant="outline">
-                      <Button
-                        isActive={selectedType === 'All'}
-                        onClick={() => setSelectedType('All')}
-                      >
-                        All
-                      </Button>
-                      <Button
-                        isActive={selectedType === 'Income'}
-                        onClick={() => setSelectedType('Income')}
-                      >
-                        Income
-                      </Button>
-                      <Button
-                        isActive={selectedType === 'Expenses'}
-                        onClick={() => setSelectedType('Expenses')}
-                      >
-                        Expenses
-                      </Button>
-                    </ButtonGroup>
+                {/* Cashflow Statement */}
+                <Card>
+                  <CardBody>
+                    <Box textAlign="center" mb={6}>
+                      <Heading size="md" mb={2}>Muhasaba</Heading>
+                      <Text fontSize="lg" fontWeight="medium">Statement of Cash Flows</Text>
+                      <Text color="gray.600">For the period ended {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
+                    </Box>
 
-                    <Box flex="1" />
-
-                    <Select
-                      size="sm"
-                      maxW="150px"
-                      value={selectedStatus}
-                      onChange={(e) => setSelectedStatus(e.target.value)}
-                    >
-                      <option value="All">Status: All</option>
-                      <option value="COMPLETED">Completed</option>
-                      <option value="PENDING">Pending</option>
-                    </Select>
+                    {/* Operating Activities Section */}
+                    <Box mb={8} borderRadius="lg" overflow="hidden">
+                      <Box bg="blue.50" p={4}>
+                        <Heading size="md" color="blue.700">CASH FLOWS FROM OPERATING ACTIVITIES</Heading>
+                      </Box>
+                      <Box p={4} bg="white">
+                        <VStack spacing={3} align="stretch">
+                          {/* Net Profit */}
+                          <HStack justify="space-between">
+                            <Text color="gray.700">Net Profit</Text>
+                            <Text fontWeight="medium">{(processedData.indirectMethod?.netProfit ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
                   </HStack>
 
-                  {/* Table */}
-                  <TableContainer>
-                    <Table variant="simple" size="sm">
-                      <Thead>
-                        <Tr borderBottom="1px" borderColor="gray.200">
-                          <Th width="180px">
-                            <HStack spacing={1}>
-                              <Text>Ref ID</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
+                          {/* Adjustments */}
+                          <Text fontWeight="bold" color="gray.700" mt={4}>Adjustments:</Text>
+                          <Box pl={4}>
+                            <VStack spacing={3} align="stretch">
+                              <HStack justify="space-between">
+                                <Text color="gray.600">Depreciation</Text>
+                                <Text fontWeight="medium">{(processedData.indirectMethod?.adjustments?.depreciation ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+                              </HStack>
+                              <HStack justify="space-between">
+                                <Text color="gray.600">Amortization</Text>
+                                <Text fontWeight="medium">{(processedData.indirectMethod?.adjustments?.amortization ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+                              </HStack>
+                              <HStack justify="space-between">
+                                <Text color="gray.600">Interest Expense</Text>
+                                <Text fontWeight="medium">{(processedData.indirectMethod?.adjustments?.interestExpense ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+                              </HStack>
+                            </VStack>
+                          </Box>
+
+                          {/* Working Capital Changes */}
+                          <Text fontWeight="bold" color="gray.700" mt={4}>Working Capital Changes:</Text>
+                          <Box pl={4}>
+                            <VStack spacing={3} align="stretch">
+                              <HStack justify="space-between">
+                                <Text color="gray.600">Accounts Receivable</Text>
+                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0) < 0 ? "green.500" : "red.500"}>
+                                  {Math.abs(processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                                </Text>
+                              </HStack>
+                              <HStack justify="space-between">
+                                <Text color="gray.600">Inventory</Text>
+                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.inventory ?? 0) < 0 ? "green.500" : "red.500"}>
+                                  {Math.abs(processedData.indirectMethod?.workingCapital?.inventory ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                                </Text>
+                              </HStack>
+                              <HStack justify="space-between">
+                                <Text color="gray.600">Accounts Payable</Text>
+                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.accountsPayable ?? 0) > 0 ? "green.500" : "red.500"}>
+                                  {Math.abs(processedData.indirectMethod?.workingCapital?.accountsPayable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                                </Text>
+                              </HStack>
+                              <HStack justify="space-between">
+                                <Text color="gray.600">VAT Payable/Receivable</Text>
+                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.vatPayable ?? 0) > 0 ? "green.500" : "red.500"}>
+                                  {Math.abs(processedData.indirectMethod?.workingCapital?.vatPayable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                                </Text>
+                              </HStack>
+                            </VStack>
+                          </Box>
+
+                          {/* Operating Activities Total */}
+                          <HStack justify="space-between" pt={4} borderTop="1px" borderColor="gray.100">
+                            <Text fontWeight="bold" color="blue.700">Net Cash from Operating Activities</Text>
+                            <Text fontWeight="bold" color="blue.700">
+                              {Math.abs(
+                                (processedData.indirectMethod?.netProfit ?? 0) +
+                                (processedData.indirectMethod?.adjustments?.depreciation ?? 0) +
+                                (processedData.indirectMethod?.adjustments?.amortization ?? 0) +
+                                (processedData.indirectMethod?.adjustments?.interestExpense ?? 0) +
+                                (processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0) +
+                                (processedData.indirectMethod?.workingCapital?.inventory ?? 0) +
+                                (processedData.indirectMethod?.workingCapital?.accountsPayable ?? 0) +
+                                (processedData.indirectMethod?.workingCapital?.vatPayable ?? 0)
+                              ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
                             </HStack>
-                          </Th>
-                          <Th width="120px">
-                            <HStack spacing={1}>
-                              <Text>Date</Text>
-                              <Icon as={LuChevronsUpDown} boxSize={3} color="gray.400" />
+                        </VStack>
+                      </Box>
+                    </Box>
+
+                    {/* Investing Activities Section */}
+                    <Box mb={8} borderRadius="lg" overflow="hidden">
+                      <Box bg="green.50" p={4}>
+                        <Heading size="md" color="green.700">CASH FLOWS FROM INVESTING ACTIVITIES</Heading>
+                      </Box>
+                      <Box p={4} bg="white">
+                        <VStack spacing={3} align="stretch">
+                          {processedData.investingActivities.map((item, index) => (
+                            <HStack key={index} justify="space-between">
+                              <Text color="gray.600" pl={item.indent ? 4 : 0}>{item.description}</Text>
+                              <Text fontWeight={item.isSubTotal ? "bold" : "medium"} color={item.isSubTotal ? "green.600" : "gray.700"}>
+                                {Math.abs(item.amount2024).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                              </Text>
                             </HStack>
-                          </Th>
-                          <Th>Description</Th>
-                          <Th width="100px">Type</Th>
-                          <Th width="100px" isNumeric>Amount</Th>
-                          <Th width="100px">Status</Th>
-                        </Tr>
-                      </Thead>
-                      <Tbody>
-                        {selectedBankId === 'all' ? (
-                          // Group transactions by bank when showing all banks
-                          connectedBanks.map(bank => {
-                            // Get transactions for this bank
-                            const bankTransactions = filteredTransactions.filter(t => t.bank_id === bank.id);
+                          ))}
+                        </VStack>
+                      </Box>
+                    </Box>
 
-                            // Skip banks with no transactions
-                            if (bankTransactions.length === 0) return null;
-
-                            // For each bank, select a diverse set of transactions
-                            const diverseTransactions = [];
-
-                            // Try to get both credit and debit transactions with diverse amounts
-                            const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
-                            const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
-
-                            // Take highest amount credit transaction if available
-                            if (credits.length > 0) {
-                              const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                              diverseTransactions.push(highestCredit);
-
-                              // If we have more credits, also take a lower amount one
-                              if (credits.length > 1) {
-                                const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                                if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
-                                  diverseTransactions.push(lowestCredit);
-                                }
-                              }
-                            }
-
-                            // Take highest amount debit transaction if available
-                            if (debits.length > 0) {
-                              const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                              diverseTransactions.push(highestDebit);
-
-                              // If we have more debits, also take a lower amount one
-                              if (debits.length > 1) {
-                                const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                                if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
-                                  diverseTransactions.push(lowestDebit);
-                                }
-                              }
-                            }
-
-                            // If we didn't get enough transactions, add more from the original list
-                            if (diverseTransactions.length < 5) {
-                              const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
-                              const remainingTransactions = bankTransactions
-                                .filter(t => !existingIds.has(t.transaction_id))
-                                .slice(0, 5 - diverseTransactions.length);
-
-                              diverseTransactions.push(...remainingTransactions);
-                            }
-
-                            // Sort by date (most recent first)
-                            diverseTransactions.sort((a, b) =>
-                              new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
-                            );
-
-                            // Limit to 5 transactions per bank
-                            const selectedTransactions = diverseTransactions.slice(0, 5);
-
-                            return selectedTransactions.length > 0 ? (
-                              <React.Fragment key={bank.id}>
-                                <Tr>
-                                  <Td
-                                    colSpan={6}
-                                    bg="gray.50"
-                                    fontWeight="medium"
-                                    py={2}
-                                  >
-                                    {bank.bank_identifier || bank.name}
-                                  </Td>
-                                </Tr>
-                                {selectedTransactions.map((transaction) => (
-                                  <Tr key={transaction.transaction_id}>
-                                    <Td>
-                                      <Text noOfLines={1} title={transaction.transaction_id}>
-                                        {transaction.transaction_id.slice(0, 8)}...
-                                      </Text>
-                                    </Td>
-                                    <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
-                                    <Td maxW="400px">
-                                      <HStack>
-                                        <Box
-                                          bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}
-                                          color="white"
-                                          w="24px"
-                                          h="24px"
-                                          flexShrink={0}
-                                          borderRadius="full"
-                                          display="flex"
-                                          alignItems="center"
-                                          justifyContent="center"
-                                        >
-                                          {transaction.bank_name?.[0] || 'B'}
+                    {/* Financing Activities Section */}
+                    <Box mb={8} borderRadius="lg" overflow="hidden">
+                      <Box bg="purple.50" p={4}>
+                        <Heading size="md" color="purple.700">CASH FLOWS FROM FINANCING ACTIVITIES</Heading>
                                         </Box>
-                                        <Text noOfLines={1} title={transaction.transaction_information}>
-                                          {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
-                                            .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
-                                            || 'Bank Transaction'}
+                      <Box p={4} bg="white">
+                        <VStack spacing={3} align="stretch">
+                          {processedData.financingActivities.map((item, index) => (
+                            <HStack key={index} justify="space-between">
+                              <Text color="gray.600" pl={item.indent ? 4 : 0}>{item.description}</Text>
+                              <Text fontWeight={item.isSubTotal ? "bold" : "medium"} color={item.isSubTotal ? "purple.600" : "gray.700"}>
+                                {Math.abs(item.amount2024).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                                         </Text>
                                       </HStack>
-                                    </Td>
-                                    <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
-                                    <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
-                                      ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
-                                    </Td>
-                                    <Td>
-                                      <Badge
-                                        colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
-                                      >
-                                        {transaction.status}
-                                      </Badge>
-                                    </Td>
-                                  </Tr>
-                                ))}
-                              </React.Fragment>
-                            ) : null;
-                          })
-                        ) : (
-                          // For single bank view, also use diverse transaction selection
-                          (() => {
-                            const bankTransactions = filteredTransactions;
-
-                            // Try to get both credit and debit transactions with diverse amounts
-                            const credits = bankTransactions.filter(t => t.credit_debit_indicator === 'CREDIT');
-                            const debits = bankTransactions.filter(t => t.credit_debit_indicator === 'DEBIT');
-
-                            const diverseTransactions = [];
-
-                            // Take highest and lowest amount credit transactions if available
-                            if (credits.length > 0) {
-                              // Sort by amount descending and take highest
-                              const highestCredit = [...credits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                              diverseTransactions.push(highestCredit);
-
-                              // If we have more than one, take lowest amount too
-                              if (credits.length > 1) {
-                                const lowestCredit = [...credits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                                if (lowestCredit.transaction_id !== highestCredit.transaction_id) {
-                                  diverseTransactions.push(lowestCredit);
-                                }
-                              }
-                            }
-
-                            // Take highest and lowest amount debit transactions if available
-                            if (debits.length > 0) {
-                              // Sort by amount descending and take highest
-                              const highestDebit = [...debits].sort((a, b) => b.amount.amount - a.amount.amount)[0];
-                              diverseTransactions.push(highestDebit);
-
-                              // If we have more than one, take lowest amount too
-                              if (debits.length > 1) {
-                                const lowestDebit = [...debits].sort((a, b) => a.amount.amount - b.amount.amount)[0];
-                                if (lowestDebit.transaction_id !== highestDebit.transaction_id) {
-                                  diverseTransactions.push(lowestDebit);
-                                }
-                              }
-                            }
-
-                            // If we didn't get enough transactions, add more from the original list
-                            if (diverseTransactions.length < 10) {
-                              const existingIds = new Set(diverseTransactions.map(t => t.transaction_id));
-                              const remainingTransactions = bankTransactions
-                                .filter(t => !existingIds.has(t.transaction_id))
-                                .slice(0, 10 - diverseTransactions.length);
-
-                              diverseTransactions.push(...remainingTransactions);
-                            }
-
-                            // Sort by date (most recent first)
-                            diverseTransactions.sort((a, b) =>
-                              new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
-                            );
-
-                            // Limit to 10 transactions
-                            return diverseTransactions.slice(0, 10).map((transaction) => (
-                              <Tr key={transaction.transaction_id}>
-                                <Td>
-                                  <Text noOfLines={1} title={transaction.transaction_id}>
-                                    {transaction.transaction_id.slice(0, 8)}...
-                                  </Text>
-                                </Td>
-                                <Td>{new Date(transaction.booking_date_time).toLocaleDateString()}</Td>
-                                <Td maxW="400px">
-                                  <HStack>
-                                    <Box
-                                      bg={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}
-                                      color="white"
-                                      w="24px"
-                                      h="24px"
-                                      flexShrink={0}
-                                      borderRadius="full"
-                                      display="flex"
-                                      alignItems="center"
-                                      justifyContent="center"
-                                    >
-                                      {transaction.bank_name?.[0] || 'B'}
+                          ))}
+                        </VStack>
+                      </Box>
                                     </Box>
-                                    <Text noOfLines={1} title={transaction.transaction_information}>
-                                      {transaction.transaction_information?.replace(/POS-PURCHASE CARD NO\.\d+\*+ /, '')
-                                        .replace(/INWARD T\/T\/REF\/MCR\/PAYMENT OF /, '')
-                                        || 'Bank Transaction'}
+
+                    {/* Net Change in Cash */}
+                    <Box p={4} bg="gray.50" borderRadius="lg">
+                      <HStack justify="space-between">
+                        <Text fontWeight="bold" fontSize="lg" color="gray.700">NET CHANGE IN CASH</Text>
+                        <Text fontWeight="bold" fontSize="lg" color="gray.700">
+                          {Math.abs(
+                            (processedData.operatingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
+                            (processedData.investingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
+                            (processedData.financingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0)
+                          ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                                     </Text>
                                   </HStack>
-                                </Td>
-                                <Td>{transaction.credit_debit_indicator === 'CREDIT' ? 'Income' : 'Expense'}</Td>
-                                <Td isNumeric color={transaction.credit_debit_indicator === 'CREDIT' ? 'green.500' : 'red.500'}>
-                                  ${((transaction.credit_debit_indicator === 'CREDIT' ? 1 : -1) * transaction.amount.amount).toFixed(2)}
-                                </Td>
-                                <Td>
-                                  <Badge
-                                    colorScheme={transaction.status === 'BOOKED' ? 'green' : 'yellow'}
-                                  >
-                                    {transaction.status}
-                                  </Badge>
-                                </Td>
-                              </Tr>
-                            ));
-                          })()
-                        )}
-                      </Tbody>
-                    </Table>
-                  </TableContainer>
-                  {selectedBankId === 'all' ? (
-                    <Text mt={4} color="gray.600" textAlign="center">
-                      Showing up to 5 recent transactions per bank ({filteredTransactions.length} total transactions)
-                    </Text>
-                  ) : filteredTransactions.length > 10 && (
-                    <Text mt={4} color="gray.600" textAlign="center">
-                      Showing 10 of {filteredTransactions.length} transactions
-                    </Text>
-                  )}
                 </Box>
+                  </CardBody>
+                </Card>
               </>
             )}
           </Box>

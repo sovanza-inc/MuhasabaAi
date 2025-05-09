@@ -14,6 +14,8 @@ import {
   Td,
   Text,
   ButtonGroup,
+  Heading,
+  TableContainer,
 } from '@chakra-ui/react';
 import React, { useState } from 'react';
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu';
@@ -29,10 +31,42 @@ interface CashFlowItem {
 }
 
 export interface FilteredCashFlowData {
-  operatingActivities: CashFlowItem[];
-  investingActivities: CashFlowItem[];
-  financingActivities: CashFlowItem[];
-  period: {
+  operatingActivities: Array<{
+    description: string;
+    amount2024: number;
+    amount2023: number;
+    indent?: number;
+    isSubTotal?: boolean;
+  }>;
+  investingActivities: Array<{
+    description: string;
+    amount2024: number;
+    amount2023: number;
+    indent?: number;
+    isSubTotal?: boolean;
+  }>;
+  financingActivities: Array<{
+    description: string;
+    amount2024: number;
+    amount2023: number;
+    indent?: number;
+    isSubTotal?: boolean;
+  }>;
+  indirectMethod?: {
+    netProfit: number;
+    adjustments: {
+      depreciation: number;
+      amortization: number;
+      interestExpense: number;
+    };
+    workingCapital: {
+      accountsReceivable: number;
+      inventory: number;
+      accountsPayable: number;
+      vatPayable: number;
+    };
+  };
+  period?: {
     startDate: Date;
     endDate: Date;
   };
@@ -42,11 +76,7 @@ interface EditablePdfPreviewProps {
   isOpen: boolean;
   onClose: () => void;
   onExport: (filteredData: FilteredCashFlowData) => void;
-  data: {
-    operatingActivities: CashFlowItem[];
-    investingActivities: CashFlowItem[];
-    financingActivities: CashFlowItem[];
-  };
+  data: FilteredCashFlowData;
 }
 
 export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
@@ -109,12 +139,12 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
   };
 
   const formatAmount = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
+    return Math.abs(amount).toLocaleString('en-US', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'AED',
       minimumFractionDigits: 0,
       maximumFractionDigits: 0
-    }).format(amount);
+    });
   };
 
   const renderSection = (title: string, items: CashFlowItem[]) => (
@@ -172,6 +202,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} size="6xl">
       <ModalOverlay bg="whiteAlpha.800" backdropFilter="blur(2px)" />
       <ModalContent maxW="95vw" mx="4" rounded="lg" overflow="hidden">
+        {/* Header Section */}
         <Box bg="white" px="6" py="4" borderBottom="1px" borderColor="gray.100">
           <HStack justify="space-between">
             <HStack spacing="4">
@@ -227,71 +258,199 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
           </HStack>
         </Box>
 
-        <Box p="6" overflowX="auto" maxW="100%">
-          <Box minW="fit-content">
-            <Table variant="simple" size="sm">
-              <Thead>
-                <Tr>
-                  <Th 
-                    py="4" 
-                    pl="6" 
-                    color="gray.600" 
-                    fontSize="xs" 
-                    textTransform="uppercase" 
-                    fontWeight="medium"
-                    borderBottom="1px"
-                    borderColor="gray.200"
-                  >
-                    Description
-                  </Th>
-                  <Th
-                    isNumeric
-                    py="4"
-                    color="gray.600"
-                    fontSize="xs"
-                    textTransform="uppercase"
-                    fontWeight="medium"
-                    borderBottom="1px"
-                    borderColor="gray.200"
-                  >
-                    {currentDate.getFullYear()}
-                  </Th>
-                  <Th
-                    isNumeric
-                    py="4"
-                    color="gray.600"
-                    fontSize="xs"
-                    textTransform="uppercase"
-                    fontWeight="medium"
-                    borderBottom="1px"
-                    borderColor="gray.200"
-                  >
-                    {currentDate.getFullYear() - 1}
-                  </Th>
-                  <Th
-                    isNumeric
-                    py="4"
-                    pr="6"
-                    color="gray.600"
-                    fontSize="xs"
-                    textTransform="uppercase"
-                    fontWeight="medium"
-                    borderBottom="1px"
-                    borderColor="gray.200"
-                  >
-                    Δ YoY (%)
-                  </Th>
-                </Tr>
-              </Thead>
-              <Tbody>
-                {renderSection('Operating Activities', data.operatingActivities)}
-                {renderSection('Investing Activities', data.investingActivities)}
-                {renderSection('Financing Activities', data.financingActivities)}
-              </Tbody>
-            </Table>
+        {/* Content Section */}
+        <Box p="6" maxH="calc(100vh - 200px)" overflowY="auto">
+          {/* Direct Method Table */}
+          <Box mb="8">
+            <Heading size="md" mb="4">Statement of Cash Flows (Direct Method)</Heading>
+            <TableContainer>
+              <Table variant="simple" size="sm">
+                <Thead>
+                  <Tr>
+                    <Th 
+                      py="4" 
+                      pl="6" 
+                      color="gray.600" 
+                      fontSize="xs" 
+                      textTransform="uppercase" 
+                      fontWeight="medium"
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                      width="50%"
+                    >
+                      Description
+                    </Th>
+                    <Th
+                      isNumeric
+                      py="4"
+                      color="gray.600"
+                      fontSize="xs"
+                      textTransform="uppercase"
+                      fontWeight="medium"
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                      width="20%"
+                    >
+                      {currentDate.getFullYear()}
+                    </Th>
+                    <Th
+                      isNumeric
+                      py="4"
+                      color="gray.600"
+                      fontSize="xs"
+                      textTransform="uppercase"
+                      fontWeight="medium"
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                      width="20%"
+                    >
+                      {currentDate.getFullYear() - 1}
+                    </Th>
+                    <Th
+                      isNumeric
+                      py="4"
+                      pr="6"
+                      color="gray.600"
+                      fontSize="xs"
+                      textTransform="uppercase"
+                      fontWeight="medium"
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                      width="10%"
+                    >
+                      Δ YoY (%)
+                    </Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {renderSection('Operating Activities', data.operatingActivities)}
+                  {renderSection('Investing Activities', data.investingActivities)}
+                  {renderSection('Financing Activities', data.financingActivities)}
+                </Tbody>
+              </Table>
+            </TableContainer>
+          </Box>
+
+          {/* Indirect Method Table */}
+          <Box>
+            <Heading size="md" mb="4">Statement of Cash Flows (Indirect Method)</Heading>
+            <TableContainer>
+              <Table variant="simple" size="sm">
+                <Thead>
+                  <Tr>
+                    <Th 
+                      py="4" 
+                      pl="6" 
+                      color="gray.600" 
+                      fontSize="xs" 
+                      textTransform="uppercase" 
+                      fontWeight="medium"
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                      width="70%"
+                    >
+                      Description
+                    </Th>
+                    <Th
+                      isNumeric
+                      py="4"
+                      pr="6"
+                      color="gray.600"
+                      fontSize="xs"
+                      textTransform="uppercase"
+                      fontWeight="medium"
+                      borderBottom="1px"
+                      borderColor="gray.200"
+                      width="30%"
+                    >
+                      Amount
+                    </Th>
+                  </Tr>
+                </Thead>
+                <Tbody>
+                  {/* Operating Activities */}
+                  <Tr>
+                    <Td colSpan={2} fontWeight="bold" bg="gray.50">CASH FLOWS FROM OPERATING ACTIVITIES</Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={8}>Net Profit</Td>
+                    <Td isNumeric>{formatAmount(data.indirectMethod?.netProfit ?? 0)}</Td>
+                  </Tr>
+                  
+                  {/* Adjustments */}
+                  <Tr>
+                    <Td pl={8} fontWeight="medium">Adjustments:</Td>
+                    <Td></Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={12}>Depreciation</Td>
+                    <Td isNumeric>{formatAmount(data.indirectMethod?.adjustments?.depreciation ?? 0)}</Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={12}>Amortization</Td>
+                    <Td isNumeric>{formatAmount(data.indirectMethod?.adjustments?.amortization ?? 0)}</Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={12}>Interest Expense</Td>
+                    <Td isNumeric>{formatAmount(data.indirectMethod?.adjustments?.interestExpense ?? 0)}</Td>
+                  </Tr>
+
+                  {/* Working Capital Changes */}
+                  <Tr>
+                    <Td pl={8} fontWeight="medium">Working Capital Changes:</Td>
+                    <Td></Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={12}>Accounts Receivable</Td>
+                    <Td isNumeric color={(data.indirectMethod?.workingCapital?.accountsReceivable ?? 0) < 0 ? "green.500" : "red.500"}>
+                      {formatAmount(data.indirectMethod?.workingCapital?.accountsReceivable ?? 0)}
+                    </Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={12}>Inventory</Td>
+                    <Td isNumeric color={(data.indirectMethod?.workingCapital?.inventory ?? 0) < 0 ? "green.500" : "red.500"}>
+                      {formatAmount(data.indirectMethod?.workingCapital?.inventory ?? 0)}
+                    </Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={12}>Accounts Payable</Td>
+                    <Td isNumeric color={(data.indirectMethod?.workingCapital?.accountsPayable ?? 0) > 0 ? "green.500" : "red.500"}>
+                      {formatAmount(data.indirectMethod?.workingCapital?.accountsPayable ?? 0)}
+                    </Td>
+                  </Tr>
+                  <Tr>
+                    <Td pl={12}>VAT Payable/Receivable</Td>
+                    <Td isNumeric color={(data.indirectMethod?.workingCapital?.vatPayable ?? 0) > 0 ? "green.500" : "red.500"}>
+                      {formatAmount(data.indirectMethod?.workingCapital?.vatPayable ?? 0)}
+                    </Td>
+                  </Tr>
+                  
+                  {/* Operating Activities Total */}
+                  <Tr fontWeight="bold" bg="gray.50">
+                    <Td pl={8}>Net Cash from Operating Activities</Td>
+                    <Td isNumeric>
+                      {formatAmount(
+                        (data.indirectMethod?.netProfit ?? 0) +
+                        (data.indirectMethod?.adjustments?.depreciation ?? 0) +
+                        (data.indirectMethod?.adjustments?.amortization ?? 0) +
+                        (data.indirectMethod?.adjustments?.interestExpense ?? 0) +
+                        (data.indirectMethod?.workingCapital?.accountsReceivable ?? 0) +
+                        (data.indirectMethod?.workingCapital?.inventory ?? 0) +
+                        (data.indirectMethod?.workingCapital?.accountsPayable ?? 0) +
+                        (data.indirectMethod?.workingCapital?.vatPayable ?? 0)
+                      )}
+                    </Td>
+                  </Tr>
+                </Tbody>
+              </Table>
+            </TableContainer>
           </Box>
         </Box>
-        <Text p="4" color="gray.600" fontSize="sm">Don&apos;t forget to review before exporting</Text>
+
+        {/* Footer */}
+        <Box p="4" borderTop="1px" borderColor="gray.100">
+          <Text color="gray.600" fontSize="sm">Don&apos;t forget to review before exporting</Text>
+        </Box>
       </ModalContent>
     </Modal>
   );
