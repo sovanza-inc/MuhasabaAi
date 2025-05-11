@@ -31,6 +31,8 @@ import {
   AlertDialogOverlay,
   useDisclosure,
   Container,
+  Select,
+  Textarea,
 } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
@@ -41,11 +43,14 @@ interface QuestionnaireFormProps {
 
 interface FixedAsset {
   name: string
-  type: string
+  type: 'Equipment' | 'Vehicle' | 'Furniture' | 'Software' | 'License' | 'Other'
   value: number
   purchaseDate: string
-  depreciationMethod: string
+  depreciationMethod: 'Straight-line' | 'Declining balance'
   usefulLife: number
+  isIntangible: boolean
+  residualValue: number
+  description: string
 }
 
 interface Loan {
@@ -54,6 +59,11 @@ interface Loan {
   interestRate: number
   monthlyPayment: number
   startDate: string
+  type: 'Loan' | 'Lease'
+  assetLeased?: string
+  leaseTerm?: number
+  isActive: boolean
+  endDate: string
 }
 
 interface OutstandingBalance {
@@ -113,6 +123,26 @@ interface FormData {
     vatRegistration: (File | string)[]
   }
   preferManualEntry: boolean
+  hasCapitalContributions: boolean
+  capitalContributions: Array<{
+    amount: number
+    date: string
+    proof?: File | string
+  }>
+  hasEquipmentPurchases: boolean
+  equipmentPurchases: Array<{
+    description: string
+    amount: number
+    date: string
+    isLongTermAsset: boolean
+  }>
+  hasLoanRepayments: boolean
+  loanRepayments: Array<{
+    totalAmount: number
+    interestPortion: number
+    date: string
+    loanId: string
+  }>
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -273,11 +303,14 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       hasFixedAssets: false,
       fixedAssets: [{
         name: '',
-        type: '',
+        type: 'Equipment',
         value: 0,
         purchaseDate: '',
-        depreciationMethod: '',
-        usefulLife: 0
+        depreciationMethod: 'Straight-line',
+        usefulLife: 0,
+        isIntangible: false,
+        residualValue: 0,
+        description: ''
       }],
       hasLoans: false,
       loans: [{
@@ -285,7 +318,12 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
         amount: 0,
         interestRate: 0,
         monthlyPayment: 0,
-        startDate: ''
+        startDate: '',
+        type: 'Loan',
+        isActive: true,
+        endDate: '',
+        assetLeased: '',
+        leaseTerm: 0
       }],
       hasAccountsPayable: false,
       accountsPayable: [{
@@ -326,7 +364,27 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
         loans: [],
         vatRegistration: []
       },
-      preferManualEntry: false
+      preferManualEntry: false,
+      hasCapitalContributions: false,
+      capitalContributions: [{
+        amount: 0,
+        date: '',
+        proof: undefined
+      }],
+      hasEquipmentPurchases: false,
+      equipmentPurchases: [{
+        description: '',
+        amount: 0,
+        date: '',
+        isLongTermAsset: false
+      }],
+      hasLoanRepayments: false,
+      loanRepayments: [{
+        totalAmount: 0,
+        interestPortion: 0,
+        date: '',
+        loanId: ''
+      }]
     }
   })
 
@@ -415,6 +473,41 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       isComplete: () => {
         if (!formData.isVatRegistered) return true
         return Boolean(formData.trn && formData.vatFrequency)
+      },
+    },
+    {
+      title: 'Owner\'s Capital',
+      description: 'Capital contributions',
+      isComplete: () => {
+        if (!formData.hasCapitalContributions) return true;
+        return formData.capitalContributions?.some(contribution => 
+          contribution.amount > 0 && contribution.date
+        ) ?? false;
+      },
+    },
+    {
+      title: 'Equipment & Investments',
+      description: 'Asset classification',
+      isComplete: () => {
+        if (!formData.hasEquipmentPurchases) return true;
+        return formData.equipmentPurchases?.some(purchase => 
+          purchase.description && 
+          purchase.amount > 0 && 
+          purchase.date
+        ) ?? false;
+      },
+    },
+    {
+      title: 'Loan Repayments',
+      description: 'Interest and principal split',
+      isComplete: () => {
+        if (!formData.hasLoanRepayments) return true;
+        return formData.loanRepayments?.some(repayment => 
+          repayment.totalAmount > 0 && 
+          repayment.interestPortion >= 0 && 
+          repayment.date && 
+          repayment.loanId
+        ) ?? false;
       },
     },
   ]
@@ -834,7 +927,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                   onChange={(e) => setFormData({ ...formData, hasFixedAssets: e.target.checked })}
                   size="lg"
                 >
-                  Do you have any fixed assets like equipment or vehicles?
+                  Do you have any fixed or intangible assets?
                 </Checkbox>
               </HStack>
 
@@ -843,176 +936,124 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                   <CardBody>
                     <Stack spacing={4}>
                       <FormControl>
-                        <FormLabel>How would you like to provide fixed assets information?</FormLabel>
-                        <RadioGroup
-                          value={formData.preferManualEntry ? 'manual' : 'upload'}
-                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                        <FormLabel>Asset Information</FormLabel>
+                        <Text fontSize="sm" color="gray.600" mb={2}>
+                          Enter details for each asset
+                        </Text>
+                        <Select
+                          placeholder="Select asset type"
+                          value={formData.fixedAssets[0]?.type || ''}
+                          onChange={(e) => {
+                            const newAssets = [...formData.fixedAssets];
+                            if (newAssets[0]) {
+                              newAssets[0].type = e.target.value as FixedAsset['type'];
+                              newAssets[0].isIntangible = ['Software', 'License'].includes(e.target.value);
+                            }
+                            setFormData({ ...formData, fixedAssets: newAssets });
+                          }}
                         >
-                          <Stack direction="row" spacing={4}>
-                            <Radio value="upload">Upload Documents</Radio>
-                            <Radio value="manual">Enter Manually</Radio>
-                          </Stack>
-                        </RadioGroup>
+                          <option value="Equipment">Equipment</option>
+                          <option value="Vehicle">Vehicle</option>
+                          <option value="Furniture">Furniture</option>
+                          <option value="Software">Software (Intangible)</option>
+                          <option value="License">License (Intangible)</option>
+                          <option value="Other">Other</option>
+                        </Select>
                       </FormControl>
 
-                      {!formData.preferManualEntry ? (
+                      <FormControl>
+                        <FormLabel>Name</FormLabel>
+                        <Input
+                          placeholder="Enter asset name"
+                          value={formData.fixedAssets[0]?.name || ''}
+                          onChange={(e) => {
+                            const newAssets = [...formData.fixedAssets];
+                            if (newAssets[0]) newAssets[0].name = e.target.value;
+                            setFormData({ ...formData, fixedAssets: newAssets });
+                          }}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Description</FormLabel>
+                        <Textarea
+                          placeholder="Enter asset description"
+                          value={formData.fixedAssets[0]?.description || ''}
+                          onChange={(e) => {
+                            const newAssets = [...formData.fixedAssets];
+                            if (newAssets[0]) newAssets[0].description = e.target.value;
+                            setFormData({ ...formData, fixedAssets: newAssets });
+                          }}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Purchase Value (AED)</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.fixedAssets[0]?.value || ''}
+                          onChange={(e) => {
+                            const newAssets = [...formData.fixedAssets];
+                            if (newAssets[0]) newAssets[0].value = parseFloat(e.target.value);
+                            setFormData({ ...formData, fixedAssets: newAssets });
+                          }}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Residual Value (AED)</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.fixedAssets[0]?.residualValue || ''}
+                          onChange={(e) => {
+                            const newAssets = [...formData.fixedAssets];
+                            if (newAssets[0]) newAssets[0].residualValue = parseFloat(e.target.value);
+                            setFormData({ ...formData, fixedAssets: newAssets });
+                          }}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Purchase Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.fixedAssets[0]?.purchaseDate || ''}
+                          onChange={(e) => {
+                            const newAssets = [...formData.fixedAssets];
+                            if (newAssets[0]) newAssets[0].purchaseDate = e.target.value;
+                            setFormData({ ...formData, fixedAssets: newAssets });
+                          }}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>Useful Life (years)</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.fixedAssets[0]?.usefulLife || ''}
+                          onChange={(e) => {
+                            const newAssets = [...formData.fixedAssets];
+                            if (newAssets[0]) newAssets[0].usefulLife = parseInt(e.target.value);
+                            setFormData({ ...formData, fixedAssets: newAssets });
+                          }}
+                        />
+                      </FormControl>
+
+                      {!formData.fixedAssets[0]?.isIntangible && (
                         <FormControl>
-                          <FormLabel>Upload Fixed Assets Documents</FormLabel>
-                          <Text fontSize="sm" color="gray.600" mb={2}>
-                            Upload purchase invoices, asset registers, or depreciation schedules
-                          </Text>
-                          <Input
-                            type="file"
-                            multiple
-                            accept=".pdf,.doc,.docx,.xls,.xlsx,.jpg,.png"
-                            onChange={(e) => handleFileUpload('fixedAssets', e.target.files)}
-                          />
-                          {formData.documents.fixedAssets && formData.documents.fixedAssets.length > 0 && (
-                            <FileList
-                              files={formData.documents.fixedAssets}
-                              onRemove={(index) => handleFileRemove('fixedAssets', index)}
-                            />
-                          )}
-                        </FormControl>
-                      ) : (
-                        <VStack spacing={4} mt={4} align="stretch">
-                          {formData.fixedAssets.map((asset, index) => (
-                            <Card key={index} variant="outline">
-                              <CardBody>
-                                <Stack spacing={4}>
-                                  <FormControl>
-                                    <FormLabel>Asset Name</FormLabel>
-                                    <Input
-                                      placeholder="e.g. Delivery Van, Office Equipment"
-                                      value={asset.name}
-                                      onChange={(e) => {
-                                        const newAssets = [...formData.fixedAssets]
-                                        newAssets[index] = { ...asset, name: e.target.value }
-                                        setFormData({ ...formData, fixedAssets: newAssets })
-                                      }}
-                                    />
-                                  </FormControl>
-
-                                  <FormControl>
-                                    <FormLabel>Asset Type</FormLabel>
-                                    <RadioGroup
-                                      value={asset.type}
-                                      onChange={(value) => {
-                                        const newAssets = [...formData.fixedAssets]
-                                        newAssets[index] = { ...asset, type: value }
-                                        setFormData({ ...formData, fixedAssets: newAssets })
-                                      }}
-                                    >
-                                      <Stack direction="row" spacing={4}>
-                                        <Radio value="equipment">Equipment</Radio>
-                                        <Radio value="vehicle">Vehicle</Radio>
-                                        <Radio value="furniture">Furniture</Radio>
-                                        <Radio value="other">Other</Radio>
-                                      </Stack>
-                                    </RadioGroup>
-                                  </FormControl>
-
-                                  <HStack spacing={4}>
-                                    <FormControl>
-                                      <FormLabel>Purchase Value (AED)</FormLabel>
-                                      <NumberInput
-                                        min={0}
-                                        value={asset.value || undefined}
-                                        onChange={(_, valueNumber) => {
-                                          const newAssets = [...formData.fixedAssets]
-                                          newAssets[index] = { ...asset, value: valueNumber || 0 }
-                                          setFormData({ ...formData, fixedAssets: newAssets })
-                                        }}
-                                      >
-                                        <NumberInputField placeholder="Enter amount" />
-                                      </NumberInput>
-                                    </FormControl>
-
-                                    <FormControl>
-                                      <FormLabel>Purchase Date</FormLabel>
-                                      <Input
-                                        type="date"
-                                        value={asset.purchaseDate}
-                                        onChange={(e) => {
-                                          const newAssets = [...formData.fixedAssets]
-                                          newAssets[index] = { ...asset, purchaseDate: e.target.value }
-                                          setFormData({ ...formData, fixedAssets: newAssets })
-                                        }}
-                                      />
-                                    </FormControl>
-                                  </HStack>
-
-                                  <HStack spacing={4}>
-                                    <FormControl>
-                                      <FormLabel>Depreciation Method</FormLabel>
-                                      <RadioGroup
-                                        value={asset.depreciationMethod}
-                                        onChange={(value) => {
-                                          const newAssets = [...formData.fixedAssets]
-                                          newAssets[index] = { ...asset, depreciationMethod: value }
-                                          setFormData({ ...formData, fixedAssets: newAssets })
-                                        }}
-                                      >
-                                        <Stack direction="row" spacing={4}>
-                                          <Radio value="straight-line">Straight-line</Radio>
-                                          <Radio value="declining-balance">Declining balance</Radio>
-                                        </Stack>
-                                      </RadioGroup>
-                                    </FormControl>
-
-                                    <FormControl>
-                                      <FormLabel>Useful Life (Years)</FormLabel>
-                                      <NumberInput
-                                        min={0}
-                                        value={asset.usefulLife || undefined}
-                                        onChange={(_, valueNumber) => {
-                                          const newAssets = [...formData.fixedAssets]
-                                          newAssets[index] = { ...asset, usefulLife: valueNumber || 0 }
-                                          setFormData({ ...formData, fixedAssets: newAssets })
-                                        }}
-                                      >
-                                        <NumberInputField placeholder="Enter years" />
-                                      </NumberInput>
-                                    </FormControl>
-                                  </HStack>
-
-                                  {index > 0 && (
-                                    <Button
-                                      aria-label="Remove asset"
-                                      onClick={() => {
-                                        const newAssets = formData.fixedAssets.filter((_, i) => i !== index)
-                                        setFormData({ ...formData, fixedAssets: newAssets })
-                                      }}
-                                      colorScheme="red"
-                                      variant="ghost"
-                                      alignSelf="flex-end"
-                                    >
-                                      Remove
-                                    </Button>
-                                  )}
-                                </Stack>
-                              </CardBody>
-                            </Card>
-                          ))}
-
-                          <Button
-                            onClick={() => setFormData({
-                              ...formData,
-                              fixedAssets: [...formData.fixedAssets, {
-                                name: '',
-                                type: '',
-                                value: 0,
-                                purchaseDate: '',
-                                depreciationMethod: '',
-                                usefulLife: 0
-                              }]
-                            })}
-                            size="sm"
-                            variant="outline"
+                          <FormLabel>Depreciation Method</FormLabel>
+                          <Select
+                            value={formData.fixedAssets[0]?.depreciationMethod || ''}
+                            onChange={(e) => {
+                              const newAssets = [...formData.fixedAssets];
+                              if (newAssets[0]) newAssets[0].depreciationMethod = e.target.value as 'Straight-line' | 'Declining balance';
+                              setFormData({ ...formData, fixedAssets: newAssets });
+                            }}
                           >
-                            + Add Another Asset
-                          </Button>
-                        </VStack>
+                            <option value="Straight-line">Straight-line</option>
+                            <option value="Declining balance">Declining balance</option>
+                          </Select>
+                        </FormControl>
                       )}
                     </Stack>
                   </CardBody>
@@ -1355,10 +1396,27 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
               <HStack>
                 <Checkbox
                   isChecked={formData.hasLoans}
-                  onChange={(e) => setFormData({ ...formData, hasLoans: e.target.checked })}
+                  onChange={(e) => {
+                    const newFormData = { ...formData, hasLoans: e.target.checked };
+                    if (e.target.checked && (!newFormData.loans || !newFormData.loans.length)) {
+                      newFormData.loans = [{
+                        purpose: '',
+                        amount: 0,
+                        interestRate: 0,
+                        monthlyPayment: 0,
+                        startDate: '',
+                        type: 'Loan',
+                        isActive: true,
+                        endDate: '',
+                        assetLeased: '',
+                        leaseTerm: 0
+                      }];
+                    }
+                    setFormData(newFormData);
+                  }}
                   size="lg"
                 >
-                  Do you have any loans or financing?
+                  Do you have any active business loans or lease agreements?
                 </Checkbox>
               </HStack>
 
@@ -1367,146 +1425,266 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                   <CardBody>
                     <Stack spacing={4}>
                       <FormControl>
-                        <FormLabel>How would you like to provide loans information?</FormLabel>
-                        <RadioGroup
-                          value={formData.preferManualEntry ? 'manual' : 'upload'}
-                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
-                        >
-                          <Stack direction="row" spacing={4}>
-                            <Radio value="upload">Upload Documents</Radio>
-                            <Radio value="manual">Enter Manually</Radio>
-                          </Stack>
-                        </RadioGroup>
-                      </FormControl>
-
-                      {!formData.preferManualEntry ? (
-                        <FormControl>
-                          <FormLabel>Upload Loan Documents</FormLabel>
-                          <Text fontSize="sm" color="gray.600" mb={2}>
-                            Upload loan agreements, statements, or repayment schedules
-                          </Text>
-                          <Input
-                            type="file"
-                            multiple
-                            accept=".pdf,.doc,.docx"
-                            onChange={(e) => handleFileUpload('loans', e.target.files)}
-                          />
-                          {formData.documents.loans && formData.documents.loans.length > 0 && (
-                            <FileList
-                              files={formData.documents.loans}
-                              onRemove={(index) => handleFileRemove('loans', index)}
-                            />
-                          )}
-                        </FormControl>
-                      ) : (
-                        <VStack spacing={4} mt={4} align="stretch">
-                          {formData.loans.map((loan, index) => (
-                            <Card key={index} variant="outline">
-                              <CardBody>
-                                <Stack spacing={4}>
-                                  <FormControl>
-                                    <FormLabel>Purpose</FormLabel>
-                                    <Input
-                                      placeholder="Enter purpose"
-                                      value={loan.purpose}
-                                      onChange={(e) => {
-                                        const newLoans = [...formData.loans]
-                                        newLoans[index] = { ...loan, purpose: e.target.value }
-                                        setFormData({ ...formData, loans: newLoans })
-                                      }}
-                                    />
-                                  </FormControl>
-                                  <FormControl>
-                                    <FormLabel>Amount</FormLabel>
-                                    <NumberInput
-                                      min={0}
-                                      value={loan.amount || undefined}
-                                      onChange={(_, valueNumber) => {
-                                        const newLoans = [...formData.loans]
-                                        newLoans[index] = { ...loan, amount: valueNumber || 0 }
-                                        setFormData({ ...formData, loans: newLoans })
-                                      }}
-                                    >
-                                      <NumberInputField placeholder="Enter amount" />
-                                    </NumberInput>
-                                  </FormControl>
-                                  <FormControl>
-                                    <FormLabel>Interest Rate</FormLabel>
-                                    <NumberInput
-                                      min={0}
-                                      value={loan.interestRate || undefined}
-                                      onChange={(_, valueNumber) => {
-                                        const newLoans = [...formData.loans]
-                                        newLoans[index] = { ...loan, interestRate: valueNumber || 0 }
-                                        setFormData({ ...formData, loans: newLoans })
-                                      }}
-                                    >
-                                      <NumberInputField placeholder="Enter interest rate" />
-                                    </NumberInput>
-                                  </FormControl>
-                                  <FormControl>
-                                    <FormLabel>Monthly Payment</FormLabel>
-                                    <NumberInput
-                                      min={0}
-                                      value={loan.monthlyPayment || undefined}
-                                      onChange={(_, valueNumber) => {
-                                        const newLoans = [...formData.loans]
-                                        newLoans[index] = { ...loan, monthlyPayment: valueNumber || 0 }
-                                        setFormData({ ...formData, loans: newLoans })
-                                      }}
-                                    >
-                                      <NumberInputField placeholder="Enter monthly payment" />
-                                    </NumberInput>
-                                  </FormControl>
-                                  <FormControl>
-                                    <FormLabel>Start Date</FormLabel>
-                                    <Input
-                                      type="date"
-                                      value={loan.startDate}
-                                      onChange={(e) => {
-                                        const newLoans = [...formData.loans]
-                                        newLoans[index] = { ...loan, startDate: e.target.value }
-                                        setFormData({ ...formData, loans: newLoans })
-                                      }}
-                                    />
-                                  </FormControl>
-                                  {index > 0 && (
-                                    <Button
-                                      aria-label="Remove loan"
-                                      onClick={() => {
-                                        const newLoans = formData.loans.filter((_, i) => i !== index)
-                                        setFormData({ ...formData, loans: newLoans })
-                                      }}
-                                      colorScheme="red"
-                                      variant="ghost"
-                                      alignSelf="flex-end"
-                                    >
-                                      Remove
-                                    </Button>
-                                  )}
-                                </Stack>
-                              </CardBody>
-                            </Card>
-                          ))}
-
-                          <Button
-                            onClick={() => setFormData({
-                              ...formData,
-                              loans: [...formData.loans, {
+                        <FormLabel>Type</FormLabel>
+                        <Select
+                          value={formData.loans?.[0]?.type || 'Loan'}
+                          onChange={(e) => {
+                            const newLoans = [...(formData.loans || [])];
+                            if (!newLoans[0]) {
+                              newLoans[0] = {
                                 purpose: '',
                                 amount: 0,
                                 interestRate: 0,
                                 monthlyPayment: 0,
-                                startDate: ''
-                              }]
-                            })}
-                            size="sm"
-                            variant="outline"
-                          >
-                            + Add Another Loan
-                          </Button>
-                        </VStack>
+                                startDate: '',
+                                type: e.target.value as 'Loan' | 'Lease',
+                                isActive: true,
+                                endDate: '',
+                                assetLeased: '',
+                                leaseTerm: 0
+                              };
+                            } else {
+                              newLoans[0].type = e.target.value as 'Loan' | 'Lease';
+                            }
+                            setFormData({ ...formData, loans: newLoans });
+                          }}
+                        >
+                          <option value="Loan">Loan</option>
+                          <option value="Lease">Lease</option>
+                        </Select>
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>{(formData.loans?.[0]?.type || 'Loan') === 'Lease' ? 'Asset Leased' : 'Purpose'}</FormLabel>
+                        {(formData.loans?.[0]?.type || 'Loan') === 'Lease' ? (
+                          <Input
+                            placeholder="Enter leased asset description"
+                            value={formData.loans?.[0]?.assetLeased || ''}
+                            onChange={(e) => {
+                              const newLoans = [...(formData.loans || [])];
+                              if (!newLoans[0]) {
+                                newLoans[0] = {
+                                  purpose: '',
+                                  amount: 0,
+                                  interestRate: 0,
+                                  monthlyPayment: 0,
+                                  startDate: '',
+                                  type: 'Lease',
+                                  isActive: true,
+                                  endDate: '',
+                                  assetLeased: e.target.value,
+                                  leaseTerm: 0
+                                };
+                              } else {
+                                newLoans[0].assetLeased = e.target.value;
+                              }
+                              setFormData({ ...formData, loans: newLoans });
+                            }}
+                          />
+                        ) : (
+                          <Input
+                            placeholder="Enter loan purpose"
+                            value={formData.loans?.[0]?.purpose || ''}
+                            onChange={(e) => {
+                              const newLoans = [...(formData.loans || [])];
+                              if (!newLoans[0]) {
+                                newLoans[0] = {
+                                  purpose: e.target.value,
+                                  amount: 0,
+                                  interestRate: 0,
+                                  monthlyPayment: 0,
+                                  startDate: '',
+                                  type: 'Loan',
+                                  isActive: true,
+                                  endDate: '',
+                                  assetLeased: '',
+                                  leaseTerm: 0
+                                };
+                              } else {
+                                newLoans[0].purpose = e.target.value;
+                              }
+                              setFormData({ ...formData, loans: newLoans });
+                            }}
+                          />
+                        )}
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>{(formData.loans?.[0]?.type || 'Loan') === 'Lease' ? 'Monthly Payment (AED)' : 'Amount (AED)'}</FormLabel>
+                        <Input
+                          type="number"
+                          value={(formData.loans?.[0]?.type || 'Loan') === 'Lease' 
+                            ? formData.loans?.[0]?.monthlyPayment || ''
+                            : formData.loans?.[0]?.amount || ''}
+                          onChange={(e) => {
+                            const newLoans = [...(formData.loans || [])];
+                            if (!newLoans[0]) {
+                              newLoans[0] = {
+                                purpose: '',
+                                amount: 0,
+                                interestRate: 0,
+                                monthlyPayment: 0,
+                                startDate: '',
+                                type: formData.loans?.[0]?.type || 'Loan',
+                                isActive: true,
+                                endDate: '',
+                                assetLeased: '',
+                                leaseTerm: 0
+                              };
+                            }
+                            if (newLoans[0].type === 'Lease') {
+                              newLoans[0].monthlyPayment = parseFloat(e.target.value) || 0;
+                            } else {
+                              newLoans[0].amount = parseFloat(e.target.value) || 0;
+                            }
+                            setFormData({ ...formData, loans: newLoans });
+                          }}
+                        />
+                      </FormControl>
+
+                      {(formData.loans?.[0]?.type || 'Loan') === 'Loan' && (
+                        <FormControl>
+                          <FormLabel>Interest Rate (%)</FormLabel>
+                          <Input
+                            type="number"
+                            value={formData.loans?.[0]?.interestRate || ''}
+                            onChange={(e) => {
+                              const newLoans = [...(formData.loans || [])];
+                              if (!newLoans[0]) {
+                                newLoans[0] = {
+                                  purpose: '',
+                                  amount: 0,
+                                  interestRate: parseFloat(e.target.value) || 0,
+                                  monthlyPayment: 0,
+                                  startDate: '',
+                                  type: 'Loan',
+                                  isActive: true,
+                                  endDate: '',
+                                  assetLeased: '',
+                                  leaseTerm: 0
+                                };
+                              } else {
+                                newLoans[0].interestRate = parseFloat(e.target.value) || 0;
+                              }
+                              setFormData({ ...formData, loans: newLoans });
+                            }}
+                          />
+                        </FormControl>
                       )}
+
+                      {(formData.loans?.[0]?.type || 'Loan') === 'Lease' && (
+                        <FormControl>
+                          <FormLabel>Lease Term (months)</FormLabel>
+                          <Input
+                            type="number"
+                            value={formData.loans?.[0]?.leaseTerm || ''}
+                            onChange={(e) => {
+                              const newLoans = [...(formData.loans || [])];
+                              if (!newLoans[0]) {
+                                newLoans[0] = {
+                                  purpose: '',
+                                  amount: 0,
+                                  interestRate: 0,
+                                  monthlyPayment: 0,
+                                  startDate: '',
+                                  type: 'Lease',
+                                  isActive: true,
+                                  endDate: '',
+                                  assetLeased: '',
+                                  leaseTerm: parseInt(e.target.value) || 0
+                                };
+                              } else {
+                                newLoans[0].leaseTerm = parseInt(e.target.value) || 0;
+                              }
+                              setFormData({ ...formData, loans: newLoans });
+                            }}
+                          />
+                        </FormControl>
+                      )}
+
+                      <FormControl>
+                        <FormLabel>Start Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.loans?.[0]?.startDate || ''}
+                          onChange={(e) => {
+                            const newLoans = [...(formData.loans || [])];
+                            if (!newLoans[0]) {
+                              newLoans[0] = {
+                                purpose: '',
+                                amount: 0,
+                                interestRate: 0,
+                                monthlyPayment: 0,
+                                startDate: e.target.value,
+                                type: 'Loan',
+                                isActive: true,
+                                endDate: '',
+                                assetLeased: '',
+                                leaseTerm: 0
+                              };
+                            } else {
+                              newLoans[0].startDate = e.target.value;
+                            }
+                            setFormData({ ...formData, loans: newLoans });
+                          }}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <FormLabel>End Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.loans?.[0]?.endDate || ''}
+                          onChange={(e) => {
+                            const newLoans = [...(formData.loans || [])];
+                            if (!newLoans[0]) {
+                              newLoans[0] = {
+                                purpose: '',
+                                amount: 0,
+                                interestRate: 0,
+                                monthlyPayment: 0,
+                                startDate: '',
+                                type: 'Loan',
+                                isActive: true,
+                                endDate: e.target.value,
+                                assetLeased: '',
+                                leaseTerm: 0
+                              };
+                            } else {
+                              newLoans[0].endDate = e.target.value;
+                            }
+                            setFormData({ ...formData, loans: newLoans });
+                          }}
+                        />
+                      </FormControl>
+
+                      <FormControl>
+                        <Checkbox
+                          isChecked={formData.loans?.[0]?.isActive ?? true}
+                          onChange={(e) => {
+                            const newLoans = [...(formData.loans || [])];
+                            if (!newLoans[0]) {
+                              newLoans[0] = {
+                                purpose: '',
+                                amount: 0,
+                                interestRate: 0,
+                                monthlyPayment: 0,
+                                startDate: '',
+                                type: 'Loan',
+                                isActive: e.target.checked,
+                                endDate: '',
+                                assetLeased: '',
+                                leaseTerm: 0
+                              };
+                            } else {
+                              newLoans[0].isActive = e.target.checked;
+                            }
+                            setFormData({ ...formData, loans: newLoans });
+                          }}
+                        >
+                          Is this {(formData.loans?.[0]?.type || 'Loan').toLowerCase()} still active?
+                        </Checkbox>
+                      </FormControl>
                     </Stack>
                   </CardBody>
                 </Card>
@@ -1597,6 +1775,265 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                           </Checkbox>
                         </VStack>
                       )}
+                    </Stack>
+                  </CardBody>
+                </Card>
+              )}
+            </FormControl>
+          </VStack>
+        )
+
+      case 8:
+        return (
+          <VStack spacing={6} align="stretch">
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={formData.hasCapitalContributions}
+                  onChange={(e) => {
+                    const newFormData = { ...formData, hasCapitalContributions: e.target.checked };
+                    if (e.target.checked && (!newFormData.capitalContributions || !newFormData.capitalContributions.length)) {
+                      newFormData.capitalContributions = [{ amount: 0, date: '', proof: undefined }];
+                    }
+                    setFormData(newFormData);
+                  }}
+                  size="lg"
+                >
+                  Do you have any capital contributions?
+                </Checkbox>
+              </HStack>
+
+              {formData.hasCapitalContributions && (
+                <Card mt={4} variant="outline">
+                  <CardBody>
+                    <Stack spacing={4}>
+                      <FormControl>
+                        <FormLabel>Capital Contributions</FormLabel>
+                        <Text fontSize="sm" color="gray.600" mb={2}>
+                          Enter the amount and date of each capital contribution
+                        </Text>
+                        <Input
+                          placeholder="Enter amount"
+                          value={formData.capitalContributions?.[0]?.amount.toString() || ''}
+                          onChange={(e) => {
+                            const newContributions = [...(formData.capitalContributions || [])];
+                            if (!newContributions[0]) {
+                              newContributions[0] = { amount: 0, date: '', proof: undefined };
+                            }
+                            newContributions[0].amount = parseFloat(e.target.value) || 0;
+                            setFormData({ ...formData, capitalContributions: newContributions });
+                          }}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.capitalContributions?.[0]?.date || ''}
+                          onChange={(e) => {
+                            const newContributions = [...(formData.capitalContributions || [])];
+                            if (!newContributions[0]) {
+                              newContributions[0] = { amount: 0, date: '', proof: undefined };
+                            }
+                            newContributions[0].date = e.target.value;
+                            setFormData({ ...formData, capitalContributions: newContributions });
+                          }}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Proof</FormLabel>
+                        <Input
+                          type="file"
+                          accept=".pdf,.jpg,.png"
+                          onChange={(e) => {
+                            const newContributions = [...(formData.capitalContributions || [])];
+                            if (!newContributions[0]) {
+                              newContributions[0] = { amount: 0, date: '', proof: undefined };
+                            }
+                            if (e.target.files && e.target.files.length > 0) {
+                              newContributions[0].proof = e.target.files[0];
+                            } else {
+                              newContributions[0].proof = undefined;
+                            }
+                            setFormData({ ...formData, capitalContributions: newContributions });
+                          }}
+                        />
+                      </FormControl>
+                    </Stack>
+                  </CardBody>
+                </Card>
+              )}
+            </FormControl>
+          </VStack>
+        )
+
+      case 9:
+        return (
+          <VStack spacing={6} align="stretch">
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={formData.hasEquipmentPurchases}
+                  onChange={(e) => {
+                    const newFormData = { ...formData, hasEquipmentPurchases: e.target.checked };
+                    if (e.target.checked && (!newFormData.equipmentPurchases || !newFormData.equipmentPurchases.length)) {
+                      newFormData.equipmentPurchases = [{ description: '', amount: 0, date: '', isLongTermAsset: false }];
+                    }
+                    setFormData(newFormData);
+                  }}
+                  size="lg"
+                >
+                  Do you have any equipment purchases?
+                </Checkbox>
+              </HStack>
+
+              {formData.hasEquipmentPurchases && (
+                <Card mt={4} variant="outline">
+                  <CardBody>
+                    <Stack spacing={4}>
+                      <FormControl>
+                        <FormLabel>Equipment Purchases</FormLabel>
+                        <Text fontSize="sm" color="gray.600" mb={2}>
+                          Enter the description, amount, and date of each equipment purchase
+                        </Text>
+                        <Input
+                          placeholder="Enter description"
+                          value={formData.equipmentPurchases?.[0]?.description || ''}
+                          onChange={(e) => {
+                            const newPurchases = [...(formData.equipmentPurchases || [])];
+                            if (!newPurchases[0]) {
+                              newPurchases[0] = { description: '', amount: 0, date: '', isLongTermAsset: false };
+                            }
+                            newPurchases[0].description = e.target.value;
+                            setFormData({ ...formData, equipmentPurchases: newPurchases });
+                          }}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Amount</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.equipmentPurchases?.[0]?.amount.toString() || ''}
+                          onChange={(e) => {
+                            const newPurchases = [...(formData.equipmentPurchases || [])];
+                            if (!newPurchases[0]) {
+                              newPurchases[0] = { description: '', amount: 0, date: '', isLongTermAsset: false };
+                            }
+                            newPurchases[0].amount = parseFloat(e.target.value) || 0;
+                            setFormData({ ...formData, equipmentPurchases: newPurchases });
+                          }}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.equipmentPurchases?.[0]?.date || ''}
+                          onChange={(e) => {
+                            const newPurchases = [...(formData.equipmentPurchases || [])];
+                            if (!newPurchases[0]) {
+                              newPurchases[0] = { description: '', amount: 0, date: '', isLongTermAsset: false };
+                            }
+                            newPurchases[0].date = e.target.value;
+                            setFormData({ ...formData, equipmentPurchases: newPurchases });
+                          }}
+                        />
+                      </FormControl>
+                    </Stack>
+                  </CardBody>
+                </Card>
+              )}
+            </FormControl>
+          </VStack>
+        )
+
+      case 10:
+        return (
+          <VStack spacing={6} align="stretch">
+            <FormControl>
+              <HStack>
+                <Checkbox
+                  isChecked={formData.hasLoanRepayments}
+                  onChange={(e) => {
+                    const newFormData = { ...formData, hasLoanRepayments: e.target.checked };
+                    if (e.target.checked && (!newFormData.loanRepayments || !newFormData.loanRepayments.length)) {
+                      newFormData.loanRepayments = [{ totalAmount: 0, interestPortion: 0, date: '', loanId: '' }];
+                    }
+                    setFormData(newFormData);
+                  }}
+                  size="lg"
+                >
+                  Do you have any loan repayments?
+                </Checkbox>
+              </HStack>
+
+              {formData.hasLoanRepayments && (
+                <Card mt={4} variant="outline">
+                  <CardBody>
+                    <Stack spacing={4}>
+                      <FormControl>
+                        <FormLabel>Loan Repayments</FormLabel>
+                        <Text fontSize="sm" color="gray.600" mb={2}>
+                          Enter the total amount, interest portion, date, and loan ID of each loan repayment
+                        </Text>
+                        <Input
+                          placeholder="Enter total amount"
+                          value={formData.loanRepayments?.[0]?.totalAmount.toString() || ''}
+                          onChange={(e) => {
+                            const newRepayments = [...(formData.loanRepayments || [])];
+                            if (!newRepayments[0]) {
+                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
+                            }
+                            newRepayments[0].totalAmount = parseFloat(e.target.value) || 0;
+                            setFormData({ ...formData, loanRepayments: newRepayments });
+                          }}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Interest Portion</FormLabel>
+                        <Input
+                          type="number"
+                          value={formData.loanRepayments?.[0]?.interestPortion.toString() || ''}
+                          onChange={(e) => {
+                            const newRepayments = [...(formData.loanRepayments || [])];
+                            if (!newRepayments[0]) {
+                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
+                            }
+                            newRepayments[0].interestPortion = parseFloat(e.target.value) || 0;
+                            setFormData({ ...formData, loanRepayments: newRepayments });
+                          }}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Date</FormLabel>
+                        <Input
+                          type="date"
+                          value={formData.loanRepayments?.[0]?.date || ''}
+                          onChange={(e) => {
+                            const newRepayments = [...(formData.loanRepayments || [])];
+                            if (!newRepayments[0]) {
+                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
+                            }
+                            newRepayments[0].date = e.target.value;
+                            setFormData({ ...formData, loanRepayments: newRepayments });
+                          }}
+                        />
+                      </FormControl>
+                      <FormControl>
+                        <FormLabel>Loan ID</FormLabel>
+                        <Input
+                          placeholder="Enter loan ID"
+                          value={formData.loanRepayments?.[0]?.loanId || ''}
+                          onChange={(e) => {
+                            const newRepayments = [...(formData.loanRepayments || [])];
+                            if (!newRepayments[0]) {
+                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
+                            }
+                            newRepayments[0].loanId = e.target.value;
+                            setFormData({ ...formData, loanRepayments: newRepayments });
+                          }}
+                        />
+                      </FormControl>
                     </Stack>
                   </CardBody>
                 </Card>
