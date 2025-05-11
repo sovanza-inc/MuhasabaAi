@@ -16,9 +16,12 @@ import {
   ButtonGroup,
   Heading,
   TableContainer,
+  Image,
+  useToast,
 } from '@chakra-ui/react';
 import React, { useState } from 'react';
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu';
+import jsPDF from 'jspdf';
 
 interface CashFlowItem {
   description: string;
@@ -52,7 +55,7 @@ export interface FilteredCashFlowData {
     indent?: number;
     isSubTotal?: boolean;
   }>;
-  indirectMethod?: {
+  indirectMethod: {
     netProfit: number;
     adjustments: {
       depreciation: number;
@@ -66,10 +69,11 @@ export interface FilteredCashFlowData {
       vatPayable: number;
     };
   };
-  period?: {
+  period: {
     startDate: Date;
     endDate: Date;
   };
+  openingCashBalance: number;
 }
 
 interface EditablePdfPreviewProps {
@@ -77,16 +81,20 @@ interface EditablePdfPreviewProps {
   onClose: () => void;
   onExport: (filteredData: FilteredCashFlowData) => void;
   data: FilteredCashFlowData;
+  logoRef: React.RefObject<HTMLImageElement>;
 }
 
 export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
   isOpen,
   onClose,
   onExport,
-  data
+  data,
+  logoRef
 }) => {
+  const toast = useToast();
   const [selectedPeriod, setSelectedPeriod] = useState<'3mo' | '6mo' | '12mo'>('6mo');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Format date as "MMM DD" (e.g., "May 25")
   const formatDate = (date: Date) => {
@@ -122,29 +130,69 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     return months;
   };
 
-  const handleExport = () => {
-    const monthsData = getMonthsData();
-    onExport({
+  const calculateClosingBalance = (data: FilteredCashFlowData) => {
+    return data.openingCashBalance + calculateNetCashChange(data);
+  };
+
+  const formatAmount = (amount: number) => {
+    return `AED ${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
+  const handleExport = async () => {
+    if (!contentRef.current || !logoRef.current) return;
+    
+    // Calculate the date range based on selected period
+    const endDate = new Date(currentDate);
+    const startDate = new Date(currentDate);
+    const periodMonths = selectedPeriod === '3mo' ? 3 : selectedPeriod === '6mo' ? 6 : 12;
+    startDate.setMonth(startDate.getMonth() - (periodMonths - 1));
+    
+    // Set dates to start and end of month
+    startDate.setDate(1);
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0);
+
+    // Update the period in the data
+    const filteredData = {
       ...data,
       period: {
-        startDate: monthsData[0].date,
-        endDate: monthsData[monthsData.length - 1].date
+        startDate,
+        endDate
       }
-    });
+    };
+    
+    onExport(filteredData);
+  };
+
+  // Helper functions for calculations
+  const calculateOperatingCashFlow = (data: FilteredCashFlowData) => {
+    return data.indirectMethod.netProfit +
+           data.indirectMethod.adjustments.depreciation +
+           data.indirectMethod.adjustments.amortization +
+           data.indirectMethod.adjustments.interestExpense +
+           data.indirectMethod.workingCapital.accountsReceivable +
+           data.indirectMethod.workingCapital.inventory +
+           data.indirectMethod.workingCapital.accountsPayable +
+           data.indirectMethod.workingCapital.vatPayable;
+  };
+
+  const calculateInvestingCashFlow = (data: FilteredCashFlowData) => {
+    return data.investingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
+  };
+
+  const calculateFinancingCashFlow = (data: FilteredCashFlowData) => {
+    return data.financingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
+  };
+
+  const calculateNetCashChange = (data: FilteredCashFlowData) => {
+    return calculateOperatingCashFlow(data) +
+           calculateInvestingCashFlow(data) +
+           calculateFinancingCashFlow(data);
   };
 
   const calculateDelta = (current: number, previous: number) => {
     if (previous === 0) return current === 0 ? 0 : 100;
     return ((current - previous) / Math.abs(previous)) * 100;
-  };
-
-  const formatAmount = (amount: number) => {
-    return Math.abs(amount).toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'AED',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
   };
 
   const renderSection = (title: string, items: CashFlowItem[]) => (
@@ -202,7 +250,6 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     <Modal isOpen={isOpen} onClose={onClose} size="6xl">
       <ModalOverlay bg="whiteAlpha.800" backdropFilter="blur(2px)" />
       <ModalContent maxW="95vw" mx="4" rounded="lg" overflow="hidden">
-        {/* Header Section */}
         <Box bg="white" px="6" py="4" borderBottom="1px" borderColor="gray.100">
           <HStack justify="space-between">
             <HStack spacing="4">
@@ -259,7 +306,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
         </Box>
 
         {/* Content Section */}
-        <Box p="6" maxH="calc(100vh - 200px)" overflowY="auto">
+        <Box ref={contentRef} p="6" maxH="calc(100vh - 200px)" overflowY="auto">
           {/* Direct Method Table */}
           <Box mb="8">
             <Heading size="md" mb="4">Statement of Cash Flows (Direct Method)</Heading>
