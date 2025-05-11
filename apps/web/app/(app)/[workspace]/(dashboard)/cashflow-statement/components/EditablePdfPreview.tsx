@@ -159,12 +159,6 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     return data.financingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
   };
 
-  const calculateNetCashChange = (data: FilteredCashFlowData) => {
-    return calculateOperatingCashFlow(data) +
-           calculateInvestingCashFlow(data) +
-           calculateFinancingCashFlow(data);
-  };
-
   const calculateDelta = (current: number, previous: number) => {
     if (previous === 0) return current === 0 ? 0 : 100;
     return ((current - previous) / Math.abs(previous)) * 100;
