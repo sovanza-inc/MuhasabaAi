@@ -113,27 +113,6 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     return `AED ${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  // Get the months for display based on selected period
-  const getMonthsData = () => {
-    const months = [];
-    const periodMonths = selectedPeriod === '3mo' ? 3 : selectedPeriod === '6mo' ? 6 : 12;
-    
-    for (let i = 0; i < periodMonths; i++) {
-      const date = new Date(currentDate);
-      date.setMonth(date.getMonth() - i);
-      months.unshift({
-        month: date.toLocaleString('default', { month: 'short' }),
-        year: date.getFullYear(),
-        date: date
-      });
-    }
-    return months;
-  };
-
-  const calculateClosingBalance = (data: FilteredCashFlowData) => {
-    return data.openingCashBalance + calculateNetCashChange(data);
-  };
-
   const handleExport = async () => {
     if (!contentRef.current || !logoRef.current) return;
     
