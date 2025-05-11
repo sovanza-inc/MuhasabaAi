@@ -19,7 +19,6 @@ import {
 } from '@chakra-ui/react';
 import React, { useState } from 'react';
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu';
-import jsPDF from 'jspdf';
 
 interface CashFlowItem {
   description: string;
