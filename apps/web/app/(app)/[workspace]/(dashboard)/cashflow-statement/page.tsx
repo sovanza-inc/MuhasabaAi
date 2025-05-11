@@ -852,7 +852,7 @@ export default function CashflowStatementPage() {
                             </Text>
                           </HStack>
                           <HStack justify="space-between">
-                            <Text color="gray.600">Owner's Capital Contributions</Text>
+                            <Text color="gray.600">Owner&apos;s Capital Contributions</Text>
                             <Text fontWeight="medium" color="green.600">
                               {Math.abs(processedData.financingActivities.find(x => x.description === 'Owner\'s Capital Contributions')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                             </Text>

@@ -16,8 +16,6 @@ import {
   ButtonGroup,
   Heading,
   TableContainer,
-  Image,
-  useToast,
 } from '@chakra-ui/react';
 import React, { useState } from 'react';
 import { LuChevronLeft, LuChevronRight } from 'react-icons/lu';
@@ -91,7 +89,6 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
   data,
   logoRef
 }) => {
-  const toast = useToast();
   const [selectedPeriod, setSelectedPeriod] = useState<'3mo' | '6mo' | '12mo'>('6mo');
   const [currentDate, setCurrentDate] = useState(new Date());
   const contentRef = React.useRef<HTMLDivElement>(null);
