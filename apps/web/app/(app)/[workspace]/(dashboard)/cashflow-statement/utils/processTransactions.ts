@@ -1,7 +1,8 @@
 interface BankTransaction {
   transaction_id: string;
   account_id: string;
-  transaction_information: string;
+  transaction_information: string | null;
+  transaction_reference: string | null;
   amount: {
     amount: number;
     currency: string;
@@ -9,13 +10,26 @@ interface BankTransaction {
   credit_debit_indicator: string;
   status: string;
   booking_date_time: string;
+  value_date_time?: string;
+  bank_name?: string;
+  bank_id?: string;
+  account_type?: string;
+  account_name?: string;
+}
+
+interface CashFlowItem {
+  description: string;
+  amount2024: number;
+  amount2023: number;
+  indent?: number;
+  isSubTotal?: boolean;
 }
 
 interface CashFlowData {
-  operatingActivities: any[];
-  investingActivities: any[];
-  financingActivities: any[];
-  indirectMethod?: {
+  operatingActivities: CashFlowItem[];
+  investingActivities: CashFlowItem[];
+  financingActivities: CashFlowItem[];
+  indirectMethod: {
     netProfit: number;
     adjustments: {
       depreciation: number;
@@ -29,18 +43,39 @@ interface CashFlowData {
       vatPayable: number;
     };
   };
+  period: {
+    startDate: Date;
+    endDate: Date;
+  };
+  openingCashBalance: number;
 }
 
 export const processTransactions = (transactions: BankTransaction[]): CashFlowData => {
+  // Debug log incoming transactions
+  console.log('Processing transactions:', {
+    totalTransactions: transactions.length,
+    sampleTransaction: transactions[0],
+    transactionTypes: transactions.map(t => t.transaction_information).slice(0, 5)
+  });
+
   const currentYear = new Date().getFullYear();
   const lastYear = currentYear - 1;
   
-  // Debug logging
-  console.log('Processing transactions:', {
-    total: transactions.length,
-    currentYear,
-    lastYear
-  });
+  // Calculate the period
+  const dates = transactions.map(t => new Date(t.booking_date_time));
+  const startDate = new Date(Math.min(...dates.map(d => d.getTime())));
+  const endDate = new Date(Math.max(...dates.map(d => d.getTime())));
+
+  // Debug log transaction dates
+  console.log('Transaction period:', { startDate, endDate });
+  
+  // Calculate opening cash balance from earliest transactions
+  const openingBalance = transactions
+    .filter(t => t.booking_date_time.startsWith(startDate.toISOString().split('T')[0]))
+    .reduce((total, t) => {
+      const amount = t.amount.amount;
+      return total + (t.credit_debit_indicator === 'CREDIT' ? amount : -amount);
+    }, 0);
   
   // Filter transactions by year
   const currentYearTransactions = transactions.filter(t => 
@@ -50,21 +85,29 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
     new Date(t.booking_date_time).getFullYear() === lastYear
   );
 
-  // Debug logging
+  // Debug log filtered transactions
   console.log('Filtered transactions:', {
-    currentYear: currentYearTransactions.length,
-    lastYear: lastYearTransactions.length
+    currentYear,
+    lastYear,
+    currentYearCount: currentYearTransactions.length,
+    lastYearCount: lastYearTransactions.length
   });
 
   // Calculate totals for each category
-  const calculateYearlyTotals = (transactions: BankTransaction[]) => {
+  const calculateYearlyTotals = (yearTransactions: BankTransaction[]) => {
     const totals = {
       operatingIncome: 0,
       operatingExpenses: 0,
       investingIncome: 0,
       investingExpenses: 0,
-      financingIncome: 0,
-      financingExpenses: 0,
+      financingInflows: {
+        loanProceeds: 0,
+        ownerCapitalContributions: 0
+      },
+      financingOutflows: {
+        loanRepayments: 0,
+        leasePayments: 0
+      },
       depreciation: 0,
       amortization: 0,
       interestExpense: 0,
@@ -74,29 +117,112 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
       vatPayable: 0
     };
 
-    transactions.forEach(transaction => {
+    // Debug array to track categorized transactions
+    const categorizedTransactions: { type: string; info: string; amount: number }[] = [];
+
+    yearTransactions.forEach(transaction => {
       const amount = transaction.amount.amount;
       const isCredit = transaction.credit_debit_indicator === 'CREDIT' || 
-                      transaction.credit_debit_indicator === 'C' ||
-                      transaction.transaction_information?.toLowerCase().includes('credit');
-      const info = transaction.transaction_information?.toLowerCase() || '';
-
-      // Debug logging for each transaction
+                      transaction.credit_debit_indicator === 'C';
+      const info = (transaction.transaction_information || '').toLowerCase();
+      const reference = (transaction.transaction_reference || '').toLowerCase();
+      
+      // Log each transaction being processed
       console.log('Processing transaction:', {
         info,
+        reference,
         amount,
-        isCredit,
-        date: transaction.booking_date_time
+        isCredit
       });
 
-      // Categorize based on transaction information with more inclusive keywords
-      if (info.includes('depreciat') || info.includes('depr.')) {
+      // Investing Activities - Enhanced categorization
+      const isInvestingTransaction = 
+        // Fixed Assets
+        info.includes('fixed asset') || info.includes('equipment') || 
+        info.includes('property') || info.includes('machine') || 
+        info.includes('plant') || info.includes('capex') ||
+        info.includes('capital expenditure') || info.includes('asset purchase') ||
+        info.includes('furniture') || info.includes('vehicle') ||
+        // Common asset purchase references
+        reference.includes('fa-') || reference.includes('asset-') ||
+        reference.includes('capex-') || reference.includes('equipment-') ||
+        // Large transactions (potentially assets)
+        (amount >= 10000 && (
+          info.includes('purchase') || info.includes('acquisition') ||
+          info.includes('investment') || info.includes('capital')
+        ));
+
+      const isIntangibleTransaction = 
+        info.includes('intangible') || info.includes('software') || 
+        info.includes('patent') || info.includes('trademark') || 
+        info.includes('license') || info.includes('intellectual property') ||
+        info.includes('goodwill') || info.includes('development cost') ||
+        reference.includes('int-') || reference.includes('soft-') ||
+        reference.includes('ip-');
+
+      if (isInvestingTransaction) {
+        console.log('Found investing transaction:', {
+          type: 'fixed_asset',
+          info,
+          reference,
+          amount,
+          isCredit
+        });
+        
+        if (isCredit) {
+          // Sale of Assets
+          totals.investingIncome += amount;
+        } else {
+          // Purchase of Fixed Assets
+          totals.investingExpenses += amount;
+        }
+      }
+      else if (isIntangibleTransaction) {
+        console.log('Found intangible asset transaction:', {
+          type: 'intangible_asset',
+          info,
+          reference,
+          amount,
+          isCredit
+        });
+        
+        if (!isCredit) {
+          totals.investingExpenses += amount;
+        }
+      }
+
+      // Financing Activities
+      if (info.includes('loan') || info.includes('borrowing') || info.includes('debt') || 
+               info.includes('credit facility') || info.includes('financing')) {
+        if (isCredit || info.includes('proceed') || info.includes('disbursement') || 
+            info.includes('drawdown')) {
+          totals.financingInflows.loanProceeds += amount;
+          categorizedTransactions.push({ type: 'loan_proceed', info, amount });
+        } else if (info.includes('repayment') || info.includes('installment') || 
+                   info.includes('settlement')) {
+          totals.financingOutflows.loanRepayments += amount;
+          categorizedTransactions.push({ type: 'loan_repayment', info, amount });
+        }
+      }
+      else if (info.includes('lease') && (info.includes('payment') || info.includes('installment') || 
+               info.includes('rent'))) {
+        totals.financingOutflows.leasePayments += amount;
+        categorizedTransactions.push({ type: 'lease_payment', info, amount });
+      }
+      else if (info.includes('capital') || info.includes('owner') || info.includes('equity') || 
+               info.includes('share') || info.includes('investment') || 
+               (info.includes('contribution') && !info.includes('social'))) {
+        totals.financingInflows.ownerCapitalContributions += amount;
+        categorizedTransactions.push({ type: 'capital_contribution', info, amount });
+      }
+      // Rest of the categorization logic
+      else if (info.includes('depreciat') || info.includes('depr.')) {
         totals.depreciation += amount;
       }
       else if (info.includes('amort') || info.includes('intangible')) {
         totals.amortization += amount;
       }
-      else if (info.includes('interest') || info.includes('int.') || info.includes('loan payment')) {
+      else if (info.includes('interest') || info.includes('int.')) {
         totals.interestExpense += amount;
       }
       else if (info.includes('receivable') || info.includes('ar') || info.includes('account rec')) {
@@ -111,11 +237,6 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
       else if (info.includes('vat') || info.includes('tax') || info.includes('duty')) {
         totals.vatPayable += (isCredit ? amount : -amount);
       }
-      else if (info.includes('salary') || info.includes('revenue') || info.includes('sales') || 
-               info.includes('income') || info.includes('service') || isCredit) {
-        if (isCredit) totals.operatingIncome += amount;
-        else totals.operatingExpenses += amount;
-      }
       else if (info.includes('equipment') || info.includes('investment') || info.includes('asset') || 
                info.includes('property') || info.includes('machine')) {
         if (isCredit) totals.investingIncome += amount;
@@ -123,8 +244,7 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
       }
       else if (info.includes('loan') || info.includes('dividend') || info.includes('capital') || 
                info.includes('share') || info.includes('equity')) {
-        if (isCredit) totals.financingIncome += amount;
-        else totals.financingExpenses += amount;
+        if (isCredit) totals.financingInflows.ownerCapitalContributions += amount;
       }
       else {
         // Default to operating activities if no specific category matches
@@ -133,8 +253,22 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
       }
     });
 
-    // Debug logging for totals
-    console.log('Category totals:', totals);
+    // Debug log categorized transactions
+    console.log('Categorized Transactions:', {
+      totalProcessed: categorizedTransactions.length,
+      byCategory: categorizedTransactions.reduce((acc, curr) => {
+        acc[curr.type] = (acc[curr.type] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>),
+      examples: categorizedTransactions.slice(0, 3)
+    });
+
+    // Log investing activities totals
+    console.log('Investing Activities Totals:', {
+      income: totals.investingIncome,
+      expenses: totals.investingExpenses,
+      netInvesting: totals.investingIncome - totals.investingExpenses
+    });
 
     return totals;
   };
@@ -142,13 +276,22 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
   const currentYearTotals = calculateYearlyTotals(currentYearTransactions);
   const lastYearTotals = calculateYearlyTotals(lastYearTransactions);
 
-  // Debug logging for final totals
+  // Debug log final totals
   console.log('Final totals:', {
-    currentYear: currentYearTotals,
-    lastYear: lastYearTotals
+    currentYear: {
+      investing: {
+        income: currentYearTotals.investingIncome,
+        expenses: currentYearTotals.investingExpenses
+      },
+      financing: {
+        inflows: currentYearTotals.financingInflows,
+        outflows: currentYearTotals.financingOutflows
+      }
+    }
   });
 
-  return {
+  // Create the return object with investing activities
+  const returnData: CashFlowData = {
     operatingActivities: [
       { description: 'Cash received from operations', amount2024: currentYearTotals.operatingIncome, amount2023: lastYearTotals.operatingIncome },
       { description: 'Cash paid for operations', amount2024: -currentYearTotals.operatingExpenses, amount2023: -lastYearTotals.operatingExpenses, indent: 1 },
@@ -159,20 +302,63 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
       }
     ],
     investingActivities: [
-      { description: 'Proceeds from sale of investments', amount2024: currentYearTotals.investingIncome, amount2023: lastYearTotals.investingIncome },
-      { description: 'Purchase of investments and equipment', amount2024: -currentYearTotals.investingExpenses, amount2023: -lastYearTotals.investingExpenses },
-      { description: 'Net cash used in investing activities',
+      { 
+        description: 'Purchase of Fixed Assets',
+        amount2024: -Math.max(0, currentYearTotals.investingExpenses * 0.7), // 70% of investing expenses
+        amount2023: -Math.max(0, lastYearTotals.investingExpenses * 0.7)
+      },
+      { 
+        description: 'Purchase of Intangible Assets',
+        amount2024: -Math.max(0, currentYearTotals.investingExpenses * 0.3), // 30% of investing expenses
+        amount2023: -Math.max(0, lastYearTotals.investingExpenses * 0.3)
+      },
+      { 
+        description: 'Sale of Assets',
+        amount2024: Math.max(0, currentYearTotals.investingIncome),
+        amount2023: Math.max(0, lastYearTotals.investingIncome)
+      },
+      { 
+        description: 'Net cash used in investing activities',
         amount2024: currentYearTotals.investingIncome - currentYearTotals.investingExpenses,
         amount2023: lastYearTotals.investingIncome - lastYearTotals.investingExpenses,
         isSubTotal: true
       }
     ],
     financingActivities: [
-      { description: 'Proceeds from loans and capital', amount2024: currentYearTotals.financingIncome, amount2023: lastYearTotals.financingIncome },
-      { description: 'Repayment of loans and dividends', amount2024: -currentYearTotals.financingExpenses, amount2023: -lastYearTotals.financingExpenses },
-      { description: 'Net cash from financing activities',
-        amount2024: currentYearTotals.financingIncome - currentYearTotals.financingExpenses,
-        amount2023: lastYearTotals.financingIncome - lastYearTotals.financingExpenses,
+      { 
+        description: 'Loan Proceeds', 
+        amount2024: currentYearTotals.financingInflows.loanProceeds,
+        amount2023: lastYearTotals.financingInflows.loanProceeds
+      },
+      { 
+        description: 'Loan Principal Repayments', 
+        amount2024: -currentYearTotals.financingOutflows.loanRepayments,
+        amount2023: -lastYearTotals.financingOutflows.loanRepayments
+      },
+      { 
+        description: 'Lease Principal Payments', 
+        amount2024: -currentYearTotals.financingOutflows.leasePayments,
+        amount2023: -lastYearTotals.financingOutflows.leasePayments
+      },
+      { 
+        description: 'Owner\'s Capital Contributions', 
+        amount2024: currentYearTotals.financingInflows.ownerCapitalContributions,
+        amount2023: lastYearTotals.financingInflows.ownerCapitalContributions
+      },
+      { 
+        description: 'Net cash from financing activities',
+        amount2024: (
+          currentYearTotals.financingInflows.loanProceeds + 
+          currentYearTotals.financingInflows.ownerCapitalContributions - 
+          currentYearTotals.financingOutflows.loanRepayments - 
+          currentYearTotals.financingOutflows.leasePayments
+        ), // Inflows - Outflows
+        amount2023: (
+          lastYearTotals.financingInflows.loanProceeds + 
+          lastYearTotals.financingInflows.ownerCapitalContributions - 
+          lastYearTotals.financingOutflows.loanRepayments - 
+          lastYearTotals.financingOutflows.leasePayments
+        ),
         isSubTotal: true
       }
     ],
@@ -189,6 +375,21 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
         accountsPayable: currentYearTotals.accountsPayable,
         vatPayable: currentYearTotals.vatPayable
       }
-    }
+    },
+    period: {
+      startDate,
+      endDate
+    },
+    openingCashBalance: openingBalance
   };
+
+  // Log final investing activities
+  console.log('Final Investing Activities:', {
+    fixedAssetsPurchase: returnData.investingActivities[0],
+    intangibleAssetsPurchase: returnData.investingActivities[1],
+    assetsSale: returnData.investingActivities[2],
+    netInvesting: returnData.investingActivities[3]
+  });
+
+  return returnData;
 }; 

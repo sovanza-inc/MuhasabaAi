@@ -52,7 +52,7 @@ export interface FilteredCashFlowData {
     indent?: number;
     isSubTotal?: boolean;
   }>;
-  indirectMethod?: {
+  indirectMethod: {
     netProfit: number;
     adjustments: {
       depreciation: number;
@@ -66,10 +66,11 @@ export interface FilteredCashFlowData {
       vatPayable: number;
     };
   };
-  period?: {
+  period: {
     startDate: Date;
     endDate: Date;
   };
+  openingCashBalance: number;
 }
 
 interface EditablePdfPreviewProps {
@@ -77,16 +78,19 @@ interface EditablePdfPreviewProps {
   onClose: () => void;
   onExport: (filteredData: FilteredCashFlowData) => void;
   data: FilteredCashFlowData;
+  logoRef: React.RefObject<HTMLImageElement>;
 }
 
 export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
   isOpen,
   onClose,
   onExport,
-  data
+  data,
+  logoRef
 }) => {
   const [selectedPeriod, setSelectedPeriod] = useState<'3mo' | '6mo' | '12mo'>('6mo');
   const [currentDate, setCurrentDate] = useState(new Date());
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Format date as "MMM DD" (e.g., "May 25")
   const formatDate = (date: Date) => {
@@ -105,32 +109,54 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     setCurrentDate(newDate);
   };
 
-  // Get the months for display based on selected period
-  const getMonthsData = () => {
-    const months = [];
-    const periodMonths = selectedPeriod === '3mo' ? 3 : selectedPeriod === '6mo' ? 6 : 12;
-    
-    for (let i = 0; i < periodMonths; i++) {
-      const date = new Date(currentDate);
-      date.setMonth(date.getMonth() - i);
-      months.unshift({
-        month: date.toLocaleString('default', { month: 'short' }),
-        year: date.getFullYear(),
-        date: date
-      });
-    }
-    return months;
+  const formatAmount = (amount: number) => {
+    return `AED ${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
-  const handleExport = () => {
-    const monthsData = getMonthsData();
-    onExport({
+  const handleExport = async () => {
+    if (!contentRef.current || !logoRef.current) return;
+    
+    // Calculate the date range based on selected period
+    const endDate = new Date(currentDate);
+    const startDate = new Date(currentDate);
+    const periodMonths = selectedPeriod === '3mo' ? 3 : selectedPeriod === '6mo' ? 6 : 12;
+    startDate.setMonth(startDate.getMonth() - (periodMonths - 1));
+    
+    // Set dates to start and end of month
+    startDate.setDate(1);
+    endDate.setMonth(endDate.getMonth() + 1);
+    endDate.setDate(0);
+
+    // Update the period in the data
+    const filteredData = {
       ...data,
       period: {
-        startDate: monthsData[0].date,
-        endDate: monthsData[monthsData.length - 1].date
+        startDate,
+        endDate
       }
-    });
+    };
+    
+    onExport(filteredData);
+  };
+
+  // Helper functions for calculations
+  const calculateOperatingCashFlow = (data: FilteredCashFlowData) => {
+    return data.indirectMethod.netProfit +
+           data.indirectMethod.adjustments.depreciation +
+           data.indirectMethod.adjustments.amortization +
+           data.indirectMethod.adjustments.interestExpense +
+           data.indirectMethod.workingCapital.accountsReceivable +
+           data.indirectMethod.workingCapital.inventory +
+           data.indirectMethod.workingCapital.accountsPayable +
+           data.indirectMethod.workingCapital.vatPayable;
+  };
+
+  const calculateInvestingCashFlow = (data: FilteredCashFlowData) => {
+    return data.investingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
+  };
+
+  const calculateFinancingCashFlow = (data: FilteredCashFlowData) => {
+    return data.financingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
   };
 
   const calculateDelta = (current: number, previous: number) => {
@@ -138,71 +164,106 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     return ((current - previous) / Math.abs(previous)) * 100;
   };
 
-  const formatAmount = (amount: number) => {
-    return Math.abs(amount).toLocaleString('en-US', {
-      style: 'currency',
-      currency: 'AED',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
-  };
+  const renderSection = (title: string, items: CashFlowItem[]) => {
+    let totalAmount2024 = 0;
+    if (title === 'Operating Activities') {
+      totalAmount2024 = calculateOperatingCashFlow(data);
+    } else if (title === 'Investing Activities') {
+      totalAmount2024 = calculateInvestingCashFlow(data);
+    } else if (title === 'Financing Activities') {
+      totalAmount2024 = calculateFinancingCashFlow(data);
+    }
 
-  const renderSection = (title: string, items: CashFlowItem[]) => (
-    <>
-      <Tr>
-        <Td 
-          py="4" 
-          pl="6" 
-          fontWeight="semibold" 
-          color="gray.700" 
-          bg="gray.50"
-          colSpan={4}
-        >
-          {title}
-        </Td>
-      </Tr>
-      {items.map((item, index) => (
-        <Tr key={index}>
+    return (
+      <>
+        <Tr>
+          <Td 
+            py="4" 
+            pl="6" 
+            fontWeight="semibold" 
+            color="gray.700" 
+            bg="gray.50"
+            colSpan={4}
+          >
+            {title}
+          </Td>
+        </Tr>
+        {items.map((item, index) => (
+          <Tr key={index}>
+            <Td 
+              py="3" 
+              pl={item.indent ? "14" : "6"} 
+              color="gray.700"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {item.description}
+            </Td>
+            <Td 
+              isNumeric 
+              py="3"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {formatAmount(item.amount2024)}
+            </Td>
+            <Td 
+              isNumeric 
+              py="3"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {formatAmount(item.amount2023)}
+            </Td>
+            <Td 
+              isNumeric 
+              py="3" 
+              pr="6"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {calculateDelta(item.amount2024, item.amount2023).toFixed(1)}%
+            </Td>
+          </Tr>
+        ))}
+        {/* Add total row */}
+        <Tr>
           <Td 
             py="3" 
-            pl={item.indent ? "14" : "6"} 
+            pl="6" 
             color="gray.700"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {item.description}
+            Total {title}
           </Td>
           <Td 
             isNumeric 
             py="3"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {formatAmount(item.amount2024)}
+            {formatAmount(totalAmount2024)}
           </Td>
           <Td 
             isNumeric 
             py="3"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {formatAmount(item.amount2023)}
+            {/* For 2023, we'll use the last item's amount2023 if it's a subtotal */}
+            {formatAmount(items.find(x => x.isSubTotal)?.amount2023 || 0)}
           </Td>
           <Td 
             isNumeric 
             py="3" 
             pr="6"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {calculateDelta(item.amount2024, item.amount2023).toFixed(1)}%
+            {calculateDelta(totalAmount2024, items.find(x => x.isSubTotal)?.amount2023 || 0).toFixed(1)}%
           </Td>
         </Tr>
-      ))}
-    </>
-  );
+      </>
+    );
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="6xl">
       <ModalOverlay bg="whiteAlpha.800" backdropFilter="blur(2px)" />
       <ModalContent maxW="95vw" mx="4" rounded="lg" overflow="hidden">
-        {/* Header Section */}
         <Box bg="white" px="6" py="4" borderBottom="1px" borderColor="gray.100">
           <HStack justify="space-between">
             <HStack spacing="4">
@@ -259,7 +320,7 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
         </Box>
 
         {/* Content Section */}
-        <Box p="6" maxH="calc(100vh - 200px)" overflowY="auto">
+        <Box ref={contentRef} p="6" maxH="calc(100vh - 200px)" overflowY="auto">
           {/* Direct Method Table */}
           <Box mb="8">
             <Heading size="md" mb="4">Statement of Cash Flows (Direct Method)</Heading>

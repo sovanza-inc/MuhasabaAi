@@ -20,6 +20,7 @@ import { LuDownload } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { EditablePdfPreview, FilteredCashFlowData } from './components/EditablePdfPreview'
 import { processTransactions } from './utils/processTransactions'
+import jsPDF from 'jspdf'
 
 interface BankTransaction {
   transaction_id: string;
@@ -313,35 +314,188 @@ export default function CashflowStatementPage() {
   };
 
   const handleExportPdfData = async (filteredData: FilteredCashFlowData) => {
+    if (!contentRef.current || !logoRef.current) return;
+
     try {
-      const cashFlowData = processTransactions(filteredTransactions);
+      const doc = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = doc.internal.pageSize.width;
+      const pageHeight = doc.internal.pageSize.height;
+      const margin = 20;
+      const indentSize = 10;
+      let yPos = margin;
 
-      // Call the API to generate and download the PDF
-      const response = await fetch('/api/reports/cash-flow-statement', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${authToken}`
-        },
-        body: JSON.stringify({
-          data: filteredData,
-          cashFlowData
-        })
-      });
+      // Helper function to format amounts consistently
+      const formatAmount = (amount: number) => {
+        const absAmount = Math.abs(amount);
+        const formatted = absAmount.toLocaleString('en-US', {
+          minimumFractionDigits: 2,
+          maximumFractionDigits: 2
+        });
+        return amount < 0 ? `(${formatted})` : formatted;
+      };
 
-      if (!response.ok) {
-        throw new Error('Failed to generate PDF');
+      // Add logo using canvas
+      try {
+        const logoCanvas = document.createElement('canvas');
+        const logoCtx = logoCanvas.getContext('2d');
+        if (logoCtx && logoRef.current) {
+          logoCanvas.width = logoRef.current.naturalWidth;
+          logoCanvas.height = logoRef.current.naturalHeight;
+          logoCtx.drawImage(logoRef.current, 0, 0);
+          const logoData = logoCanvas.toDataURL('image/png');
+          const logoWidth = 40;
+          const aspectRatio = logoRef.current.naturalWidth / logoRef.current.naturalHeight;
+          const logoHeight = logoWidth / aspectRatio;
+          const logoX = pageWidth - margin - logoWidth;
+          doc.addImage(logoData, 'PNG', logoX, margin - 5, logoWidth, logoHeight);
+        }
+      } catch (logoError) {
+        console.error('Error adding logo to PDF:', logoError);
+        toast({
+          title: "Warning",
+          description: "Could not add logo to PDF",
+          status: "warning",
+          duration: 3000,
+          isClosable: true,
+        });
       }
 
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'cash-flow-statement.pdf';
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      // Add title and date with consistent styling
+      doc.setFontSize(18);
+      doc.setFont('helvetica', 'bold');
+      doc.text('Muhasaba', margin, margin + 5);
+      
+      doc.setFontSize(14);
+      doc.text('STATEMENT OF CASH FLOWS', margin, margin + 12);
+      
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'normal');
+      const startDate = new Date(filteredData.period.startDate);
+      const endDate = new Date(filteredData.period.endDate);
+      const formattedStartDate = startDate.toLocaleString('default', { month: 'long', day: 'numeric', year: 'numeric' });
+      const formattedEndDate = endDate.toLocaleString('default', { month: 'long', day: 'numeric', year: 'numeric' });
+      doc.text(
+        `For the Period ${formattedStartDate} to ${formattedEndDate}`,
+        margin,
+        margin + 18
+      );
+
+      // Add column headers
+      const startY = margin + 30;
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      
+      doc.text('Description', margin, startY);
+      const currentYear = endDate.getFullYear();
+      doc.text(currentYear.toString(), pageWidth - margin - 40, startY, { align: 'right' });
+      doc.text((currentYear - 1).toString(), pageWidth - margin, startY, { align: 'right' });
+
+      // Add line under headers
+      doc.setLineWidth(0.2);
+      doc.line(margin, startY + 1, pageWidth - margin, startY + 1);
+      yPos = startY + 8;
+
+      // OPERATING ACTIVITIES SECTION
+      doc.setFont('helvetica', 'bold');
+      doc.text('CASH FLOWS FROM OPERATING ACTIVITIES', margin, yPos);
+      yPos += 8;
+
+      // Add operating activities
+      filteredData.operatingActivities.forEach(item => {
+        if (!item.isSubTotal) {
+          doc.setFont('helvetica', 'normal');
+          doc.text(item.description, margin + (item.indent ? indentSize : 0), yPos);
+          doc.text(formatAmount(item.amount2024), pageWidth - margin - 40, yPos, { align: 'right' });
+          yPos += 6;
+        }
+      });
+
+      // Operating Cash Flow Total
+      const operatingCashFlow = filteredData.operatingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
+      doc.line(pageWidth - margin - 70, yPos, pageWidth - margin, yPos);
+      yPos += 4;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Operating Cash Flow', margin, yPos);
+      doc.text(formatAmount(operatingCashFlow), pageWidth - margin - 40, yPos, { align: 'right' });
+      yPos += 12;
+
+      // INVESTING ACTIVITIES SECTION
+      doc.setFont('helvetica', 'bold');
+      doc.text('CASH FLOWS FROM INVESTING ACTIVITIES', margin, yPos);
+      yPos += 8;
+
+      // Add investing activities
+      filteredData.investingActivities.forEach(item => {
+        if (!item.isSubTotal) {
+          doc.setFont('helvetica', 'normal');
+          doc.text(item.description, margin + (item.indent ? indentSize : 0), yPos);
+          doc.text(formatAmount(item.amount2024), pageWidth - margin - 40, yPos, { align: 'right' });
+          yPos += 6;
+        }
+      });
+
+      // Investing Cash Flow Total
+      const investingCashFlow = filteredData.investingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
+      doc.line(pageWidth - margin - 70, yPos, pageWidth - margin, yPos);
+      yPos += 4;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Investing Cash Flow', margin, yPos);
+      doc.text(formatAmount(investingCashFlow), pageWidth - margin - 40, yPos, { align: 'right' });
+      yPos += 12;
+
+      // FINANCING ACTIVITIES SECTION
+      doc.setFont('helvetica', 'bold');
+      doc.text('CASH FLOWS FROM FINANCING ACTIVITIES', margin, yPos);
+      yPos += 8;
+
+      // Add financing activities
+      filteredData.financingActivities.forEach(item => {
+        if (!item.isSubTotal) {
+          doc.setFont('helvetica', 'normal');
+          doc.text(item.description, margin + (item.indent ? indentSize : 0), yPos);
+          doc.text(formatAmount(item.amount2024), pageWidth - margin - 40, yPos, { align: 'right' });
+          yPos += 6;
+        }
+      });
+
+      // Financing Cash Flow Total
+      const financingCashFlow = filteredData.financingActivities.find(x => x.isSubTotal)?.amount2024 || 0;
+      doc.line(pageWidth - margin - 70, yPos, pageWidth - margin, yPos);
+      yPos += 4;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Financing Cash Flow', margin, yPos);
+      doc.text(formatAmount(financingCashFlow), pageWidth - margin - 40, yPos, { align: 'right' });
+      yPos += 12;
+
+      // Final Cash Summary
+      yPos += 6;
+
+      // Opening Cash Balance
+      doc.text('Opening Cash Balance', margin, yPos);
+      doc.text(formatAmount(filteredData.openingCashBalance), pageWidth - margin - 40, yPos, { align: 'right' });
+      yPos += 6;
+
+      // Net Cash Change
+      const netCashChange = operatingCashFlow + investingCashFlow + financingCashFlow;
+      doc.text('Net Cash Change', margin, yPos);
+      doc.text(formatAmount(netCashChange), pageWidth - margin - 40, yPos, { align: 'right' });
+      yPos += 6;
+
+      // Closing Cash Balance
+      doc.line(margin, yPos, pageWidth - margin, yPos);
+      yPos += 4;
+      doc.setFont('helvetica', 'bold');
+      doc.text('Closing Cash Balance', margin, yPos);
+      doc.text(formatAmount(filteredData.openingCashBalance + netCashChange), pageWidth - margin - 40, yPos, { align: 'right' });
+
+      // Footer
+      const footerText = 'The accompanying notes are an integral part of these financial statements.';
+      doc.setFontSize(8);
+      doc.setFont('helvetica', 'italic');
+      doc.text(footerText, pageWidth / 2, pageHeight - 10, { align: 'center' });
+
+      // Save the PDF
+      doc.save('cash-flow-statement.pdf');
 
       setIsPdfPreviewOpen(false);
       toast({
@@ -362,8 +516,34 @@ export default function CashflowStatementPage() {
     }
   };
 
-  // Inside the component, add this memoized value for processed transactions
-  const processedData = React.useMemo(() => processTransactions(filteredTransactions), [filteredTransactions]);
+  // Inside the component, update the memoized value for processed transactions
+  const processedData = React.useMemo(() => {
+    const data = processTransactions(filteredTransactions);
+    // Ensure the data matches FilteredCashFlowData type
+    const filteredData: FilteredCashFlowData = {
+      ...data,
+      period: data.period || {
+        startDate: new Date(),
+        endDate: new Date()
+      },
+      openingCashBalance: data.openingCashBalance || 0,
+      indirectMethod: data.indirectMethod || {
+        netProfit: 0,
+        adjustments: {
+          depreciation: 0,
+          amortization: 0,
+          interestExpense: 0
+        },
+        workingCapital: {
+          accountsReceivable: 0,
+          inventory: 0,
+          accountsPayable: 0,
+          vatPayable: 0
+        }
+      }
+    };
+    return filteredData;
+  }, [filteredTransactions]);
 
   return (
     <Box>
@@ -376,8 +556,8 @@ export default function CashflowStatementPage() {
           alt="Muhasaba Logo"
           style={{ display: 'none' }}
           crossOrigin="anonymous"
-          width="120px"
-          height="auto"
+          width="30px"
+          height="15px"
         />
 
         <Box
@@ -518,7 +698,7 @@ export default function CashflowStatementPage() {
                   <CardBody>
                     <Box textAlign="center" mb={6}>
                       <Heading size="md" mb={2}>Muhasaba</Heading>
-                      <Text fontSize="lg" fontWeight="medium">Statement of Cash Flows</Text>
+                      <Text fontSize="lg" fontWeight="medium">Statement of Cash Flows (Indirect Method)</Text>
                       <Text color="gray.600">For the period ended {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}</Text>
                     </Box>
 
@@ -554,42 +734,46 @@ export default function CashflowStatementPage() {
                             </VStack>
                           </Box>
 
-                          {/* Working Capital Changes */}
-                          <Text fontWeight="bold" color="gray.700" mt={4}>Working Capital Changes:</Text>
+                          {/* Working Capital Adjustments */}
+                          <Text fontWeight="bold" color="gray.700" mt={4}>Working Capital Adjustments:</Text>
                           <Box pl={4}>
                             <VStack spacing={3} align="stretch">
                               <HStack justify="space-between">
-                                <Text color="gray.600">Accounts Receivable</Text>
-                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0) < 0 ? "green.500" : "red.500"}>
-                                  {Math.abs(processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                                </Text>
+                                <HStack>
+                                  <Text color="gray.600">Accounts Receivable</Text>
+                                  <Text fontSize="xs" color="gray.500">(Increase = Outflow, Decrease = Inflow)</Text>
+                                </HStack>
+                                <Text fontWeight="medium">{(processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
                               </HStack>
                               <HStack justify="space-between">
-                                <Text color="gray.600">Inventory</Text>
-                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.inventory ?? 0) < 0 ? "green.500" : "red.500"}>
-                                  {Math.abs(processedData.indirectMethod?.workingCapital?.inventory ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                                </Text>
+                                <HStack>
+                                  <Text color="gray.600">Inventory</Text>
+                                  <Text fontSize="xs" color="gray.500">(Increase = Outflow, Decrease = Inflow)</Text>
+                                </HStack>
+                                <Text fontWeight="medium">{(processedData.indirectMethod?.workingCapital?.inventory ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
                               </HStack>
                               <HStack justify="space-between">
-                                <Text color="gray.600">Accounts Payable</Text>
-                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.accountsPayable ?? 0) > 0 ? "green.500" : "red.500"}>
-                                  {Math.abs(processedData.indirectMethod?.workingCapital?.accountsPayable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                                </Text>
+                                <HStack>
+                                  <Text color="gray.600">Accounts Payable</Text>
+                                  <Text fontSize="xs" color="gray.500">(Increase = Inflow, Decrease = Outflow)</Text>
+                                </HStack>
+                                <Text fontWeight="medium">{(processedData.indirectMethod?.workingCapital?.accountsPayable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
                               </HStack>
                               <HStack justify="space-between">
-                                <Text color="gray.600">VAT Payable/Receivable</Text>
-                                <Text fontWeight="medium" color={(processedData.indirectMethod?.workingCapital?.vatPayable ?? 0) > 0 ? "green.500" : "red.500"}>
-                                  {Math.abs(processedData.indirectMethod?.workingCapital?.vatPayable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                                </Text>
+                                <HStack>
+                                  <Text color="gray.600">VAT Payable/Receivable</Text>
+                                  <Text fontSize="xs" color="gray.500">(Difference in net VAT balances)</Text>
+                                </HStack>
+                                <Text fontWeight="medium">{(processedData.indirectMethod?.workingCapital?.vatPayable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
                               </HStack>
                             </VStack>
                           </Box>
 
-                          {/* Operating Activities Total */}
-                          <HStack justify="space-between" pt={4} borderTop="1px" borderColor="gray.100">
-                            <Text fontWeight="bold" color="blue.700">Net Cash from Operating Activities</Text>
+                          {/* Operating Cash Flow Total */}
+                          <HStack justify="space-between" mt={4} pt={4} borderTop="1px" borderColor="gray.200">
+                            <Text fontWeight="bold" color="blue.700">Operating Cash Flow</Text>
                             <Text fontWeight="bold" color="blue.700">
-                              {Math.abs(
+                              {(
                                 (processedData.indirectMethod?.netProfit ?? 0) +
                                 (processedData.indirectMethod?.adjustments?.depreciation ?? 0) +
                                 (processedData.indirectMethod?.adjustments?.amortization ?? 0) +
@@ -612,14 +796,32 @@ export default function CashflowStatementPage() {
                       </Box>
                       <Box p={4} bg="white">
                         <VStack spacing={3} align="stretch">
-                          {processedData.investingActivities.map((item, index) => (
-                            <HStack key={index} justify="space-between">
-                              <Text color="gray.600" pl={item.indent ? 4 : 0}>{item.description}</Text>
-                              <Text fontWeight={item.isSubTotal ? "bold" : "medium"} color={item.isSubTotal ? "green.600" : "gray.700"}>
-                                {Math.abs(item.amount2024).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                              </Text>
-                            </HStack>
-                          ))}
+                          <HStack justify="space-between">
+                            <Text color="gray.600">Purchase of Fixed Assets</Text>
+                            <Text fontWeight="medium" color="red.600">
+                              {Math.abs(processedData.investingActivities.find(x => x.description === 'Purchase of Fixed Assets')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text color="gray.600">Purchase of Intangible Assets</Text>
+                            <Text fontWeight="medium" color="red.600">
+                              {Math.abs(processedData.investingActivities.find(x => x.description === 'Purchase of Intangible Assets')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text color="gray.600">Sale of Assets</Text>
+                            <Text fontWeight="medium" color="green.600">
+                              {Math.abs(processedData.investingActivities.find(x => x.description === 'Sale of Assets')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
+                          
+                          {/* Investing Cash Flow Total */}
+                          <HStack justify="space-between" pt={4} borderTop="1px" borderColor="gray.200">
+                            <Text fontWeight="bold" color="green.700">Investing Cash Flow</Text>
+                            <Text fontWeight="bold" color="green.700">
+                              {(processedData.investingActivities.reduce((sum, item) => sum + (item.amount2024 ?? 0), 0)).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
                         </VStack>
                       </Box>
                     </Box>
@@ -631,30 +833,73 @@ export default function CashflowStatementPage() {
                       </Box>
                       <Box p={4} bg="white">
                         <VStack spacing={3} align="stretch">
-                          {processedData.financingActivities.map((item, index) => (
-                            <HStack key={index} justify="space-between">
-                              <Text color="gray.600" pl={item.indent ? 4 : 0}>{item.description}</Text>
-                              <Text fontWeight={item.isSubTotal ? "bold" : "medium"} color={item.isSubTotal ? "purple.600" : "gray.700"}>
-                                {Math.abs(item.amount2024).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                              </Text>
-                            </HStack>
-                          ))}
+                          <HStack justify="space-between">
+                            <Text color="gray.600">Loan Proceeds</Text>
+                            <Text fontWeight="medium" color="green.600">
+                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Loan Proceeds')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text color="gray.600">Loan Principal Repayments</Text>
+                            <Text fontWeight="medium" color="red.600">
+                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Loan Principal Repayments')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text color="gray.600">Lease Principal Payments</Text>
+                            <Text fontWeight="medium" color="red.600">
+                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Lease Principal Payments')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
+                          <HStack justify="space-between">
+                            <Text color="gray.600">Owner&apos;s Capital Contributions</Text>
+                            <Text fontWeight="medium" color="green.600">
+                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Owner\'s Capital Contributions')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
+                          
+                          {/* Financing Cash Flow Total */}
+                          <HStack justify="space-between" pt={4} borderTop="1px" borderColor="gray.200">
+                            <Text fontWeight="bold" color="purple.700">Financing Cash Flow</Text>
+                            <Text fontWeight="bold" color="purple.700">
+                              {(processedData.financingActivities.reduce((sum, item) => sum + (item.amount2024 ?? 0), 0)).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            </Text>
+                          </HStack>
                         </VStack>
                       </Box>
                     </Box>
 
-                    {/* Net Change in Cash */}
+                    {/* Final Cash Summary */}
                     <Box p={4} bg="gray.50" borderRadius="lg">
-                      <HStack justify="space-between">
-                        <Text fontWeight="bold" fontSize="lg" color="gray.700">NET CHANGE IN CASH</Text>
-                        <Text fontWeight="bold" fontSize="lg" color="gray.700">
-                          {Math.abs(
-                            (processedData.operatingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
-                            (processedData.investingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
-                            (processedData.financingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0)
-                          ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                        </Text>
-                      </HStack>
+                      <VStack spacing={3} align="stretch">
+                        <HStack justify="space-between">
+                          <Text fontWeight="bold" color="gray.700">Opening Cash Balance</Text>
+                          <Text fontWeight="bold" color="gray.700">
+                            {(processedData.openingCashBalance ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                          </Text>
+                        </HStack>
+                        <HStack justify="space-between">
+                          <Text fontWeight="bold" color="gray.700">Net Cash Change</Text>
+                          <Text fontWeight="bold" color="gray.700">
+                            {(
+                              (processedData.operatingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
+                              (processedData.investingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
+                              (processedData.financingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0)
+                            ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                          </Text>
+                        </HStack>
+                        <HStack justify="space-between" pt={4} borderTop="2px" borderColor="gray.300">
+                          <Text fontWeight="bold" fontSize="lg" color="gray.700">Closing Cash Balance</Text>
+                          <Text fontWeight="bold" fontSize="lg" color="gray.700">
+                            {(
+                              (processedData.openingCashBalance ?? 0) +
+                              (processedData.operatingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
+                              (processedData.investingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
+                              (processedData.financingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0)
+                            ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                          </Text>
+                        </HStack>
+                      </VStack>
                     </Box>
                   </CardBody>
                 </Card>
@@ -678,7 +923,8 @@ export default function CashflowStatementPage() {
           isOpen={isPdfPreviewOpen}
           onClose={() => setIsPdfPreviewOpen(false)}
           onExport={handleExportPdfData}
-          data={processTransactions(filteredTransactions)}
+          data={processedData}
+          logoRef={logoRef}
         />
       </Box>
       {/* Summary Footer */}
