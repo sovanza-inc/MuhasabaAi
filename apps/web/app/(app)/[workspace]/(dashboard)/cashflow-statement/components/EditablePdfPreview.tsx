@@ -164,56 +164,101 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     return ((current - previous) / Math.abs(previous)) * 100;
   };
 
-  const renderSection = (title: string, items: CashFlowItem[]) => (
-    <>
-      <Tr>
-        <Td 
-          py="4" 
-          pl="6" 
-          fontWeight="semibold" 
-          color="gray.700" 
-          bg="gray.50"
-          colSpan={4}
-        >
-          {title}
-        </Td>
-      </Tr>
-      {items.map((item, index) => (
-        <Tr key={index}>
+  const renderSection = (title: string, items: CashFlowItem[]) => {
+    let totalAmount2024 = 0;
+    if (title === 'Operating Activities') {
+      totalAmount2024 = calculateOperatingCashFlow(data);
+    } else if (title === 'Investing Activities') {
+      totalAmount2024 = calculateInvestingCashFlow(data);
+    } else if (title === 'Financing Activities') {
+      totalAmount2024 = calculateFinancingCashFlow(data);
+    }
+
+    return (
+      <>
+        <Tr>
+          <Td 
+            py="4" 
+            pl="6" 
+            fontWeight="semibold" 
+            color="gray.700" 
+            bg="gray.50"
+            colSpan={4}
+          >
+            {title}
+          </Td>
+        </Tr>
+        {items.map((item, index) => (
+          <Tr key={index}>
+            <Td 
+              py="3" 
+              pl={item.indent ? "14" : "6"} 
+              color="gray.700"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {item.description}
+            </Td>
+            <Td 
+              isNumeric 
+              py="3"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {formatAmount(item.amount2024)}
+            </Td>
+            <Td 
+              isNumeric 
+              py="3"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {formatAmount(item.amount2023)}
+            </Td>
+            <Td 
+              isNumeric 
+              py="3" 
+              pr="6"
+              fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            >
+              {calculateDelta(item.amount2024, item.amount2023).toFixed(1)}%
+            </Td>
+          </Tr>
+        ))}
+        {/* Add total row */}
+        <Tr>
           <Td 
             py="3" 
-            pl={item.indent ? "14" : "6"} 
+            pl="6" 
             color="gray.700"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {item.description}
+            Total {title}
           </Td>
           <Td 
             isNumeric 
             py="3"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {formatAmount(item.amount2024)}
+            {formatAmount(totalAmount2024)}
           </Td>
           <Td 
             isNumeric 
             py="3"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {formatAmount(item.amount2023)}
+            {/* For 2023, we'll use the last item's amount2023 if it's a subtotal */}
+            {formatAmount(items.find(x => x.isSubTotal)?.amount2023 || 0)}
           </Td>
           <Td 
             isNumeric 
             py="3" 
             pr="6"
-            fontWeight={item.isSubTotal || item.isTotal ? "semibold" : "normal"}
+            fontWeight="bold"
           >
-            {calculateDelta(item.amount2024, item.amount2023).toFixed(1)}%
+            {calculateDelta(totalAmount2024, items.find(x => x.isSubTotal)?.amount2023 || 0).toFixed(1)}%
           </Td>
         </Tr>
-      ))}
-    </>
-  );
+      </>
+    );
+  };
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} size="6xl">
