@@ -109,6 +109,10 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
     setCurrentDate(newDate);
   };
 
+  const formatAmount = (amount: number) => {
+    return `AED ${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  };
+
   // Get the months for display based on selected period
   const getMonthsData = () => {
     const months = [];
@@ -128,10 +132,6 @@ export const EditablePdfPreview: React.FC<EditablePdfPreviewProps> = ({
 
   const calculateClosingBalance = (data: FilteredCashFlowData) => {
     return data.openingCashBalance + calculateNetCashChange(data);
-  };
-
-  const formatAmount = (amount: number) => {
-    return `AED ${Math.abs(amount).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   };
 
   const handleExport = async () => {
