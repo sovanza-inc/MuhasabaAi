@@ -48,6 +48,43 @@ interface FixedAsset {
   description: string
 }
 
+interface Loan {
+  purpose: string
+  amount: number
+  interestRate: number
+  monthlyPayment: number
+  startDate: string
+  type: 'Loan' | 'Lease'
+  assetLeased?: string
+  leaseTerm?: number
+  isActive: boolean
+  endDate: string
+}
+
+interface OutstandingBalance {
+  partyName: string
+  type: string
+  amount: number
+  dueDate: string
+  description: string
+}
+
+interface AccountPayable {
+  vendorName: string
+  amount: number
+  dueDate: string
+  description: string
+  terms: string
+}
+
+interface AccountReceivable {
+  customerName: string
+  amount: number
+  dueDate: string
+  description: string
+  terms: string
+}
+
 interface FormData {
   businessName: string;
   industry: string;
@@ -302,6 +339,14 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
     };
 
     if (initialData) {
+      // Set manual entry preferences based on existing files
+      Object.entries(initialData.documents || {}).forEach(([key, fileNames]) => {
+        if (Array.isArray(fileNames) && fileNames.length > 0) {
+          // Set manual entry preference to false if there are files
+          defaultManualPreferences[key as keyof typeof defaultManualPreferences] = false;
+        }
+      });
+
       // Create placeholder File objects for existing documents
       const documents = Object.entries(initialData.documents || {}).reduce((acc, [key, fileNames]) => {
         if (Array.isArray(fileNames)) {
