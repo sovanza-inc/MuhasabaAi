@@ -1,10 +1,11 @@
 import { Suspense } from 'react'
+
 import { ErrorBoundary } from '@saas-ui/react'
+
 import { BillingProvider } from '#features/billing/providers/billing-provider'
 import { WorkspaceLoading } from '#features/workspaces/workspace.loading'
 import { WorkspaceNotFound } from '#features/workspaces/workspace.not-found'
 import { HydrateClient, api } from '#lib/trpc/rsc'
-import { QuestionnaireContainer } from '#components/Questionnaire/QuestionnaireContainer'
 
 export default async function WorkspaceLayout(props: {
   params: Promise<{
@@ -22,10 +23,7 @@ export default async function WorkspaceLayout(props: {
     <HydrateClient>
       <Suspense fallback={<WorkspaceLoading />}>
         <ErrorBoundary fallback={<WorkspaceNotFound />}>
-          <BillingProvider>
-            <QuestionnaireContainer />
-            {props.children}
-          </BillingProvider>
+          <BillingProvider>{props.children}</BillingProvider>
         </ErrorBoundary>
       </Suspense>
     </HydrateClient>

@@ -13,7 +13,7 @@ import {
 } from '@saas-ui/react'
 import { useRouter } from 'next/navigation'
 
-import { AppearanceStep } from './appearance'
+// import { AppearanceStep } from './appearance'
 import { CreateWorkspaceStep } from './create-workspace'
 import { InviteTeamMembersStep } from './invite-team-members'
 import { OnboardingLayout } from './onboarding-layout'
@@ -28,9 +28,9 @@ export const GettingStartedPage: React.FC = () => {
             <StepsItem title="Create workspace">
               <CreateWorkspaceStep />
             </StepsItem>
-            <StepsItem title="Choose your style">
+            {/* <StepsItem title="Choose your style">
               <AppearanceStep />
-            </StepsItem>
+            </StepsItem> */}
             <StepsItem title="Invite team members">
               <InviteTeamMembersStep />
             </StepsItem>
