@@ -41,6 +41,8 @@ interface QuestionnaireFormProps {
   initialData?: FormData & { id?: string }
 }
 
+// Fixed Assets
+
 interface FixedAsset {
   name: string
   type: 'Equipment' | 'Vehicle' | 'Furniture' | 'Software' | 'License' | 'Other'
