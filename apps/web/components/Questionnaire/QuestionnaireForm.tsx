@@ -23,14 +23,6 @@ import {
   NumberInput,
   NumberInputField,
   IconButton,
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogContent,
-  AlertDialogOverlay,
-  useDisclosure,
-  Container,
   Select,
   Textarea,
 } from '@chakra-ui/react'
@@ -54,43 +46,6 @@ interface FixedAsset {
   isIntangible: boolean
   residualValue: number
   description: string
-}
-
-interface Loan {
-  purpose: string
-  amount: number
-  interestRate: number
-  monthlyPayment: number
-  startDate: string
-  type: 'Loan' | 'Lease'
-  assetLeased?: string
-  leaseTerm?: number
-  isActive: boolean
-  endDate: string
-}
-
-interface OutstandingBalance {
-  partyName: string
-  type: string
-  amount: number
-  dueDate: string
-  description: string
-}
-
-interface AccountPayable {
-  vendorName: string
-  amount: number
-  dueDate: string
-  description: string
-  terms: string
-}
-
-interface AccountReceivable {
-  customerName: string
-  amount: number
-  dueDate: string
-  description: string
-  terms: string
 }
 
 interface FormData {
@@ -347,16 +302,6 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
     };
 
     if (initialData) {
-      // Create a map of document filenames to indicate which sections have files
-      const documentSections = Object.entries(initialData.documents || {}).reduce((acc, [key, fileNames]) => {
-        if (Array.isArray(fileNames) && fileNames.length > 0) {
-          acc[key as keyof InitialDataDocuments] = true;
-          // Set manual entry preference to false if there are files
-          defaultManualPreferences[key as keyof typeof defaultManualPreferences] = false;
-        }
-        return acc;
-      }, {} as Record<keyof InitialDataDocuments, boolean>);
-
       // Create placeholder File objects for existing documents
       const documents = Object.entries(initialData.documents || {}).reduce((acc, [key, fileNames]) => {
         if (Array.isArray(fileNames)) {
