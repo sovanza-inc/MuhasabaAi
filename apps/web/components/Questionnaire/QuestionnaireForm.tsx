@@ -48,43 +48,6 @@ interface FixedAsset {
   description: string
 }
 
-interface Loan {
-  purpose: string
-  amount: number
-  interestRate: number
-  monthlyPayment: number
-  startDate: string
-  type: 'Loan' | 'Lease'
-  assetLeased?: string
-  leaseTerm?: number
-  isActive: boolean
-  endDate: string
-}
-
-interface OutstandingBalance {
-  partyName: string
-  type: string
-  amount: number
-  dueDate: string
-  description: string
-}
-
-interface AccountPayable {
-  vendorName: string
-  amount: number
-  dueDate: string
-  description: string
-  terms: string
-}
-
-interface AccountReceivable {
-  customerName: string
-  amount: number
-  dueDate: string
-  description: string
-  terms: string
-}
-
 interface FormData {
   businessName: string;
   industry: string;
