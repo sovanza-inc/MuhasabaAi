@@ -38,7 +38,10 @@ import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspac
 
 interface QuestionnaireFormProps {
   onComplete: () => void
-  initialData?: FormData & { id?: string }
+  initialData?: Omit<FormData, 'documents'> & { 
+    id?: string;
+    documents?: InitialDataDocuments;
+  };
 }
 
 interface FixedAsset {
@@ -91,58 +94,112 @@ interface AccountReceivable {
 }
 
 interface FormData {
-  productType: string
-  cogsCategories: Array<{ type: string; description: string }>
-  calculateCogs: boolean
-  beginningInventory: number
-  purchases: number
-  endingInventory: number
-  hasFixedAssets: boolean
-  fixedAssets: FixedAsset[]
-  hasLoans: boolean
-  loans: Loan[]
-  hasAccountsPayable: boolean
-  accountsPayable: AccountPayable[]
-  hasAccountsReceivable: boolean
-  accountsReceivable: AccountReceivable[]
-  paymentType: string
-  outstandingBalances: OutstandingBalance[]
-  isVatRegistered: boolean
-  trn: string
-  vatFrequency: string
-  trackVat: boolean
-  businessName: string
-  industry: string
-  operatingSince: number
-  documents: {
-    cogsInventory: (File | string)[]
-    fixedAssets: (File | string)[]
-    accountsPayable: (File | string)[]
-    accountsReceivable: (File | string)[]
-    loans: (File | string)[]
-    vatRegistration: (File | string)[]
-  }
-  preferManualEntry: boolean
-  hasCapitalContributions: boolean
+  businessName: string;
+  industry: string;
+  operatingSince: number;
+  productType: string;
+  cogsCategories: Array<{ type: string; description: string }>;
+  calculateCogs: boolean;
+  beginningInventory: number;
+  purchases: number;
+  endingInventory: number;
+  hasFixedAssets: boolean;
+  fixedAssets: Array<{
+    name: string;
+    type: string;
+    value: number;
+    purchaseDate: string;
+    depreciationMethod: string;
+    usefulLife: number;
+    isIntangible: boolean;
+    residualValue: number;
+    description: string;
+  }>;
+  hasLoans: boolean;
+  loans: Array<{
+    purpose: string;
+    amount: number;
+    interestRate: number
+    monthlyPayment: number;
+    startDate: string;
+    type: 'Loan' | 'Lease';
+    isActive: boolean;
+    endDate: string;
+    assetLeased: string;
+    leaseTerm: number;
+  }>;
+  hasAccountsPayable: boolean;
+  accountsPayable: Array<{
+    vendorName: string;
+    amount: number;
+    dueDate: string;
+    description: string;
+    terms: string;
+  }>;
+  hasAccountsReceivable: boolean;
+  accountsReceivable: Array<{
+    customerName: string;
+    amount: number;
+    dueDate: string;
+    description: string;
+    terms: string;
+  }>;
+  paymentType: string;
+  outstandingBalances: Array<{
+    partyName: string;
+    type: string;
+    amount: number
+    dueDate: string;
+    description: string;
+  }>;
+  isVatRegistered: boolean;
+  trn: string;
+  vatFrequency: string;
+  trackVat: boolean;
+  hasCapitalContributions: boolean;
   capitalContributions: Array<{
-    amount: number
-    date: string
-    proof?: File | string
-  }>
-  hasEquipmentPurchases: boolean
+    amount: number;
+    date: string;
+    proof?: string | File;
+  }>;
+  hasEquipmentPurchases: boolean;
   equipmentPurchases: Array<{
-    description: string
-    amount: number
-    date: string
-    isLongTermAsset: boolean
-  }>
-  hasLoanRepayments: boolean
+    name: string;
+    cost: number;
+    date: string;
+  }>;
+  hasLoanRepayments: boolean;
   loanRepayments: Array<{
-    totalAmount: number
-    interestPortion: number
-    date: string
-    loanId: string
-  }>
+    amount: number;
+    date: string;
+    loanId: string;
+  }>;
+  manualEntryPreferences: {
+    fixedAssets: boolean;
+    accountsPayable: boolean;
+    accountsReceivable: boolean;
+    vatRegistration: boolean;
+    cogsInventory: boolean;
+    loans: boolean;
+  };
+  documents: {
+    cogsInventory: File[];
+    fixedAssets: File[];
+    accountsPayable: File[];
+    accountsReceivable: File[];
+    loans: File[];
+    vatRegistration: File[];
+  };
+  preferManualEntry: boolean;
+}
+
+interface InitialDataDocuments {
+  cogsInventory?: string[];
+  fixedAssets?: string[];
+  accountsPayable?: string[];
+  accountsReceivable?: string[];
+  loans?: string[];
+  vatRegistration?: string[];
 }
 
 const formatFileSize = (bytes: number): string => {
@@ -157,100 +214,37 @@ const FileList = ({
   files, 
   onRemove 
 }: { 
-  files: (File | string)[], 
+  files: File[], 
   onRemove: (index: number) => void 
 }) => {
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const cancelRef = React.useRef<HTMLButtonElement>(null)
-  const [fileToRemove, setFileToRemove] = React.useState<{ index: number; name: string } | null>(null)
-
-  const handleRemoveClick = (index: number, fileName: string) => {
-    const file = files[index]
-    if (typeof file === 'string') {
-      // For already uploaded files, show confirmation
-      setFileToRemove({ index, name: fileName })
-      onOpen()
-    } else {
-      // For newly added files, remove directly
-      onRemove(index)
-    }
-  }
-
-  const handleConfirmRemove = () => {
-    if (fileToRemove) {
-      onRemove(fileToRemove.index)
-    }
-    onClose()
-    setFileToRemove(null)
-  }
-
   return (
-    <>
-      <VStack align="stretch" spacing={2} mt={2}>
-        {files.map((file, index) => {
-          const isStoredFile = typeof file === 'string'
-          const fileName = isStoredFile ? file : file.name
-          const fileSize = isStoredFile ? null : (file as File).size
-          
-          return (
-            <HStack key={index} p={2} bg="gray.50" borderRadius="md" justify="space-between">
-              <HStack>
-                <Text fontSize="sm">📎</Text>
-                <Text fontSize="sm">{fileName}</Text>
-                {fileSize && (
-                  <Text fontSize="xs" color="gray.500">({formatFileSize(fileSize)})</Text>
-                )}
-                {isStoredFile && (
-                  <Text fontSize="xs" color="green.500">(Uploaded)</Text>
-                )}
-              </HStack>
-              <IconButton
-                aria-label="Remove file"
-                icon={<Text>✕</Text>}
-                size="sm"
-                variant="ghost"
-                colorScheme="red"
-                onClick={() => handleRemoveClick(index, fileName)}
-              />
-            </HStack>
-          )
-        })}
-      </VStack>
-
-      <AlertDialog
-        isOpen={isOpen}
-        leastDestructiveRef={cancelRef}
-        onClose={onClose}
-      >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader fontSize="lg" fontWeight="bold">
-              Remove Uploaded File
-            </AlertDialogHeader>
-
-            <AlertDialogBody>
-              Are you sure you want to remove &quot;{fileToRemove?.name}&quot;? This action cannot be undone.
-            </AlertDialogBody>
-
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={onClose}>
-                Cancel
-              </Button>
-              <Button colorScheme="red" onClick={handleConfirmRemove} ml={3}>
-                Remove
-              </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
-    </>
+    <VStack align="stretch" spacing={2} mt={2}>
+      {files.map((file, index) => (
+        <HStack key={index} p={2} bg="gray.50" borderRadius="md" justify="space-between">
+          <HStack>
+            <Text fontSize="sm">📎</Text>
+            <Text fontSize="sm">{file.name}</Text>
+            <Text fontSize="xs" color="gray.500">
+              {file.size > 0 ? `(${formatFileSize(file.size)})` : '(Uploaded)'}
+            </Text>
+          </HStack>
+          <IconButton
+            aria-label="Remove file"
+            icon={<Text>✕</Text>}
+            size="sm"
+            variant="ghost"
+            colorScheme="red"
+            onClick={() => onRemove(index)}
+          />
+        </HStack>
+      ))}
+    </VStack>
   )
 }
 
-// Helper function to normalize filenames
 const normalizeFileName = (filename: string): string => {
-  return filename.replace(/[_\s-]+/g, ' ').toLowerCase().trim()
-}
+  return filename.replace(/[_\s-]+/g, ' ').toLowerCase().trim();
+};
 
 export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireFormProps) {
   const toast = useToast()
@@ -260,40 +254,28 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
 
   // Form state
   const [formData, setFormData] = React.useState<FormData>(() => {
-    if (initialData) {
-      const documents = Object.keys(initialData.documents || {}).reduce((acc, key) => {
-        const section = key as keyof FormData['documents']
-        const files = initialData.documents[section] || []
-        
-        // Deduplicate based on normalized names
-        const uniqueFiles = Array.from(
-          files.reduce((map, file) => {
-            const normalizedName = normalizeFileName(typeof file === 'string' ? file : file.name)
-            if (!map.has(normalizedName)) {
-              map.set(normalizedName, file)
-            }
-            return map
-          }, new Map()).values()
-        )
-        
-        acc[section] = uniqueFiles
-        return acc
-      }, {} as FormData['documents'])
+    const defaultManualPreferences = {
+      fixedAssets: false,
+      accountsPayable: false,
+      accountsReceivable: false,
+      vatRegistration: false,
+      cogsInventory: false,
+      loans: false
+    };
 
-      return {
-        ...initialData,
-        documents: {
-          cogsInventory: documents.cogsInventory || [],
-          fixedAssets: documents.fixedAssets || [],
-          accountsPayable: documents.accountsPayable || [],
-          accountsReceivable: documents.accountsReceivable || [],
-          loans: documents.loans || [],
-          vatRegistration: documents.vatRegistration || [],
-        }
-      }
-    }
+    const defaultDocuments = {
+      cogsInventory: [] as File[],
+      fixedAssets: [] as File[],
+      accountsPayable: [] as File[],
+      accountsReceivable: [] as File[],
+      loans: [] as File[],
+      vatRegistration: [] as File[]
+    };
 
-    return {
+    const defaultState: FormData = {
+      businessName: '',
+      industry: '',
+      operatingSince: 0,
       productType: '',
       cogsCategories: [{ type: '', description: '' }],
       calculateCogs: false,
@@ -319,7 +301,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
         interestRate: 0,
         monthlyPayment: 0,
         startDate: '',
-        type: 'Loan',
+        type: 'Loan' as const,
         isActive: true,
         endDate: '',
         assetLeased: '',
@@ -353,161 +335,229 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       trn: '',
       vatFrequency: '',
       trackVat: false,
-      businessName: '',
-      industry: '',
-      operatingSince: 0,
-      documents: {
-        cogsInventory: [],
-        fixedAssets: [],
-        accountsPayable: [],
-        accountsReceivable: [],
-        loans: [],
-        vatRegistration: []
-      },
-      preferManualEntry: false,
       hasCapitalContributions: false,
-      capitalContributions: [{
-        amount: 0,
-        date: '',
-        proof: undefined
-      }],
+      capitalContributions: [],
       hasEquipmentPurchases: false,
-      equipmentPurchases: [{
-        description: '',
-        amount: 0,
-        date: '',
-        isLongTermAsset: false
-      }],
+      equipmentPurchases: [],
       hasLoanRepayments: false,
-      loanRepayments: [{
-        totalAmount: 0,
-        interestPortion: 0,
-        date: '',
-        loanId: ''
-      }]
+      loanRepayments: [],
+      manualEntryPreferences: defaultManualPreferences,
+      documents: defaultDocuments,
+      preferManualEntry: false
+    };
+
+    if (initialData) {
+      // Create a map of document filenames to indicate which sections have files
+      const documentSections = Object.entries(initialData.documents || {}).reduce((acc, [key, fileNames]) => {
+        if (Array.isArray(fileNames) && fileNames.length > 0) {
+          acc[key as keyof InitialDataDocuments] = true;
+          // Set manual entry preference to false if there are files
+          defaultManualPreferences[key as keyof typeof defaultManualPreferences] = false;
+        }
+        return acc;
+      }, {} as Record<keyof InitialDataDocuments, boolean>);
+
+      // Create placeholder File objects for existing documents
+      const documents = Object.entries(initialData.documents || {}).reduce((acc, [key, fileNames]) => {
+        if (Array.isArray(fileNames)) {
+          // Create placeholder File objects with just the name
+          acc[key as keyof FormData['documents']] = fileNames.map(fileName => 
+            new File([], fileName, { type: 'application/octet-stream' })
+          );
+        }
+        return acc;
+      }, { ...defaultDocuments });
+
+      return {
+        ...defaultState,
+        ...initialData,
+        manualEntryPreferences: {
+          ...defaultManualPreferences,
+          ...(initialData.manualEntryPreferences || {})
+        },
+        documents
+      };
     }
+
+    return defaultState;
   })
 
   const steps = [
     {
       title: 'Business Information',
       description: 'Tell us about your business',
-      isComplete: () => formData.businessName && formData.industry && formData.operatingSince > 0,
+      isComplete: () => Boolean(formData.businessName && formData.industry && formData.operatingSince > 0),
     },
     {
       title: 'Products & Services',
       description: 'What do you sell?',
-      isComplete: () => formData.productType !== '',
+      isComplete: () => Boolean(formData.productType),
     },
     {
       title: 'COGS & Inventory',
       description: 'Cost of goods sold details',
       isComplete: () => {
-        if (!formData.calculateCogs) return true
-        return formData.cogsCategories[0].type !== ''
+        // If COGS calculation is not enabled, step is complete
+        if (!formData.calculateCogs) return true;
+
+        // If manual entry is selected, check for categories
+        if (formData.manualEntryPreferences.cogsInventory) {
+          return Boolean(formData.cogsCategories?.[0]?.type);
+        }
+
+        // If we reach here, document upload is optional
+        return true;
       },
     },
     {
       title: 'Fixed Assets',
       description: 'Equipment and property',
       isComplete: () => {
-        if (!formData.hasFixedAssets) return true
-        // If user chose to upload documents, check if files are uploaded
-        if (!formData.preferManualEntry) {
-          return formData.documents.fixedAssets && formData.documents.fixedAssets.length > 0
+        if (!formData.hasFixedAssets) return true;
+        
+        if (!formData.manualEntryPreferences.fixedAssets) {
+          return Boolean(formData.documents.fixedAssets?.length > 0);
         }
-        // For manual entry, check if assets are filled out
-        return formData.fixedAssets.some(asset => 
-          asset.name && 
-          asset.type && 
-          asset.value > 0 && 
-          asset.purchaseDate && 
-          asset.depreciationMethod && 
-          asset.usefulLife > 0
-        )
+        
+        const asset = formData.fixedAssets?.[0];
+        return Boolean(
+          asset?.name &&
+          asset?.type &&
+          asset?.value > 0 &&
+          asset?.purchaseDate &&
+          asset?.depreciationMethod &&
+          asset?.usefulLife > 0 &&
+          typeof asset?.residualValue === 'number'
+        );
       },
     },
     {
       title: 'Accounts Payable',
       description: 'Money owed to vendors',
       isComplete: () => {
-        if (!formData.hasAccountsPayable) return true
-        return formData.accountsPayable.some(payable => 
-          payable.vendorName && 
-          payable.amount > 0 && 
-          payable.dueDate && 
+        if (!formData.hasAccountsPayable) return true;
+        
+        // For document upload mode
+        if (!formData.manualEntryPreferences.accountsPayable) {
+          return formData.documents.accountsPayable && formData.documents.accountsPayable.length > 0;
+        }
+        
+        // For manual entry mode
+        const payable = formData.accountsPayable[0];
+        return Boolean(
+          payable &&
+          payable.vendorName &&
+          payable.amount > 0 &&
+          payable.dueDate &&
           payable.terms
-        )
+        );
       },
     },
     {
       title: 'Accounts Receivable',
       description: 'Money owed by customers',
       isComplete: () => {
-        if (!formData.hasAccountsReceivable) return true
-        return formData.accountsReceivable.some(receivable => 
-          receivable.customerName && 
-          receivable.amount > 0 && 
-          receivable.dueDate && 
-          receivable.terms
-        )
+        if (!formData.hasAccountsReceivable) return true;
+        
+        if (!formData.manualEntryPreferences.accountsReceivable) {
+          return Boolean(formData.documents.accountsReceivable?.length > 0);
+        }
+        
+        const receivable = formData.accountsReceivable?.[0];
+        return Boolean(
+          receivable?.customerName &&
+          receivable?.amount > 0 &&
+          receivable?.dueDate &&
+          receivable?.terms
+        );
       },
     },
     {
       title: 'Loans',
       description: 'Business loans and financing',
       isComplete: () => {
-        if (!formData.hasLoans) return true
-        return formData.loans.some(loan => 
-          loan.purpose && 
-          loan.amount > 0 && 
-          loan.interestRate > 0 && 
-          loan.monthlyPayment > 0 && 
-          loan.startDate
-        )
+        // If no loans selected, step is complete
+        if (!formData.hasLoans) {
+          return true;
+        }
+
+        const loan = formData.loans?.[0];
+        if (!loan) {
+          return false;
+        }
+
+        // Basic validation for both loan and lease
+        const baseValidation = Boolean(
+          loan.startDate &&
+          loan.endDate
+        );
+
+        // Specific validation based on type
+        if (loan.type === 'Loan') {
+          return Boolean(
+            baseValidation &&
+            loan.purpose &&
+            loan.amount > 0 &&
+            loan.interestRate >= 0
+          );
+        } else {
+          return Boolean(
+            baseValidation &&
+            loan.assetLeased &&
+            loan.monthlyPayment > 0
+          );
+        }
       },
     },
     {
       title: 'VAT Registration',
       description: 'Tax information',
       isComplete: () => {
-        if (!formData.isVatRegistered) return true
-        return Boolean(formData.trn && formData.vatFrequency)
+        if (!formData.isVatRegistered) return true;
+        
+        if (!formData.manualEntryPreferences.vatRegistration) {
+          return Boolean(formData.documents.vatRegistration?.length > 0);
+        }
+        
+        return Boolean(
+          formData.trn &&
+          formData.vatFrequency
+        );
       },
     },
     {
       title: 'Owner\'s Capital',
       description: 'Capital contributions',
       isComplete: () => {
-        if (!formData.hasCapitalContributions) return true;
-        return formData.capitalContributions?.some(contribution => 
-          contribution.amount > 0 && contribution.date
-        ) ?? false;
+        if (!formData.hasCapitalContributions) return true
+        return formData.capitalContributions?.length > 0 && formData.capitalContributions[0] && (
+          formData.capitalContributions[0].amount > 0 && 
+          formData.capitalContributions[0].date
+        )
       },
     },
     {
       title: 'Equipment & Investments',
       description: 'Asset classification',
       isComplete: () => {
-        if (!formData.hasEquipmentPurchases) return true;
-        return formData.equipmentPurchases?.some(purchase => 
-          purchase.description && 
-          purchase.amount > 0 && 
-          purchase.date
-        ) ?? false;
+        if (!formData.hasEquipmentPurchases) return true
+        return formData.equipmentPurchases?.length > 0 && formData.equipmentPurchases[0] && (
+          formData.equipmentPurchases[0].name && 
+          formData.equipmentPurchases[0].cost > 0 && 
+          formData.equipmentPurchases[0].date
+        )
       },
     },
     {
       title: 'Loan Repayments',
       description: 'Interest and principal split',
       isComplete: () => {
-        if (!formData.hasLoanRepayments) return true;
-        return formData.loanRepayments?.some(repayment => 
-          repayment.totalAmount > 0 && 
-          repayment.interestPortion >= 0 && 
-          repayment.date && 
-          repayment.loanId
-        ) ?? false;
+        if (!formData.hasLoanRepayments) return true
+        return formData.loanRepayments?.length > 0 && formData.loanRepayments[0] && (
+          formData.loanRepayments[0].amount > 0 && 
+          formData.loanRepayments[0].date && 
+          formData.loanRepayments[0].loanId
+        )
       },
     },
   ]
@@ -545,7 +595,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
         documents: Object.entries(formData.documents).reduce((acc, [key, files]) => {
           // Only include filenames, no duplicates
           const uniqueFiles = Array.from(new Set(
-            files.map(file => typeof file === 'string' ? file : file.name)
+            files.map(file => file.name)
           ))
           acc[key] = uniqueFiles
           return acc
@@ -557,9 +607,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       // Only append new File objects for upload
       Object.entries(formData.documents).forEach(([section, files]) => {
         files.forEach(file => {
-          if (file instanceof File) {
-            submitData.append(`documents_${section}`, file)
-          }
+          submitData.append(`documents_${section}`, file)
         })
       })
 
@@ -652,82 +700,67 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
   }
 
   const handleFileUpload = (section: keyof FormData['documents'], files: FileList | null) => {
-    if (!files || files.length === 0) return
+    if (!files) return;
 
-    setFormData(prev => {
-      const existingFiles = prev.documents[section] || []
-      const newFiles = Array.from(files)
-      
-      // Normalize filenames for comparison
-      const existingNormalizedNames = new Set(
-        existingFiles.map(f => normalizeFileName(typeof f === 'string' ? f : f.name))
-      )
+    // Normalize filenames and check for duplicates
+    const existingFiles = formData.documents[section];
+    const existingNames = new Set(existingFiles.map(f => normalizeFileName(f.name)));
+    
+    const newFiles = Array.from(files).filter(file => 
+      !existingNames.has(normalizeFileName(file.name))
+    );
 
-      // Filter out duplicates based on normalized names
-      const uniqueNewFiles = newFiles.filter(file => 
-        !existingNormalizedNames.has(normalizeFileName(file.name))
-      )
-
-      if (uniqueNewFiles.length !== newFiles.length) {
-        toast({
-          title: 'Duplicate Files',
-          description: 'Some files were skipped as they were already uploaded.',
-          status: 'warning',
-          duration: 3000,
-          isClosable: true,
-        })
+    setFormData({
+      ...formData,
+      documents: {
+        ...formData.documents,
+        [section]: [...existingFiles, ...newFiles]
       }
-
-      return {
-        ...prev,
-        documents: {
-          ...prev.documents,
-          [section]: [...existingFiles, ...uniqueNewFiles]
-        }
-      }
-    })
-  }
+    });
+  };
 
   const handleFileRemove = (section: keyof FormData['documents'], index: number) => {
-    setFormData(prev => {
-      const newDocs = { ...prev.documents }
-      if (newDocs[section]) {
-        const files = [...newDocs[section]]
-        files.splice(index, 1)
-        newDocs[section] = files
+    const newFiles = [...formData.documents[section]];
+    newFiles.splice(index, 1);
+    
+    setFormData({
+      ...formData,
+      documents: {
+        ...formData.documents,
+        [section]: newFiles
       }
-      return {
-        ...prev,
-        documents: newDocs
-      }
-    })
-  }
+    });
+  };
 
   const renderStep = () => {
     switch (currentStep) {
       case 0:
         return (
-          <VStack spacing={6} align="stretch">
+          <VStack spacing={8} align="stretch">
             <FormControl isRequired>
-              <FormLabel>Business Name</FormLabel>
+              <FormLabel fontSize="lg" mb={3}>Business Name</FormLabel>
               <Input
                 placeholder="Enter your business name"
                 value={formData.businessName}
                 onChange={(e) => setFormData({ ...formData, businessName: e.target.value })}
                 size="lg"
+                height="56px"
+                fontSize="md"
               />
             </FormControl>
             <FormControl isRequired>
-              <FormLabel>Industry</FormLabel>
+              <FormLabel fontSize="lg" mb={3}>Industry</FormLabel>
               <Input
                 placeholder="e.g. Retail, Manufacturing, Services"
                 value={formData.industry}
                 onChange={(e) => setFormData({ ...formData, industry: e.target.value })}
                 size="lg"
+                height="56px"
+                fontSize="md"
               />
             </FormControl>
             <FormControl isRequired>
-              <FormLabel>Operating Since (Year)</FormLabel>
+              <FormLabel fontSize="lg" mb={3}>Operating Since (Year)</FormLabel>
               <NumberInput
                 min={1900}
                 max={new Date().getFullYear()}
@@ -737,6 +770,8 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
               >
                 <NumberInputField
                   placeholder="Enter year"
+                  height="56px"
+                  fontSize="md"
                 />
               </NumberInput>
             </FormControl>
@@ -935,125 +970,185 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 <Card mt={4} variant="outline">
                   <CardBody>
                     <Stack spacing={4}>
-                      <FormControl>
-                        <FormLabel>Asset Information</FormLabel>
-                        <Text fontSize="sm" color="gray.600" mb={2}>
-                          Enter details for each asset
-                        </Text>
-                        <Select
-                          placeholder="Select asset type"
-                          value={formData.fixedAssets[0]?.type || ''}
-                          onChange={(e) => {
-                            const newAssets = [...formData.fixedAssets];
-                            if (newAssets[0]) {
-                              newAssets[0].type = e.target.value as FixedAsset['type'];
-                              newAssets[0].isIntangible = ['Software', 'License'].includes(e.target.value);
-                            }
-                            setFormData({ ...formData, fixedAssets: newAssets });
+                      <FormControl isRequired>
+                        <FormLabel>How would you like to provide fixed assets information?</FormLabel>
+                        <RadioGroup
+                          value={formData.manualEntryPreferences.fixedAssets ? 'manual' : 'upload'}
+                          onChange={(value) => {
+                            setFormData({ 
+                              ...formData, 
+                              manualEntryPreferences: {
+                                ...formData.manualEntryPreferences,
+                                fixedAssets: value === 'manual'
+                              },
+                              // Reset the data when switching between manual and upload
+                              fixedAssets: value === 'manual' ? [{
+                                name: '',
+                                type: 'Equipment',
+                                value: 0,
+                                purchaseDate: '',
+                                depreciationMethod: 'Straight-line',
+                                usefulLife: 0,
+                                isIntangible: false,
+                                residualValue: 0,
+                                description: ''
+                              }] : [],
+                              documents: {
+                                ...formData.documents,
+                                fixedAssets: value === 'upload' ? [] : formData.documents.fixedAssets
+                              }
+                            })
                           }}
                         >
-                          <option value="Equipment">Equipment</option>
-                          <option value="Vehicle">Vehicle</option>
-                          <option value="Furniture">Furniture</option>
-                          <option value="Software">Software (Intangible)</option>
-                          <option value="License">License (Intangible)</option>
-                          <option value="Other">Other</option>
-                        </Select>
+                          <Stack direction="row" spacing={4}>
+                            <Radio value="upload">Upload Documents</Radio>
+                            <Radio value="manual">Enter Manually</Radio>
+                          </Stack>
+                        </RadioGroup>
                       </FormControl>
 
-                      <FormControl>
-                        <FormLabel>Name</FormLabel>
-                        <Input
-                          placeholder="Enter asset name"
-                          value={formData.fixedAssets[0]?.name || ''}
-                          onChange={(e) => {
-                            const newAssets = [...formData.fixedAssets];
-                            if (newAssets[0]) newAssets[0].name = e.target.value;
-                            setFormData({ ...formData, fixedAssets: newAssets });
-                          }}
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel>Description</FormLabel>
-                        <Textarea
-                          placeholder="Enter asset description"
-                          value={formData.fixedAssets[0]?.description || ''}
-                          onChange={(e) => {
-                            const newAssets = [...formData.fixedAssets];
-                            if (newAssets[0]) newAssets[0].description = e.target.value;
-                            setFormData({ ...formData, fixedAssets: newAssets });
-                          }}
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel>Purchase Value (AED)</FormLabel>
-                        <Input
-                          type="number"
-                          value={formData.fixedAssets[0]?.value || ''}
-                          onChange={(e) => {
-                            const newAssets = [...formData.fixedAssets];
-                            if (newAssets[0]) newAssets[0].value = parseFloat(e.target.value);
-                            setFormData({ ...formData, fixedAssets: newAssets });
-                          }}
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel>Residual Value (AED)</FormLabel>
-                        <Input
-                          type="number"
-                          value={formData.fixedAssets[0]?.residualValue || ''}
-                          onChange={(e) => {
-                            const newAssets = [...formData.fixedAssets];
-                            if (newAssets[0]) newAssets[0].residualValue = parseFloat(e.target.value);
-                            setFormData({ ...formData, fixedAssets: newAssets });
-                          }}
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel>Purchase Date</FormLabel>
-                        <Input
-                          type="date"
-                          value={formData.fixedAssets[0]?.purchaseDate || ''}
-                          onChange={(e) => {
-                            const newAssets = [...formData.fixedAssets];
-                            if (newAssets[0]) newAssets[0].purchaseDate = e.target.value;
-                            setFormData({ ...formData, fixedAssets: newAssets });
-                          }}
-                        />
-                      </FormControl>
-
-                      <FormControl>
-                        <FormLabel>Useful Life (years)</FormLabel>
-                        <Input
-                          type="number"
-                          value={formData.fixedAssets[0]?.usefulLife || ''}
-                          onChange={(e) => {
-                            const newAssets = [...formData.fixedAssets];
-                            if (newAssets[0]) newAssets[0].usefulLife = parseInt(e.target.value);
-                            setFormData({ ...formData, fixedAssets: newAssets });
-                          }}
-                        />
-                      </FormControl>
-
-                      {!formData.fixedAssets[0]?.isIntangible && (
-                        <FormControl>
-                          <FormLabel>Depreciation Method</FormLabel>
-                          <Select
-                            value={formData.fixedAssets[0]?.depreciationMethod || ''}
-                            onChange={(e) => {
-                              const newAssets = [...formData.fixedAssets];
-                              if (newAssets[0]) newAssets[0].depreciationMethod = e.target.value as 'Straight-line' | 'Declining balance';
-                              setFormData({ ...formData, fixedAssets: newAssets });
-                            }}
-                          >
-                            <option value="Straight-line">Straight-line</option>
-                            <option value="Declining balance">Declining balance</option>
-                          </Select>
+                      {!formData.manualEntryPreferences.fixedAssets ? (
+                        <FormControl isRequired>
+                          <FormLabel>Upload Fixed Assets Documents</FormLabel>
+                          <Text fontSize="sm" color="gray.600" mb={2}>
+                            Upload purchase invoices, depreciation schedules, or asset registers
+                          </Text>
+                          <Input
+                            type="file"
+                            multiple
+                            accept=".pdf,.xls,.xlsx,.csv"
+                            onChange={(e) => handleFileUpload('fixedAssets', e.target.files)}
+                          />
+                          {formData.documents.fixedAssets && formData.documents.fixedAssets.length > 0 && (
+                            <FileList
+                              files={formData.documents.fixedAssets}
+                              onRemove={(index) => handleFileRemove('fixedAssets', index)}
+                            />
+                          )}
                         </FormControl>
+                      ) : (
+                        <>
+                          <FormControl>
+                            <FormLabel>Asset Information</FormLabel>
+                            <Text fontSize="sm" color="gray.600" mb={2}>
+                              Enter details for each asset
+                            </Text>
+                            <Select
+                              placeholder="Select asset type"
+                              value={formData.fixedAssets[0]?.type || ''}
+                              onChange={(e) => {
+                                const newAssets = [...formData.fixedAssets];
+                                if (newAssets[0]) {
+                                  newAssets[0].type = e.target.value as FixedAsset['type'];
+                                  newAssets[0].isIntangible = ['Software', 'License'].includes(e.target.value);
+                                }
+                                setFormData({ ...formData, fixedAssets: newAssets });
+                              }}
+                            >
+                              <option value="Equipment">Equipment</option>
+                              <option value="Vehicle">Vehicle</option>
+                              <option value="Furniture">Furniture</option>
+                              <option value="Software">Software (Intangible)</option>
+                              <option value="License">License (Intangible)</option>
+                              <option value="Other">Other</option>
+                            </Select>
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>Name</FormLabel>
+                            <Input
+                              placeholder="Enter asset name"
+                              value={formData.fixedAssets[0]?.name || ''}
+                              onChange={(e) => {
+                                const newAssets = [...formData.fixedAssets];
+                                if (newAssets[0]) newAssets[0].name = e.target.value;
+                                setFormData({ ...formData, fixedAssets: newAssets });
+                              }}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>Description</FormLabel>
+                            <Textarea
+                              placeholder="Enter asset description"
+                              value={formData.fixedAssets[0]?.description || ''}
+                              onChange={(e) => {
+                                const newAssets = [...formData.fixedAssets];
+                                if (newAssets[0]) newAssets[0].description = e.target.value;
+                                setFormData({ ...formData, fixedAssets: newAssets });
+                              }}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>Purchase Value (AED)</FormLabel>
+                            <Input
+                              type="number"
+                              value={formData.fixedAssets[0]?.value || ''}
+                              onChange={(e) => {
+                                const newAssets = [...formData.fixedAssets];
+                                if (newAssets[0]) newAssets[0].value = parseFloat(e.target.value);
+                                setFormData({ ...formData, fixedAssets: newAssets });
+                              }}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>Residual Value (AED)</FormLabel>
+                            <Input
+                              type="number"
+                              value={formData.fixedAssets[0]?.residualValue || ''}
+                              onChange={(e) => {
+                                const newAssets = [...formData.fixedAssets];
+                                if (newAssets[0]) newAssets[0].residualValue = parseFloat(e.target.value);
+                                setFormData({ ...formData, fixedAssets: newAssets });
+                              }}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>Purchase Date</FormLabel>
+                            <Input
+                              type="date"
+                              value={formData.fixedAssets[0]?.purchaseDate || ''}
+                              onChange={(e) => {
+                                const newAssets = [...formData.fixedAssets];
+                                if (newAssets[0]) newAssets[0].purchaseDate = e.target.value;
+                                setFormData({ ...formData, fixedAssets: newAssets });
+                              }}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>Useful Life (years)</FormLabel>
+                            <Input
+                              type="number"
+                              value={formData.fixedAssets[0]?.usefulLife || ''}
+                              onChange={(e) => {
+                                const newAssets = [...formData.fixedAssets];
+                                if (newAssets[0]) newAssets[0].usefulLife = parseInt(e.target.value);
+                                setFormData({ ...formData, fixedAssets: newAssets });
+                              }}
+                            />
+                          </FormControl>
+
+                          {!formData.fixedAssets[0]?.isIntangible && (
+                            <FormControl>
+                              <FormLabel>Depreciation Method</FormLabel>
+                              <Select
+                                value={formData.fixedAssets[0]?.depreciationMethod || ''}
+                                onChange={(e) => {
+                                  const newAssets = [...formData.fixedAssets];
+                                  if (newAssets[0]) newAssets[0].depreciationMethod = e.target.value as 'Straight-line' | 'Declining balance';
+                                  setFormData({ ...formData, fixedAssets: newAssets });
+                                }}
+                              >
+                                <option value="Straight-line">Straight-line</option>
+                                <option value="Declining balance">Declining balance</option>
+                              </Select>
+                            </FormControl>
+                          )}
+                        </>
                       )}
                     </Stack>
                   </CardBody>
@@ -1081,11 +1176,32 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 <Card mt={4} variant="outline">
                   <CardBody>
                     <Stack spacing={4}>
-                      <FormControl>
+                      <FormControl isRequired>
                         <FormLabel>How would you like to provide accounts payable information?</FormLabel>
                         <RadioGroup
-                          value={formData.preferManualEntry ? 'manual' : 'upload'}
-                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                          value={formData.manualEntryPreferences.accountsPayable ? 'manual' : 'upload'}
+                          onChange={(value) => {
+                            const isManual = value === 'manual';
+                            setFormData({
+                              ...formData,
+                              manualEntryPreferences: {
+                                ...formData.manualEntryPreferences,
+                                accountsPayable: isManual
+                              },
+                              // Reset the data when switching between manual and upload
+                              accountsPayable: isManual ? [{
+                                vendorName: '',
+                                amount: 0,
+                                dueDate: '',
+                                description: '',
+                                terms: ''
+                              }] : [],
+                              documents: {
+                                ...formData.documents,
+                                accountsPayable: isManual ? [] : formData.documents.accountsPayable
+                              }
+                            });
+                          }}
                         >
                           <Stack direction="row" spacing={4}>
                             <Radio value="upload">Upload Documents</Radio>
@@ -1094,8 +1210,8 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                         </RadioGroup>
                       </FormControl>
 
-                      {!formData.preferManualEntry ? (
-                        <FormControl>
+                      {!formData.manualEntryPreferences.accountsPayable ? (
+                        <FormControl isRequired>
                           <FormLabel>Upload Accounts Payable Documents</FormLabel>
                           <Text fontSize="sm" color="gray.600" mb={2}>
                             Upload vendor invoices, statements, or aging reports
@@ -1103,7 +1219,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                           <Input
                             type="file"
                             multiple
-                            accept=".pdf,.xls,.xlsx,.csv"
+                            accept=".pdf,.doc,.docx,.xls,.xlsx"
                             onChange={(e) => handleFileUpload('accountsPayable', e.target.files)}
                           />
                           {formData.documents.accountsPayable && formData.documents.accountsPayable.length > 0 && (
@@ -1244,11 +1360,25 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 <Card mt={4} variant="outline">
                   <CardBody>
                     <Stack spacing={4}>
-                      <FormControl>
+                      <FormControl isRequired>
                         <FormLabel>How would you like to provide accounts receivable information?</FormLabel>
                         <RadioGroup
-                          value={formData.preferManualEntry ? 'manual' : 'upload'}
-                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                          value={formData.manualEntryPreferences.accountsReceivable ? 'manual' : 'upload'}
+                          onChange={(value) => {
+                            setFormData({ 
+                              ...formData, 
+                              manualEntryPreferences: {
+                                ...formData.manualEntryPreferences,
+                                accountsReceivable: value === 'manual'
+                              },
+                              // Reset the data when switching between manual and upload
+                              accountsReceivable: value === 'manual' ? [{ customerName: '', amount: 0, dueDate: '', description: '', terms: '' }] : [],
+                              documents: {
+                                ...formData.documents,
+                                accountsReceivable: value === 'upload' ? [] : formData.documents.accountsReceivable
+                              }
+                            });
+                          }}
                         >
                           <Stack direction="row" spacing={4}>
                             <Radio value="upload">Upload Documents</Radio>
@@ -1257,8 +1387,8 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                         </RadioGroup>
                       </FormControl>
 
-                      {!formData.preferManualEntry ? (
-                        <FormControl>
+                      {!formData.manualEntryPreferences.accountsReceivable ? (
+                        <FormControl isRequired>
                           <FormLabel>Upload Accounts Receivable Documents</FormLabel>
                           <Text fontSize="sm" color="gray.600" mb={2}>
                             Upload customer invoices, statements, or aging reports
@@ -1397,7 +1527,14 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                 <Checkbox
                   isChecked={formData.hasLoans}
                   onChange={(e) => {
-                    const newFormData = { ...formData, hasLoans: e.target.checked };
+                    const newFormData = { 
+                      ...formData, 
+                      hasLoans: e.target.checked,
+                      manualEntryPreferences: {
+                        ...formData.manualEntryPreferences,
+                        loans: true // Set to true by default when loans are enabled
+                      }
+                    };
                     if (e.target.checked && (!newFormData.loans || !newFormData.loans.length)) {
                       newFormData.loans = [{
                         purpose: '',
@@ -1405,7 +1542,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                         interestRate: 0,
                         monthlyPayment: 0,
                         startDate: '',
-                        type: 'Loan',
+                        type: 'Loan' as const,
                         isActive: true,
                         endDate: '',
                         assetLeased: '',
@@ -1429,23 +1566,26 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                         <Select
                           value={formData.loans?.[0]?.type || 'Loan'}
                           onChange={(e) => {
+                            const newType = e.target.value as 'Loan' | 'Lease';
                             const newLoans = [...(formData.loans || [])];
-                            if (!newLoans[0]) {
-                              newLoans[0] = {
-                                purpose: '',
-                                amount: 0,
-                                interestRate: 0,
-                                monthlyPayment: 0,
-                                startDate: '',
-                                type: e.target.value as 'Loan' | 'Lease',
-                                isActive: true,
-                                endDate: '',
-                                assetLeased: '',
-                                leaseTerm: 0
-                              };
-                            } else {
-                              newLoans[0].type = e.target.value as 'Loan' | 'Lease';
-                            }
+                            
+                            // Initialize or update the loan object based on type
+                            newLoans[0] = {
+                              // Common fields
+                              startDate: formData.loans?.[0]?.startDate || '',
+                              endDate: formData.loans?.[0]?.endDate || '',
+                              isActive: true,
+                              type: newType,
+                              
+                              // Type-specific fields with appropriate defaults
+                              purpose: newType === 'Loan' ? (formData.loans?.[0]?.purpose || '') : '',
+                              amount: newType === 'Loan' ? (formData.loans?.[0]?.amount || 0) : 0,
+                              interestRate: newType === 'Loan' ? (formData.loans?.[0]?.interestRate || 0) : 0,
+                              monthlyPayment: newType === 'Lease' ? (formData.loans?.[0]?.monthlyPayment || 0) : 0,
+                              assetLeased: newType === 'Lease' ? (formData.loans?.[0]?.assetLeased || '') : '',
+                              leaseTerm: newType === 'Lease' ? (formData.loans?.[0]?.leaseTerm || 0) : 0
+                            };
+                            
                             setFormData({ ...formData, loans: newLoans });
                           }}
                         >
@@ -1494,7 +1634,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                                   interestRate: 0,
                                   monthlyPayment: 0,
                                   startDate: '',
-                                  type: 'Loan',
+                                  type: 'Loan' as const,
                                   isActive: true,
                                   endDate: '',
                                   assetLeased: '',
@@ -1557,7 +1697,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                                   interestRate: parseFloat(e.target.value) || 0,
                                   monthlyPayment: 0,
                                   startDate: '',
-                                  type: 'Loan',
+                                  type: 'Loan' as const,
                                   isActive: true,
                                   endDate: '',
                                   assetLeased: '',
@@ -1587,7 +1727,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                                   interestRate: 0,
                                   monthlyPayment: 0,
                                   startDate: '',
-                                  type: 'Lease',
+                                  type: 'Lease' as const,
                                   isActive: true,
                                   endDate: '',
                                   assetLeased: '',
@@ -1616,7 +1756,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                                 interestRate: 0,
                                 monthlyPayment: 0,
                                 startDate: e.target.value,
-                                type: 'Loan',
+                                type: 'Loan' as const,
                                 isActive: true,
                                 endDate: '',
                                 assetLeased: '',
@@ -1644,7 +1784,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                                 interestRate: 0,
                                 monthlyPayment: 0,
                                 startDate: '',
-                                type: 'Loan',
+                                type: 'Loan' as const,
                                 isActive: true,
                                 endDate: e.target.value,
                                 assetLeased: '',
@@ -1670,7 +1810,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                                 interestRate: 0,
                                 monthlyPayment: 0,
                                 startDate: '',
-                                type: 'Loan',
+                                type: 'Loan' as const,
                                 isActive: e.target.checked,
                                 endDate: '',
                                 assetLeased: '',
@@ -1714,8 +1854,24 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                       <FormControl>
                         <FormLabel>How would you like to provide VAT registration information?</FormLabel>
                         <RadioGroup
-                          value={formData.preferManualEntry ? 'manual' : 'upload'}
-                          onChange={(value) => setFormData({ ...formData, preferManualEntry: value === 'manual' })}
+                          value={formData.manualEntryPreferences.vatRegistration ? 'manual' : 'upload'}
+                          onChange={(value) => {
+                            setFormData({ 
+                              ...formData, 
+                              manualEntryPreferences: {
+                                ...formData.manualEntryPreferences,
+                                vatRegistration: value === 'manual'
+                              },
+                              preferManualEntry: value === 'manual',
+                              trn: '',
+                              vatFrequency: '',
+                              trackVat: false,
+                              documents: {
+                                ...formData.documents,
+                                vatRegistration: value === 'upload' ? [] : formData.documents.vatRegistration
+                              }
+                            });
+                          }}
                         >
                           <Stack direction="row" spacing={4}>
                             <Radio value="upload">Upload Documents</Radio>
@@ -1724,7 +1880,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                         </RadioGroup>
                       </FormControl>
 
-                      {!formData.preferManualEntry ? (
+                      {!formData.manualEntryPreferences.vatRegistration ? (
                         <FormControl>
                           <FormLabel>Upload VAT Documents</FormLabel>
                           <Text fontSize="sm" color="gray.600" mb={2}>
@@ -1877,7 +2033,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                   onChange={(e) => {
                     const newFormData = { ...formData, hasEquipmentPurchases: e.target.checked };
                     if (e.target.checked && (!newFormData.equipmentPurchases || !newFormData.equipmentPurchases.length)) {
-                      newFormData.equipmentPurchases = [{ description: '', amount: 0, date: '', isLongTermAsset: false }];
+                      newFormData.equipmentPurchases = [{ name: '', cost: 0, date: '' }];
                     }
                     setFormData(newFormData);
                   }}
@@ -1894,32 +2050,32 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                       <FormControl>
                         <FormLabel>Equipment Purchases</FormLabel>
                         <Text fontSize="sm" color="gray.600" mb={2}>
-                          Enter the description, amount, and date of each equipment purchase
+                          Enter the name, cost, and date of each equipment purchase
                         </Text>
                         <Input
-                          placeholder="Enter description"
-                          value={formData.equipmentPurchases?.[0]?.description || ''}
+                          placeholder="Enter name"
+                          value={formData.equipmentPurchases?.[0]?.name || ''}
                           onChange={(e) => {
                             const newPurchases = [...(formData.equipmentPurchases || [])];
                             if (!newPurchases[0]) {
-                              newPurchases[0] = { description: '', amount: 0, date: '', isLongTermAsset: false };
+                              newPurchases[0] = { name: '', cost: 0, date: '' };
                             }
-                            newPurchases[0].description = e.target.value;
+                            newPurchases[0].name = e.target.value;
                             setFormData({ ...formData, equipmentPurchases: newPurchases });
                           }}
                         />
                       </FormControl>
                       <FormControl>
-                        <FormLabel>Amount</FormLabel>
+                        <FormLabel>Cost</FormLabel>
                         <Input
                           type="number"
-                          value={formData.equipmentPurchases?.[0]?.amount.toString() || ''}
+                          value={formData.equipmentPurchases?.[0]?.cost.toString() || ''}
                           onChange={(e) => {
                             const newPurchases = [...(formData.equipmentPurchases || [])];
                             if (!newPurchases[0]) {
-                              newPurchases[0] = { description: '', amount: 0, date: '', isLongTermAsset: false };
+                              newPurchases[0] = { name: '', cost: 0, date: '' };
                             }
-                            newPurchases[0].amount = parseFloat(e.target.value) || 0;
+                            newPurchases[0].cost = parseFloat(e.target.value) || 0;
                             setFormData({ ...formData, equipmentPurchases: newPurchases });
                           }}
                         />
@@ -1932,7 +2088,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                           onChange={(e) => {
                             const newPurchases = [...(formData.equipmentPurchases || [])];
                             if (!newPurchases[0]) {
-                              newPurchases[0] = { description: '', amount: 0, date: '', isLongTermAsset: false };
+                              newPurchases[0] = { name: '', cost: 0, date: '' };
                             }
                             newPurchases[0].date = e.target.value;
                             setFormData({ ...formData, equipmentPurchases: newPurchases });
@@ -1957,7 +2113,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                   onChange={(e) => {
                     const newFormData = { ...formData, hasLoanRepayments: e.target.checked };
                     if (e.target.checked && (!newFormData.loanRepayments || !newFormData.loanRepayments.length)) {
-                      newFormData.loanRepayments = [{ totalAmount: 0, interestPortion: 0, date: '', loanId: '' }];
+                      newFormData.loanRepayments = [{ amount: 0, date: '', loanId: '' }];
                     }
                     setFormData(newFormData);
                   }}
@@ -1974,32 +2130,17 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                       <FormControl>
                         <FormLabel>Loan Repayments</FormLabel>
                         <Text fontSize="sm" color="gray.600" mb={2}>
-                          Enter the total amount, interest portion, date, and loan ID of each loan repayment
+                          Enter the amount, date, and loan ID of each loan repayment
                         </Text>
                         <Input
-                          placeholder="Enter total amount"
-                          value={formData.loanRepayments?.[0]?.totalAmount.toString() || ''}
+                          placeholder="Enter amount"
+                          value={formData.loanRepayments?.[0]?.amount.toString() || ''}
                           onChange={(e) => {
                             const newRepayments = [...(formData.loanRepayments || [])];
                             if (!newRepayments[0]) {
-                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
+                              newRepayments[0] = { amount: 0, date: '', loanId: '' };
                             }
-                            newRepayments[0].totalAmount = parseFloat(e.target.value) || 0;
-                            setFormData({ ...formData, loanRepayments: newRepayments });
-                          }}
-                        />
-                      </FormControl>
-                      <FormControl>
-                        <FormLabel>Interest Portion</FormLabel>
-                        <Input
-                          type="number"
-                          value={formData.loanRepayments?.[0]?.interestPortion.toString() || ''}
-                          onChange={(e) => {
-                            const newRepayments = [...(formData.loanRepayments || [])];
-                            if (!newRepayments[0]) {
-                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
-                            }
-                            newRepayments[0].interestPortion = parseFloat(e.target.value) || 0;
+                            newRepayments[0].amount = parseFloat(e.target.value) || 0;
                             setFormData({ ...formData, loanRepayments: newRepayments });
                           }}
                         />
@@ -2012,7 +2153,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                           onChange={(e) => {
                             const newRepayments = [...(formData.loanRepayments || [])];
                             if (!newRepayments[0]) {
-                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
+                              newRepayments[0] = { amount: 0, date: '', loanId: '' };
                             }
                             newRepayments[0].date = e.target.value;
                             setFormData({ ...formData, loanRepayments: newRepayments });
@@ -2027,7 +2168,7 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
                           onChange={(e) => {
                             const newRepayments = [...(formData.loanRepayments || [])];
                             if (!newRepayments[0]) {
-                              newRepayments[0] = { totalAmount: 0, interestPortion: 0, date: '', loanId: '' };
+                              newRepayments[0] = { amount: 0, date: '', loanId: '' };
                             }
                             newRepayments[0].loanId = e.target.value;
                             setFormData({ ...formData, loanRepayments: newRepayments });
@@ -2048,124 +2189,123 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
   }
 
   return (
-    <Container maxW="8xl" p={8}>
-      <Box bg="white" borderRadius="xl" shadow="lg" p={8}>
-        <VStack spacing={8} align="stretch">
-          <Box>
-            <Heading size="xl" mb={3}>AI Bookkeeping Onboarding</Heading>
-            <Text color="gray.600" fontSize="lg">
-              Welcome to your AI-powered accounting assistant. This short onboarding will help generate accurate IFRS financial reports using your bank transactions.
-            </Text>
-          </Box>
+    <Box w="100%" minH="100vh" bg="gray.50">
+      <Box maxW="100%" mx="auto" p={4}>
+        <Box bg="white" borderRadius="xl" shadow="lg" p={8}>
+          <VStack spacing={8} align="stretch" w="100%">
+            <Box>
+              <Heading size="xl" mb={4}>AI Bookkeeping Onboarding</Heading>
+              <Text color="gray.600" fontSize="lg">
+                Welcome to your AI-powered accounting assistant. This short onboarding will help generate accurate IFRS financial reports using your bank transactions.
+              </Text>
+            </Box>
 
-          <Progress
-            value={(currentStep / (steps.length - 1)) * 100}
-            mb={6}
-            colorScheme="green"
-            size="lg"
-            borderRadius="full"
-          />
+            <Progress
+              value={(currentStep / (steps.length - 1)) * 100}
+              mb={6}
+              colorScheme="green"
+              size="lg"
+              borderRadius="full"
+            />
 
-          <Stack
-            direction={{ base: 'column', md: 'row' }}
-            spacing={{ base: 4, md: 12 }}
-            align={{ base: 'stretch', md: 'flex-start' }}
-          >
-            <Box
-              minW={{ base: 'full', md: '250px' }}
-              overflowX={{ base: 'auto', md: 'visible' }}
-              py={{ base: 2, md: 0 }}
+            <Stack
+              direction={{ base: 'column', md: 'row' }}
+              spacing={6}
+              align="flex-start"
+              w="100%"
             >
-              <Stack
-                direction={{ base: 'row', md: 'column' }}
-                spacing={{ base: 2, md: 4 }}
-                align="stretch"
-                minW={{ base: 'fit-content', md: 'auto' }}
+              <Box
+                w={{ base: 'full', md: '280px' }}
+                position={{ base: 'relative', md: 'sticky' }}
+                top={{ base: 0, md: '20px' }}
               >
-                {steps.map((step, index) => (
-                  <Button
-                    key={index}
-                    onClick={() => setCurrentStep(index)}
-                    variant={currentStep === index ? 'solid' : 'ghost'}
-                    colorScheme={currentStep === index ? 'green' : 'gray'}
-                    size="lg"
-                    justifyContent={{ base: 'center', md: 'flex-start' }}
-                    p={{ base: 4, md: 6 }}
-                    minW={{ base: '100px', md: 'auto' }}
-                    leftIcon={
-                      <Box
-                        w={{ base: '24px', md: '32px' }}
-                        h={{ base: '24px', md: '32px' }}
-                        borderRadius="full"
-                        bg={currentStep === index ? 'white' : 'gray.200'}
-                        color={currentStep === index ? 'green.500' : 'gray.600'}
-                        display="flex"
-                        alignItems="center"
-                        justifyContent="center"
-                        fontSize={{ base: 'sm', md: 'md' }}
-                        fontWeight="bold"
+                <Stack
+                  direction={{ base: 'row', md: 'column' }}
+                  spacing={3}
+                  overflowX={{ base: 'auto', md: 'visible' }}
+                  pb={{ base: 4, md: 0 }}
+                >
+                  {steps.map((step, index) => (
+                    <Button
+                      key={index}
+                      onClick={() => setCurrentStep(index)}
+                      variant={currentStep === index ? 'solid' : 'ghost'}
+                      colorScheme={currentStep === index ? 'green' : 'gray'}
+                      size="lg"
+                      justifyContent="flex-start"
+                      p={4}
+                      whiteSpace="nowrap"
+                      leftIcon={
+                        <Box
+                          w="32px"
+                          h="32px"
+                          borderRadius="full"
+                          bg={currentStep === index ? 'white' : 'gray.200'}
+                          color={currentStep === index ? 'green.500' : 'gray.600'}
+                          display="flex"
+                          alignItems="center"
+                          justifyContent="center"
+                          fontSize="md"
+                          fontWeight="bold"
+                        >
+                          {index + 1}
+                        </Box>
+                      }
+                      isDisabled={!steps.slice(0, index).every(step => step.isComplete())}
+                    >
+                      <VStack
+                        align="flex-start"
+                        spacing={0}
                       >
-                        {index + 1}
-                      </Box>
-                    }
-                    isDisabled={!steps.slice(0, index).every(step => step.isComplete())}
-                  >
-                    <VStack
-                      align={{ base: 'center', md: 'flex-start' }}
-                      spacing={{ base: 0, md: 1 }}
-                      display={{ base: 'none', md: 'flex' }}
-                    >
-                      <Text fontSize="lg">{step.title}</Text>
-                      <Text fontSize="sm" color={currentStep === index ? 'whiteAlpha.800' : 'gray.500'}>
-                        {step.description}
-                      </Text>
-                    </VStack>
-                    <Text
-                      display={{ base: 'block', md: 'none' }}
-                      fontSize="sm"
-                      fontWeight="medium"
-                    >
-                      {step.title.split(' ')[0]}
-                    </Text>
-                  </Button>
-                ))}
-              </Stack>
-            </Box>
+                        <Text fontSize="md" fontWeight="medium">{step.title}</Text>
+                        <Text 
+                          fontSize="sm" 
+                          color={currentStep === index ? 'whiteAlpha.800' : 'gray.500'}
+                          display={{ base: 'none', md: 'block' }}
+                        >
+                          {step.description}
+                        </Text>
+                      </VStack>
+                    </Button>
+                  ))}
+                </Stack>
+              </Box>
 
-            <Box flex={1}>
-              <form onSubmit={handleSubmit}>
-                <Card variant="outline" size="lg" p={6}>
-                  <CardBody>
-                    {renderStep()}
-                  </CardBody>
-                </Card>
+              <Box flex="1" w="100%">
+                <form onSubmit={handleSubmit}>
+                  <Card variant="outline" size="lg" p={6}>
+                    <CardBody>
+                      {renderStep()}
+                    </CardBody>
+                  </Card>
 
-                <HStack mt={6} spacing={4} justify="flex-end">
-                  <Button
-                    onClick={prevStep}
-                    isDisabled={currentStep === 0}
-                    variant="outline"
-                    colorScheme="green"
-                    size="lg"
-                    px={8}
-                  >
-                    Previous
-                  </Button>
-                  <Button
-                    colorScheme="green"
-                    onClick={currentStep === steps.length - 1 ? handleSubmit : nextStep}
-                    isLoading={isSubmitting}
-                    size="lg"
-                    px={8}
-                  >
-                    {currentStep === steps.length - 1 ? 'Submit' : 'Next'}
-                  </Button>
-                </HStack>
-              </form>
-            </Box>
-          </Stack>
-        </VStack>
+                  <HStack mt={6} spacing={4} justify="flex-end">
+                    <Button
+                      onClick={prevStep}
+                      isDisabled={currentStep === 0}
+                      variant="outline"
+                      colorScheme="green"
+                      size="lg"
+                      px={8}
+                    >
+                      Previous
+                    </Button>
+                    <Button
+                      colorScheme="green"
+                      onClick={currentStep === steps.length - 1 ? handleSubmit : nextStep}
+                      isLoading={isSubmitting}
+                      size="lg"
+                      px={8}
+                    >
+                      {currentStep === steps.length - 1 ? 'Submit' : 'Next'}
+                    </Button>
+                  </HStack>
+                </form>
+              </Box>
+            </Stack>
+          </VStack>
+        </Box>
       </Box>
-    </Container>
+    </Box>
   )
 } 

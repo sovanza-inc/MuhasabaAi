@@ -4,6 +4,7 @@ import { AuthProvider } from '#features/auth/auth-provider'
 import { AppProvider } from '#features/common/providers/app-provider'
 import { TRPCProvider } from '#lib/trpc/trpc-provider'
 import { BankConnectionProvider } from '#features/bank-integrations/context/bank-connection-context'
+import { QuestionnaireProvider } from '#features/bank-integrations/context/questionnaire-context'
 
 /**
  * This is the root context provider for the application.
@@ -20,11 +21,13 @@ export function Provider({
     <I18nProvider>
       <TRPCProvider>
         <AuthProvider>
-          <BankConnectionProvider>
-            <AppProvider initialColorMode={initialColorMode}>
-              {children}
-            </AppProvider>
-          </BankConnectionProvider>
+          <QuestionnaireProvider>
+            <BankConnectionProvider>
+              <AppProvider initialColorMode={initialColorMode}>
+                {children}
+              </AppProvider>
+            </BankConnectionProvider>
+          </QuestionnaireProvider>
         </AuthProvider>
       </TRPCProvider>
     </I18nProvider>
