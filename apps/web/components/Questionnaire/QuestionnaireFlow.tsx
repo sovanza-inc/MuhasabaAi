@@ -1,4 +1,4 @@
- 'use client'
+'use client'
 
 import React from 'react'
 import { useRouter, usePathname } from 'next/navigation'
@@ -15,7 +15,11 @@ import {
   Text,
 } from '@chakra-ui/react'
 
-export function QuestionnaireFlow() {
+interface QuestionnaireFlowProps {
+  children: React.ReactNode
+}
+
+export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
   const router = useRouter()
   const pathname = usePathname()
   const toast = useToast()
@@ -149,22 +153,27 @@ export function QuestionnaireFlow() {
     )
   }
 
-  // Show the questionnaire modal if needed
   return (
-    <Modal 
-      isOpen={showQuestionnaire} 
-      onClose={() => {}} 
-      closeOnOverlayClick={false}
-      closeOnEsc={false}
-      size="xl"
-    >
-      <ModalOverlay backdropFilter='blur(10px)' />
-      <ModalContent maxW="800px">
-        <ModalBody p={6}>
-          <Text mb={4} fontSize="lg" fontWeight="bold">Please complete the questionnaire to continue</Text>
-          <QuestionnaireForm onComplete={handleQuestionnaireComplete} />
-        </ModalBody>
-      </ModalContent>
-    </Modal>
+    <>
+      {children}
+      {/* Show the questionnaire modal if needed */}
+      {showQuestionnaire && (
+        <Modal 
+          isOpen={true}
+          onClose={() => {}} 
+          closeOnOverlayClick={false}
+          closeOnEsc={false}
+          size="xl"
+        >
+          <ModalOverlay backdropFilter='blur(10px)' />
+          <ModalContent maxW="800px">
+            <ModalBody p={6}>
+              <Text mb={4} fontSize="lg" fontWeight="bold">Please complete the questionnaire to continue</Text>
+              <QuestionnaireForm onComplete={handleQuestionnaireComplete} />
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      )}
+    </>
   )
 } 
