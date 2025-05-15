@@ -404,6 +404,9 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       description: 'Cost of goods sold details',
       isComplete: () => {
         if (!formData.calculateCogs) return true
+        // If documents are uploaded, consider it complete
+        if (formData.documents.cogsInventory && formData.documents.cogsInventory.length > 0) return true
+        // Otherwise check manual entry
         return formData.cogsCategories[0].type !== ''
       },
     },
@@ -412,11 +415,9 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       description: 'Equipment and property',
       isComplete: () => {
         if (!formData.hasFixedAssets) return true
-        // If user chose to upload documents, check if files are uploaded
-        if (!formData.preferManualEntry) {
-          return formData.documents.fixedAssets && formData.documents.fixedAssets.length > 0
-        }
-        // For manual entry, check if assets are filled out
+        // If documents are uploaded, consider it complete
+        if (formData.documents.fixedAssets && formData.documents.fixedAssets.length > 0) return true
+        // Otherwise check manual entry
         return formData.fixedAssets.some(asset => 
           asset.name && 
           asset.type && 
@@ -432,6 +433,9 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       description: 'Money owed to vendors',
       isComplete: () => {
         if (!formData.hasAccountsPayable) return true
+        // If documents are uploaded, consider it complete
+        if (formData.documents.accountsPayable && formData.documents.accountsPayable.length > 0) return true
+        // Otherwise check manual entry
         return formData.accountsPayable.some(payable => 
           payable.vendorName && 
           payable.amount > 0 && 
@@ -445,6 +449,9 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       description: 'Money owed by customers',
       isComplete: () => {
         if (!formData.hasAccountsReceivable) return true
+        // If documents are uploaded, consider it complete
+        if (formData.documents.accountsReceivable && formData.documents.accountsReceivable.length > 0) return true
+        // Otherwise check manual entry
         return formData.accountsReceivable.some(receivable => 
           receivable.customerName && 
           receivable.amount > 0 && 
@@ -454,17 +461,36 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       },
     },
     {
-      title: 'Loans',
-      description: 'Business loans and financing',
+      title: 'Loans & Leases',
+      description: 'Active loans and leases',
       isComplete: () => {
         if (!formData.hasLoans) return true
-        return formData.loans.some(loan => 
-          loan.purpose && 
-          loan.amount > 0 && 
-          loan.interestRate > 0 && 
-          loan.monthlyPayment > 0 && 
-          loan.startDate
-        )
+        // If documents are uploaded, consider it complete
+        if (formData.documents.loans && formData.documents.loans.length > 0) return true
+        // Otherwise check manual entry
+        return formData.loans.some(loan => {
+          // For loan type
+          if (loan.type === 'Loan') {
+            return Boolean(
+              loan.purpose &&
+              loan.amount > 0 &&
+              loan.interestRate >= 0 &&
+              loan.startDate &&
+              loan.endDate
+            )
+          }
+          // For lease type
+          if (loan.type === 'Lease') {
+            return Boolean(
+              loan.assetLeased &&
+              loan.monthlyPayment > 0 &&
+              (loan.leaseTerm ?? 0) > 0 &&
+              loan.startDate &&
+              loan.endDate
+            )
+          }
+          return false
+        })
       },
     },
     {
@@ -472,6 +498,9 @@ export function QuestionnaireForm({ onComplete, initialData }: QuestionnaireForm
       description: 'Tax information',
       isComplete: () => {
         if (!formData.isVatRegistered) return true
+        // If documents are uploaded, consider it complete
+        if (formData.documents.vatRegistration && formData.documents.vatRegistration.length > 0) return true
+        // Otherwise check manual entry
         return Boolean(formData.trn && formData.vatFrequency)
       },
     },

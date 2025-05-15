@@ -1,9 +1,15 @@
+'use client'
+
 import React from 'react'
 import { useToast } from '@chakra-ui/react'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { FloatingQuestionnaireButton } from './FloatingQuestionnaireButton'
 
-export function QuestionnaireProvider() {
+interface QuestionnaireProviderProps {
+  children: React.ReactNode
+}
+
+export function QuestionnaireProvider({ children }: QuestionnaireProviderProps) {
   const toast = useToast()
   const [workspace] = useCurrentWorkspace()
   const [responses, setResponses] = React.useState<any>(null)
@@ -56,5 +62,10 @@ export function QuestionnaireProvider() {
     })
   }
 
-  return <FloatingQuestionnaireButton initialData={responses} onComplete={handleComplete} />
+  return (
+    <>
+      {children}
+      <FloatingQuestionnaireButton initialData={responses} onComplete={handleComplete} />
+    </>
+  )
 } 

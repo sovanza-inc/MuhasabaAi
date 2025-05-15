@@ -7,6 +7,7 @@ import { WorkspaceLoading } from '#features/workspaces/workspace.loading'
 import { WorkspaceNotFound } from '#features/workspaces/workspace.not-found'
 import { HydrateClient, api } from '#lib/trpc/rsc'
 import { QuestionnaireFlow } from '#components/Questionnaire/QuestionnaireFlow'
+import { QuestionnaireProvider } from '#components/Questionnaire/QuestionnaireProvider'
 
 export default async function WorkspaceLayout(props: {
   params: Promise<{
@@ -25,7 +26,9 @@ export default async function WorkspaceLayout(props: {
       <Suspense fallback={<WorkspaceLoading />}>
         <ErrorBoundary fallback={<WorkspaceNotFound />}>
           <QuestionnaireFlow>
-            <BillingProvider>{props.children}</BillingProvider>
+            <QuestionnaireProvider>
+              <BillingProvider>{props.children}</BillingProvider>
+            </QuestionnaireProvider>
           </QuestionnaireFlow>
         </ErrorBoundary>
       </Suspense>
