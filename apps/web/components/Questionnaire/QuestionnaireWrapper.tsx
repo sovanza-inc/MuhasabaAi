@@ -3,14 +3,18 @@
 import React from 'react'
 import { QuestionnaireFlow } from './QuestionnaireFlow'
 
-export function QuestionnaireWrapper() {
+interface QuestionnaireWrapperProps {
+  children: React.ReactNode
+}
+
+export function QuestionnaireWrapper({ children }: QuestionnaireWrapperProps) {
   React.useEffect(() => {
     console.log('QuestionnaireWrapper mounted')
   }, [])
 
   return (
     <div>
-      <QuestionnaireFlow />
+      <QuestionnaireFlow>{children}</QuestionnaireFlow>
     </div>
   )
 } 

@@ -3,10 +3,18 @@
 import React from 'react'
 import { QuestionnaireFlow } from './QuestionnaireFlow'
 
-export function QuestionnaireContainer() {
+interface QuestionnaireContainerProps {
+  children?: React.ReactNode
+}
+
+export function QuestionnaireContainer({ children }: QuestionnaireContainerProps) {
   React.useEffect(() => {
     console.log('QuestionnaireContainer mounted')
   }, [])
   
-  return <QuestionnaireFlow />
+  return (
+    <QuestionnaireFlow>
+      {children || <div />}
+    </QuestionnaireFlow>
+  )
 } 
