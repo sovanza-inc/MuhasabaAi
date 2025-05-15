@@ -15,7 +15,6 @@ export async function GET(
 
     if (!response) {
       return NextResponse.json(
-        { message: 'No questionnaire responses found' },
         { status: 404 }
       )
     }
