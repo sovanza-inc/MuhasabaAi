@@ -20,17 +20,20 @@ import {
   Spinner,
   Button,
   useToast,
-  Image
+  Image,
+  IconButton
 } from '@chakra-ui/react'
 import React, { useState } from 'react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useProfitLoss } from '#features/bank-integrations/hooks/use-profit-loss'
-import { LuDownload } from 'react-icons/lu'
+import { LuDownload, LuPlus } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
 import { EditablePdfPreview } from './components/EditablePdfPreview'
-import { FilteredProfitLossData } from './types'
+import { FilteredProfitLossData, CustomStatement } from './types'
+import { z } from 'zod'
+import { useModals } from '@saas-ui/react'
 
 interface Bank {
   id: string;
@@ -50,7 +53,42 @@ export default function ProfitLossPage() {
   const toast = useToast();
   const logoRef = React.useRef<HTMLImageElement>(null);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [customStatements, setCustomStatements] = useState<CustomStatement[]>([]);
+  const modals = useModals();
   
+  // Load custom statements from local storage on mount
+  React.useEffect(() => {
+    if (workspace?.id) {
+      const storageKey = `customStatements_${workspace.id}`;
+      const savedStatements = localStorage.getItem(storageKey);
+      if (savedStatements) {
+        try {
+          const parsedStatements = JSON.parse(savedStatements);
+          setCustomStatements(parsedStatements);
+        } catch (error) {
+          console.error('Error parsing saved statements:', error);
+          localStorage.removeItem(storageKey);
+        }
+      }
+    }
+  }, [workspace?.id]);
+
+  // Save custom statements to local storage whenever they change
+  React.useEffect(() => {
+    if (workspace?.id) {
+      const storageKey = `customStatements_${workspace.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(customStatements));
+    }
+  }, [customStatements, workspace?.id]);
+
+  // Clear storage on auth token change (indicates login/logout)
+  React.useEffect(() => {
+    if (!authToken && workspace?.id) {
+      const storageKey = `customStatements_${workspace.id}`;
+      localStorage.removeItem(storageKey);
+    }
+  }, [authToken, workspace?.id]);
+
   // Initialize auth token and customer ID
   React.useEffect(() => {
     const initializeAuth = async () => {
@@ -65,6 +103,11 @@ export default function ProfitLossPage() {
         
         if (!authResponse.ok) {
           throw new Error('Failed to authenticate');
+          // Clear storage on auth failure
+          if (workspace?.id) {
+            const storageKey = `customStatements_${workspace.id}`;
+            localStorage.removeItem(storageKey);
+          }
         }
         
         const authData = await authResponse.json();
@@ -84,6 +127,11 @@ export default function ProfitLossPage() {
         }
       } catch (error) {
         console.error('Error initializing auth:', error);
+        // Clear storage on auth error
+        if (workspace?.id) {
+          const storageKey = `customStatements_${workspace.id}`;
+          localStorage.removeItem(storageKey);
+        }
       }
     }
 
@@ -137,6 +185,63 @@ export default function ProfitLossPage() {
 
   const handleExportClick = () => {
     setIsPreviewOpen(true);
+  };
+
+  const handleAddStatement = async (type: 'income' | 'expense') => {
+    const schema = z.object({
+      name: z.string().min(1, 'Name is required'),
+      amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
+      date: z.string().optional()
+    });
+
+    type FormData = z.infer<typeof schema>;
+
+    const onSubmit = (data: FormData) => {
+      const newStatement: CustomStatement = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: data.name,
+        amount: data.amount,
+        date: data.date || new Date().toISOString().split('T')[0],
+        type
+      };
+
+      setCustomStatements(prev => [...prev, newStatement]);
+
+      toast({
+        title: "Statement added",
+        description: `New ${type} statement has been added successfully`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      modals.closeAll(); // Explicitly close all modals after successful submission
+      return true;
+    };
+
+    modals.form({
+      title: `Add New ${type === 'income' ? 'Income' : 'Expense'} Statement`,
+      schema,
+      defaultValues: {
+        date: new Date().toISOString().split('T')[0]
+      },
+      onSubmit,
+      fields: {
+        name: {
+          label: 'Statement Name',
+          placeholder: 'Enter statement name'
+        },
+        amount: {
+          label: 'Amount (AED)',
+          type: 'number',
+          placeholder: '0.00'
+        },
+        date: {
+          label: 'Date',
+          type: 'date'
+        }
+      }
+    });
   };
 
   const handleExportPDF = async (filteredData: FilteredProfitLossData) => {
@@ -265,6 +370,15 @@ export default function ProfitLossPage() {
           amount: filteredData.revenues.totalSpending,
           indent: true 
         },
+        // Add custom income statements
+        ...customStatements
+          .filter(statement => statement.type === 'income')
+          .map(statement => ({
+            description: statement.name,
+            amount: statement.amount,
+            indent: true,
+            date: statement.date
+          })),
         {
           description: 'Other Operating Income',
           amount: filteredData.calculations.otherIncome,
@@ -272,7 +386,11 @@ export default function ProfitLossPage() {
         },
         { 
           description: 'Total Income', 
-          amount: filteredData.revenues.totalSpending + filteredData.calculations.otherIncome,
+          amount: filteredData.revenues.totalSpending + 
+                  filteredData.calculations.otherIncome +
+                  customStatements
+                    .filter(statement => statement.type === 'income')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true 
         }
       ];
@@ -286,7 +404,10 @@ export default function ProfitLossPage() {
         { description: 'Cost of Goods Sold (COGS)', amount: filteredData.calculations.cogs },
         { 
           description: 'Gross Profit', 
-          amount: filteredData.calculations.grossProfit,
+          amount: filteredData.calculations.grossProfit +
+                  customStatements
+                    .filter(statement => statement.type === 'income')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true 
         },
         { description: 'Operating Expenses:', amount: 0 },
@@ -320,14 +441,32 @@ export default function ProfitLossPage() {
           amount: filteredData.calculations.operatingExpenses.amortization,
           indent: true
         },
+        // Add custom expense statements
+        ...customStatements
+          .filter(statement => statement.type === 'expense')
+          .map(statement => ({
+            description: statement.name,
+            amount: statement.amount,
+            indent: true,
+            date: statement.date
+          })),
         {
           description: 'Total Operating Expenses',
-          amount: filteredData.calculations.operatingExpenses.total,
+          amount: filteredData.calculations.operatingExpenses.total +
+                  customStatements
+                    .filter(statement => statement.type === 'expense')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true
         },
         {
           description: 'Operating Profit',
-          amount: filteredData.calculations.operatingProfit,
+          amount: filteredData.calculations.operatingProfit +
+                  customStatements
+                    .filter(statement => statement.type === 'income')
+                    .reduce((total, statement) => total + statement.amount, 0) -
+                  customStatements
+                    .filter(statement => statement.type === 'expense')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true
         },
         {
@@ -339,7 +478,10 @@ export default function ProfitLossPage() {
           description: 'Total Expenses', 
           amount: -(filteredData.calculations.cogs + 
                    filteredData.calculations.operatingExpenses.total + 
-                   filteredData.calculations.financeCosts),
+                   filteredData.calculations.financeCosts +
+                   customStatements
+                    .filter(statement => statement.type === 'expense')
+                    .reduce((total, statement) => total + statement.amount, 0)),
           isSubTotal: true 
         }
       ];
@@ -352,7 +494,13 @@ export default function ProfitLossPage() {
       const netProfitItems = [
         { 
           description: 'NET PROFIT/(LOSS)', 
-          amount: filteredData.netProfit,
+          amount: filteredData.netProfit +
+                  customStatements
+                    .filter(statement => statement.type === 'income')
+                    .reduce((total, statement) => total + statement.amount, 0) -
+                  customStatements
+                    .filter(statement => statement.type === 'expense')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isTotal: true 
         }
       ];
@@ -540,8 +688,16 @@ export default function ProfitLossPage() {
 
                     {/* Revenue Section */}
                     <Box mb={8} borderRadius="lg" overflow="hidden">
-                      <Box bg="blue.50" p={4}>
+                      <Box bg="blue.50" p={4} display="flex" alignItems="center" justifyContent="space-between">
                         <Heading size="md" color="blue.700">INCOME</Heading>
+                        <IconButton
+                          aria-label="Add income statement"
+                          icon={<LuPlus />}
+                          size="sm"
+                          colorScheme="blue"
+                          variant="ghost"
+                          onClick={() => handleAddStatement('income')}
+                        />
                       </Box>
                       <Box p={4} bg="white">
                       <TableContainer>
@@ -551,6 +707,16 @@ export default function ProfitLossPage() {
                                 <Td pl={8}>Sales / Service Income</Td>
                               <Td isNumeric>AED {Number(data?.revenues?.totalSpending || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
                             </Tr>
+                            {/* Custom Income Statements */}
+                            {customStatements
+                              .filter(statement => statement.type === 'income')
+                              .map(statement => (
+                                <Tr key={statement.id}>
+                                  <Td pl={8}>{statement.name}</Td>
+                                  <Td isNumeric>AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                                </Tr>
+                              ))
+                            }
                             <Tr>
                                 <Td pl={8}>
                                   <HStack>
@@ -580,7 +746,11 @@ export default function ProfitLossPage() {
                                         return total + Number(transaction.amount);
                                       }
                                       return total;
-                                    }, 0) || 0)
+                                    }, 0) || 0) +
+                                    // Add custom income statements
+                                    customStatements
+                                      .filter(statement => statement.type === 'income')
+                                      .reduce((total, statement) => total + statement.amount, 0)
                                   ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                 </Td>
                             </Tr>
@@ -592,8 +762,16 @@ export default function ProfitLossPage() {
 
                             {/* Expenses Section */}
                     <Box mb={8} borderRadius="lg" overflow="hidden">
-                      <Box bg="red.50" p={4}>
+                      <Box bg="red.50" p={4} display="flex" alignItems="center" justifyContent="space-between">
                         <Heading size="md" color="red.700">EXPENSES</Heading>
+                        <IconButton
+                          aria-label="Add expense statement"
+                          icon={<LuPlus />}
+                          size="sm"
+                          colorScheme="red"
+                          variant="ghost"
+                          onClick={() => handleAddStatement('expense')}
+                        />
                       </Box>
                       <Box p={4} bg="white">
                         <TableContainer>
@@ -608,6 +786,17 @@ export default function ProfitLossPage() {
                                     AED {(Number(data.expenses.totalSpending) * 0.4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </Td>
                                 </Tr>
+
+                                  {/* Custom Expense Statements */}
+                                  {customStatements
+                                    .filter(statement => statement.type === 'expense')
+                                    .map(statement => (
+                                      <Tr key={statement.id}>
+                                        <Td pl={8}>{statement.name}</Td>
+                                        <Td isNumeric>AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                                      </Tr>
+                                    ))
+                                  }
 
                                   {/* Gross Profit Calculation */}
                                   <Tr borderTop="1px" borderColor="gray.100" bg="gray.50">
@@ -744,7 +933,11 @@ export default function ProfitLossPage() {
                                         (Number(data.expenses.totalSpending) * 0.1) +  // Admin
                                         (100000 / 5) + // Depreciation
                                         (50000 / 3) + // Amortization
-                                        ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12)) // Finance Costs
+                                        ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12)) + // Finance Costs
+                                        // Add custom expense statements
+                                        customStatements
+                                          .filter(statement => statement.type === 'expense')
+                                          .reduce((total, statement) => total + statement.amount, 0)
                                       ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </Td>
                                   </Tr>
@@ -777,9 +970,17 @@ export default function ProfitLossPage() {
                                   (Number(data.expenses.totalSpending) * 0.1) +  // Marketing
                                   (Number(data.expenses.totalSpending) * 0.1) +  // Admin
                                   (100000 / 5) + // Depreciation
-                                  (50000 / 3))) - // Amortization
+                                  (50000 / 3))) -
                                   // Minus Finance Costs
-                                  ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12))
+                                  ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12)) +
+                                  // Add custom income statements
+                                  customStatements
+                                    .filter(statement => statement.type === 'income')
+                                    .reduce((total, statement) => total + statement.amount, 0) -
+                                  // Subtract custom expense statements
+                                  customStatements
+                                    .filter(statement => statement.type === 'expense')
+                                    .reduce((total, statement) => total + statement.amount, 0)
                                 ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </Td>
                             </Tr>

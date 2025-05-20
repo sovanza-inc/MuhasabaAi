@@ -29,32 +29,16 @@ export interface ProfitLossData {
 }
 
 export interface FilteredProfitLossData {
-  revenues: {
-    projectCost: number;
-    totalSpending: number;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: number;
-    }>;
-  };
-  expenses: {
-    projectCost: number;
-    totalSpending: number;
-    transactions: Array<{
-      date: string;
-      accountName: string;
-      description: string;
-      amount: number;
-    }>;
-  };
-  netProfit: number;
   period: {
     startDate: Date;
     endDate: Date;
   };
+  revenues: {
+    totalSpending: number;
+    transactions: any[];
+  };
   calculations: {
+    otherIncome: number;
     cogs: number;
     grossProfit: number;
     operatingExpenses: {
@@ -68,6 +52,14 @@ export interface FilteredProfitLossData {
     };
     operatingProfit: number;
     financeCosts: number;
-    otherIncome: number;
   };
+  netProfit: number;
+}
+
+export interface CustomStatement {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  type: 'income' | 'expense';
 } 

@@ -1,13 +1,16 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack, IconButton } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import React, { useRef, useState } from 'react'
-import { LuDownload } from 'react-icons/lu'
+import { LuDownload, LuPlus } from 'react-icons/lu'
 import jsPDF from 'jspdf'
 import { EditablePdfPreview, FilteredBalanceSheetData } from './components/EditablePdfPreview'
+import { CustomBalanceSheetStatement } from './types'
+import { useModals } from '@saas-ui/react'
+import { z } from 'zod'
 
 interface BankAccount {
   id?: string;
@@ -76,6 +79,8 @@ export default function BalanceSheetPage() {
   const contentRef = useRef<HTMLDivElement>(null)
   const logoRef = useRef<HTMLImageElement>(null)
   const toast = useToast()
+  const [customStatements, setCustomStatements] = useState<CustomBalanceSheetStatement[]>([])
+  const modals = useModals()
 
   // Initialize auth token and customer ID
   React.useEffect(() => {
@@ -662,12 +667,24 @@ export default function BalanceSheetPage() {
       // Process assets data using filtered data
       const currentAssetsItems = [
         { description: 'Current Assets', amount: 0 },
-        { description: 'Cash', amount: filteredData.assets.currentAssets.cash, indent: true },
-        { description: 'Bank', amount: filteredData.assets.currentAssets.bank, indent: true },
-        { description: 'Savings', amount: filteredData.assets.currentAssets.savings, indent: true },
+        { description: 'Cash and Cash Equivalents', amount: filteredData.assets.currentAssets.cash, indent: true },
+        { description: 'Accounts Receivable', amount: filteredData.assets.currentAssets.bank, indent: true },
+        { description: 'Inventory', amount: filteredData.assets.currentAssets.savings, indent: true },
+        // Add custom current assets
+        ...customStatements
+          .filter(statement => statement.type === 'asset' && statement.category === 'current')
+          .map(statement => ({
+            description: statement.name,
+            amount: statement.amount,
+            indent: true,
+            date: statement.date
+          })),
         { 
           description: 'Total Current Assets', 
-          amount: filteredData.assets.currentAssets.totalCurrent,
+          amount: filteredData.assets.currentAssets.totalCurrent +
+                  customStatements
+                    .filter(statement => statement.type === 'asset' && statement.category === 'current')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true 
         }
       ];
@@ -676,9 +693,21 @@ export default function BalanceSheetPage() {
         { description: 'Non-Current Assets', amount: 0 },
         { description: 'Fixed Assets', amount: filteredData.assets.nonCurrentAssets.fixedAssets, indent: true },
         { description: 'Investments', amount: filteredData.assets.nonCurrentAssets.investments, indent: true },
+        // Add custom non-current assets
+        ...customStatements
+          .filter(statement => statement.type === 'asset' && statement.category === 'non-current')
+          .map(statement => ({
+            description: statement.name,
+            amount: statement.amount,
+            indent: true,
+            date: statement.date
+          })),
         { 
           description: 'Total Non-Current Assets', 
-          amount: filteredData.assets.nonCurrentAssets.totalNonCurrent,
+          amount: filteredData.assets.nonCurrentAssets.totalNonCurrent +
+                  customStatements
+                    .filter(statement => statement.type === 'asset' && statement.category === 'non-current')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true 
         }
       ];
@@ -701,9 +730,21 @@ export default function BalanceSheetPage() {
         { description: 'Current Liabilities', amount: 0 },
         { description: 'Accounts Payable', amount: filteredData.liabilities.currentLiabilities.accountsPayable, indent: true },
         { description: 'Short-term Loans', amount: filteredData.liabilities.currentLiabilities.shortTermLoans, indent: true },
+        // Add custom current liabilities
+        ...customStatements
+          .filter(statement => statement.type === 'liability' && statement.category === 'current')
+          .map(statement => ({
+            description: statement.name,
+            amount: statement.amount,
+            indent: true,
+            date: statement.date
+          })),
         { 
           description: 'Total Current Liabilities', 
-          amount: filteredData.liabilities.currentLiabilities.totalCurrent,
+          amount: filteredData.liabilities.currentLiabilities.totalCurrent +
+                  customStatements
+                    .filter(statement => statement.type === 'liability' && statement.category === 'current')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true 
         }
       ];
@@ -711,9 +752,21 @@ export default function BalanceSheetPage() {
       const nonCurrentLiabilitiesItems = [
         { description: 'Non-Current Liabilities', amount: 0 },
         { description: 'Long-term Loans', amount: filteredData.liabilities.nonCurrentLiabilities.longTermLoans, indent: true },
+        // Add custom non-current liabilities
+        ...customStatements
+          .filter(statement => statement.type === 'liability' && statement.category === 'non-current')
+          .map(statement => ({
+            description: statement.name,
+            amount: statement.amount,
+            indent: true,
+            date: statement.date
+          })),
         { 
           description: 'Total Non-Current Liabilities', 
-          amount: filteredData.liabilities.nonCurrentLiabilities.totalNonCurrent,
+          amount: filteredData.liabilities.nonCurrentLiabilities.totalNonCurrent +
+                  customStatements
+                    .filter(statement => statement.type === 'liability' && statement.category === 'non-current')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isSubTotal: true 
         }
       ];
@@ -734,9 +787,21 @@ export default function BalanceSheetPage() {
       const equityItems = [
         { description: "Owner's Equity", amount: filteredData.equity.ownerEquity, indent: true },
         { description: 'Retained Earnings', amount: filteredData.equity.retainedEarnings, indent: true },
+        // Add custom equity items
+        ...customStatements
+          .filter(statement => statement.type === 'equity')
+          .map(statement => ({
+            description: statement.name,
+            amount: statement.amount,
+            indent: true,
+            date: statement.date
+          })),
         { 
           description: 'TOTAL EQUITY', 
-          amount: filteredData.equity.totalEquity,
+          amount: filteredData.equity.totalEquity +
+                  customStatements
+                    .filter(statement => statement.type === 'equity')
+                    .reduce((total, statement) => total + statement.amount, 0),
           isTotal: true 
         }
       ];
@@ -817,10 +882,13 @@ export default function BalanceSheetPage() {
   };
 
   const calculateCurrentAssets = () => {
-    return calculateCashAndEquivalents() + 
-           calculateAccountsReceivable() + 
-           calculateInventory() + 
-           calculateVATReceivable();
+    const baseCurrentAssets = calculateCashAndEquivalents() + 
+                            calculateAccountsReceivable() + 
+                            calculateInventory() + 
+                            calculateVATReceivable();
+    
+    // Remove custom statements from here since they are added in the UI
+    return baseCurrentAssets;
   };
 
   const calculatePPE = () => {
@@ -842,7 +910,10 @@ export default function BalanceSheetPage() {
   };
 
   const calculateNonCurrentAssets = () => {
-    return calculatePPE() + calculateRightOfUseAssets() + calculateIntangibleAssets();
+    const baseNonCurrentAssets = calculatePPE() + calculateRightOfUseAssets() + calculateIntangibleAssets();
+    
+    // Remove custom statements from here since they are added in the UI
+    return baseNonCurrentAssets;
   };
 
   const calculateOwnersCapital = () => {
@@ -860,7 +931,10 @@ export default function BalanceSheetPage() {
   };
 
   const calculateTotalEquity = () => {
-    return calculateOwnersCapital() + calculateRetainedEarnings();
+    const baseEquity = calculateOwnersCapital() + calculateRetainedEarnings();
+    
+    // Remove custom statements from here since they are added in the UI
+    return baseEquity;
   };
 
   const calculateLongTermLoans = () => {
@@ -876,7 +950,10 @@ export default function BalanceSheetPage() {
   };
 
   const calculateNonCurrentLiabilities = () => {
-    return calculateLongTermLoans() + calculateNonCurrentLeaseLiabilities();
+    const baseNonCurrentLiabilities = calculateLongTermLoans() + calculateNonCurrentLeaseLiabilities();
+    
+    // Remove custom statements from here since they are added in the UI
+    return baseNonCurrentLiabilities;
   };
 
   const calculateAccountsPayable = () => {
@@ -913,10 +990,192 @@ export default function BalanceSheetPage() {
   };
 
   const calculateCurrentLiabilities = () => {
-    return calculateAccountsPayable() + 
-           calculateShortTermLoans() + 
-           calculateCurrentLeaseLiabilities() + 
-           calculateVATPayable();
+    const baseCurrentLiabilities = calculateAccountsPayable() + 
+                                 calculateShortTermLoans() + 
+                                 calculateCurrentLeaseLiabilities() + 
+                                 calculateVATPayable();
+    
+    // Remove custom statements from here since they are added in the UI
+    return baseCurrentLiabilities;
+  };
+
+  // Load custom statements from local storage on mount
+  React.useEffect(() => {
+    if (workspace?.id) {
+      const storageKey = `balanceSheetStatements_${workspace.id}`;
+      const savedStatements = localStorage.getItem(storageKey);
+      if (savedStatements) {
+        try {
+          const parsedStatements = JSON.parse(savedStatements);
+          setCustomStatements(parsedStatements);
+        } catch (error) {
+          console.error('Error parsing saved statements:', error);
+          localStorage.removeItem(storageKey);
+        }
+      }
+    }
+  }, [workspace?.id]);
+
+  // Save custom statements to local storage whenever they change
+  React.useEffect(() => {
+    if (workspace?.id) {
+      const storageKey = `balanceSheetStatements_${workspace.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(customStatements));
+    }
+  }, [customStatements, workspace?.id]);
+
+  // Clear storage on auth token change (indicates login/logout)
+  React.useEffect(() => {
+    if (!authToken && workspace?.id) {
+      const storageKey = `balanceSheetStatements_${workspace.id}`;
+      localStorage.removeItem(storageKey);
+    }
+  }, [authToken, workspace?.id]);
+
+  const handleAddStatement = async (type: 'asset' | 'liability' | 'equity') => {
+    const schema = z.object({
+      name: z.string().min(1, 'Name is required'),
+      amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
+      date: z.string().optional(),
+      category: z.enum(['current', 'non-current']).default('current')
+    });
+
+    type FormData = z.infer<typeof schema>;
+
+    const onSubmit = (data: FormData) => {
+      const newStatement: CustomBalanceSheetStatement = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: data.name,
+        amount: data.amount,
+        date: data.date || new Date().toISOString().split('T')[0],
+        type: type === 'liability' ? 
+          (data.category === 'current' ? 'liability' : 'liability') : 
+          (type === 'asset' ? 'asset' : 'equity'),
+        category: type === 'equity' ? 'current' : data.category
+      };
+
+      setCustomStatements(prev => [...prev, newStatement]);
+
+      toast({
+        title: "Statement added",
+        description: `New ${type} statement has been added successfully`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      modals.closeAll();
+      return true;
+    };
+
+    const categoryField = type === 'equity' ? {} : {
+      category: {
+        label: 'Category',
+        type: 'select',
+        options: type === 'liability' ? [
+          { label: 'Current Liabilities', value: 'current' },
+          { label: 'Non-Current Liabilities', value: 'non-current' }
+        ] : [
+          { label: 'Current Assets', value: 'current' },
+          { label: 'Non-Current Assets', value: 'non-current' }
+        ]
+      }
+    };
+
+    modals.form({
+      title: `Add New ${type === 'liability' ? 'Liability' : type.charAt(0).toUpperCase() + type.slice(1)} Statement`,
+      schema,
+      defaultValues: {
+        date: new Date().toISOString().split('T')[0],
+        category: 'current'
+      },
+      onSubmit,
+      fields: {
+        name: {
+          label: 'Statement Name',
+          placeholder: type === 'liability' ? 'Enter liability name' : type === 'asset' ? 'Enter asset name' : 'Enter equity name'
+        },
+        amount: {
+          label: 'Amount (AED)',
+          type: 'number',
+          placeholder: '0.00'
+        },
+        date: {
+          label: 'Date',
+          type: 'date'
+        },
+        ...categoryField
+      }
+    });
+  };
+
+  const handleAddEquityOrLiability = () => {
+    const schema = z.object({
+      name: z.string().min(1, 'Name is required'),
+      amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
+      date: z.string().optional(),
+      section: z.enum(['equity', 'current_liability', 'non_current_liability'])
+    });
+
+    type FormData = z.infer<typeof schema>;
+
+    const onSubmit = (data: FormData) => {
+      const newStatement: CustomBalanceSheetStatement = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: data.name,
+        amount: data.amount,
+        date: data.date || new Date().toISOString().split('T')[0],
+        type: data.section === 'equity' ? 'equity' : 'liability',
+        category: data.section === 'current_liability' ? 'current' : 'non-current'
+      };
+
+      setCustomStatements(prev => [...prev, newStatement]);
+
+      toast({
+        title: "Statement added",
+        description: `New ${data.section.replace('_', ' ')} statement has been added successfully`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      modals.closeAll();
+      return true;
+    };
+
+    modals.form({
+      title: 'Add New Statement',
+      schema,
+      defaultValues: {
+        date: new Date().toISOString().split('T')[0],
+        section: 'equity'
+      },
+      onSubmit,
+      fields: {
+        section: {
+          label: 'Section',
+          type: 'select',
+          options: [
+            { label: 'Equity', value: 'equity' },
+            { label: 'Current Liabilities', value: 'current_liability' },
+            { label: 'Non-Current Liabilities', value: 'non_current_liability' }
+          ]
+        },
+        name: {
+          label: 'Statement Name',
+          placeholder: 'Enter statement name'
+        },
+        amount: {
+          label: 'Amount (AED)',
+          type: 'number',
+          placeholder: '0.00'
+        },
+        date: {
+          label: 'Date',
+          type: 'date'
+        }
+      }
+    });
   };
 
   if (error) {
@@ -1075,8 +1334,18 @@ export default function BalanceSheetPage() {
                         {/* ASSETS Section */}
                         <Box mb={8} borderRadius="lg" overflow="hidden">
                           <Box bg="green.50" p={4}>
-                            <Heading size="md" color="green.700">ASSETS</Heading>
-                            </Box>
+                            <HStack justify="space-between" align="center">
+                              <Heading size="md" color="green.700">ASSETS</Heading>
+                              <IconButton
+                                icon={<LuPlus />}
+                                size="sm"
+                                colorScheme="green"
+                                variant="ghost"
+                                aria-label="Add Asset"
+                                onClick={() => handleAddStatement('asset')}
+                              />
+                            </HStack>
+                          </Box>
                           
                           {/* Non-Current Assets */}
                           <Box p={4} bg="white" borderBottom="1px" borderColor="gray.100">
@@ -1095,9 +1364,24 @@ export default function BalanceSheetPage() {
                                   <Text color="gray.600">Intangible Assets</Text>
                                   <Text fontWeight="medium">AED {calculateIntangibleAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
+                                {/* Custom Non-Current Asset Statements */}
+                                {customStatements
+                                  .filter(statement => statement.type === 'asset' && statement.category === 'non-current')
+                                  .map(statement => (
+                                    <HStack key={statement.id} justify="space-between">
+                                      <Text color="gray.600">{statement.name}</Text>
+                                      <Text fontWeight="medium">AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                    </HStack>
+                                  ))}
                                 <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
                                   <Text fontWeight="semibold">Total Non-Current Assets</Text>
-                                  <Text fontWeight="semibold" color="green.600">AED {calculateNonCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                  <Text fontWeight="semibold" color="green.600">
+                                    AED {(calculateNonCurrentAssets() + 
+                                      customStatements
+                                        .filter(statement => statement.type === 'asset' && statement.category === 'non-current')
+                                        .reduce((total, statement) => total + statement.amount, 0)
+                                    ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Text>
                                 </HStack>
                               </VStack>
                             </Box>
@@ -1124,9 +1408,24 @@ export default function BalanceSheetPage() {
                                   <Text color="gray.600">VAT Receivable</Text>
                                   <Text fontWeight="medium">AED {calculateVATReceivable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
+                                {/* Custom Current Asset Statements */}
+                                {customStatements
+                                  .filter(statement => statement.type === 'asset' && statement.category === 'current')
+                                  .map(statement => (
+                                    <HStack key={statement.id} justify="space-between">
+                                      <Text color="gray.600">{statement.name}</Text>
+                                      <Text fontWeight="medium">AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                    </HStack>
+                                  ))}
                                 <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
                                   <Text fontWeight="semibold">Total Current Assets</Text>
-                                  <Text fontWeight="semibold" color="green.600">AED {calculateCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                  <Text fontWeight="semibold" color="green.600">
+                                    AED {(calculateCurrentAssets() + 
+                                      customStatements
+                                        .filter(statement => statement.type === 'asset' && statement.category === 'current')
+                                        .reduce((total, statement) => total + statement.amount, 0)
+                                    ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Text>
                                 </HStack>
                               </VStack>
                             </Box>
@@ -1136,7 +1435,13 @@ export default function BalanceSheetPage() {
                           <Box p={4} bg="green.50">
                             <HStack justify="space-between">
                               <Text fontWeight="bold" fontSize="lg" color="green.700">TOTAL ASSETS</Text>
-                              <Text fontWeight="bold" fontSize="lg" color="green.700">AED {(calculateCurrentAssets() + calculateNonCurrentAssets()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                              <Text fontWeight="bold" fontSize="lg" color="green.700">
+                                AED {(calculateCurrentAssets() + calculateNonCurrentAssets() + 
+                                  customStatements
+                                    .filter(statement => statement.type === 'asset')
+                                    .reduce((total, statement) => total + statement.amount, 0)
+                                ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Text>
                             </HStack>
                           </Box>
                         </Box>
@@ -1144,7 +1449,17 @@ export default function BalanceSheetPage() {
                         {/* EQUITY AND LIABILITIES Section */}
                         <Box mb={8} borderRadius="lg" overflow="hidden">
                           <Box bg="blue.50" p={4}>
-                            <Heading size="md" color="blue.700">EQUITY AND LIABILITIES</Heading>
+                            <HStack justify="space-between" align="center">
+                              <Heading size="md" color="blue.700">EQUITY AND LIABILITIES</Heading>
+                              <IconButton
+                                icon={<LuPlus />}
+                                size="sm"
+                                colorScheme="blue"
+                                variant="ghost"
+                                aria-label="Add Statement"
+                                onClick={() => handleAddEquityOrLiability()}
+                              />
+                            </HStack>
                           </Box>
 
                           {/* Equity */}
@@ -1160,9 +1475,24 @@ export default function BalanceSheetPage() {
                                   <Text color="gray.600">Retained Earnings</Text>
                                   <Text fontWeight="medium">AED {calculateRetainedEarnings().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
+                                {/* Custom Equity Statements */}
+                                {customStatements
+                                  .filter(statement => statement.type === 'equity')
+                                  .map(statement => (
+                                    <HStack key={statement.id} justify="space-between">
+                                      <Text color="gray.600">{statement.name}</Text>
+                                      <Text fontWeight="medium">AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                    </HStack>
+                                  ))}
                                 <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
                                   <Text fontWeight="semibold">Total Equity</Text>
-                                  <Text fontWeight="semibold" color="blue.600">AED {calculateTotalEquity().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                  <Text fontWeight="semibold" color="blue.600">
+                                    AED {(calculateTotalEquity() + 
+                                      customStatements
+                                        .filter(statement => statement.type === 'equity')
+                                        .reduce((total, statement) => total + statement.amount, 0)
+                                    ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Text>
                                 </HStack>
                               </VStack>
                             </Box>
@@ -1181,9 +1511,24 @@ export default function BalanceSheetPage() {
                                   <Text color="gray.600">Lease Liabilities (Non-Current)</Text>
                                   <Text fontWeight="medium">AED {calculateNonCurrentLeaseLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
+                                {/* Custom Non-Current Liability Statements */}
+                                {customStatements
+                                  .filter(statement => statement.type === 'liability' && statement.category === 'non-current')
+                                  .map(statement => (
+                                    <HStack key={statement.id} justify="space-between">
+                                      <Text color="gray.600">{statement.name}</Text>
+                                      <Text fontWeight="medium">AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                    </HStack>
+                                  ))}
                                 <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
                                   <Text fontWeight="semibold">Total Non-Current Liabilities</Text>
-                                  <Text fontWeight="semibold" color="blue.600">AED {calculateNonCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                  <Text fontWeight="semibold" color="blue.600">
+                                    AED {(calculateNonCurrentLiabilities() + 
+                                      customStatements
+                                        .filter(statement => statement.type === 'liability' && statement.category === 'non-current')
+                                        .reduce((total, statement) => total + statement.amount, 0)
+                                    ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Text>
                                 </HStack>
                               </VStack>
                             </Box>
@@ -1210,9 +1555,24 @@ export default function BalanceSheetPage() {
                                   <Text color="gray.600">VAT Payable</Text>
                                   <Text fontWeight="medium">AED {calculateVATPayable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
+                                {/* Custom Current Liability Statements */}
+                                {customStatements
+                                  .filter(statement => statement.type === 'liability' && statement.category === 'current')
+                                  .map(statement => (
+                                    <HStack key={statement.id} justify="space-between">
+                                      <Text color="gray.600">{statement.name}</Text>
+                                      <Text fontWeight="medium">AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                    </HStack>
+                                  ))}
                                 <HStack justify="space-between" pt={2} borderTop="1px" borderColor="gray.100">
                                   <Text fontWeight="semibold">Total Current Liabilities</Text>
-                                  <Text fontWeight="semibold" color="blue.600">AED {calculateCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                  <Text fontWeight="semibold" color="blue.600">
+                                    AED {(calculateCurrentLiabilities() + 
+                                      customStatements
+                                        .filter(statement => statement.type === 'liability' && statement.category === 'current')
+                                        .reduce((total, statement) => total + statement.amount, 0)
+                                    ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Text>
                                 </HStack>
                               </VStack>
                             </Box>
@@ -1222,7 +1582,16 @@ export default function BalanceSheetPage() {
                           <Box p={4} bg="blue.50">
                             <HStack justify="space-between">
                               <Text fontWeight="bold" fontSize="lg" color="blue.700">TOTAL EQUITY AND LIABILITIES</Text>
-                              <Text fontWeight="bold" fontSize="lg" color="blue.700">AED {(calculateTotalEquity() + calculateCurrentLiabilities() + calculateNonCurrentLiabilities()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                              <Text fontWeight="bold" fontSize="lg" color="blue.700">
+                                AED {(
+                                  calculateTotalEquity() + 
+                                  calculateCurrentLiabilities() + 
+                                  calculateNonCurrentLiabilities() +
+                                  customStatements
+                                    .filter(statement => statement.type === 'equity' || statement.type === 'liability')
+                                    .reduce((total, statement) => total + statement.amount, 0)
+                                ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                              </Text>
                             </HStack>
                           </Box>
                         </Box>
