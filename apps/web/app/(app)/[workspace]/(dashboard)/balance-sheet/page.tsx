@@ -1468,7 +1468,7 @@ export default function BalanceSheetPage() {
                             <Box pl={4}>
                               <VStack spacing={3} align="stretch">
                                 <HStack justify="space-between">
-                                  <Text color="gray.600">Owner's Capital</Text>
+                                  <Text color="gray.600">Owner&apos;s Capital</Text>
                                   <Text fontWeight="medium">AED {calculateOwnersCapital().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
                                 <HStack justify="space-between">

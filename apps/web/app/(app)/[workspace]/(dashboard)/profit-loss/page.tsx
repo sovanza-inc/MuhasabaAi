@@ -21,8 +21,7 @@ import {
   Button,
   useToast,
   Image,
-  IconButton,
-  useDisclosure
+  IconButton
 } from '@chakra-ui/react'
 import React, { useState } from 'react'
 import { PageHeader } from '#features/common/components/page-header'
@@ -971,7 +970,7 @@ export default function ProfitLossPage() {
                                   (Number(data.expenses.totalSpending) * 0.1) +  // Marketing
                                   (Number(data.expenses.totalSpending) * 0.1) +  // Admin
                                   (100000 / 5) + // Depreciation
-                                  (50000 / 3))) - // Amortization
+                                  (50000 / 3))) -
                                   // Minus Finance Costs
                                   ((1000000 * 0.05 / 12) + (500000 * 0.06 / 12)) +
                                   // Add custom income statements
