@@ -50,7 +50,7 @@ interface CashFlowData {
   openingCashBalance: number;
 }
 
-export const processTransactions = (transactions: BankTransaction[]): CashFlowData => {
+export const processTransactions = (transactions: BankTransaction[]) => {
   // Debug log incoming transactions
   console.log('Processing transactions:', {
     totalTransactions: transactions.length,

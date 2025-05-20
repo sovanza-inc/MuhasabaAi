@@ -10,17 +10,21 @@ import {
   Spinner,
   useToast,
   Image,
-  VStack
+  VStack,
+  IconButton
 } from '@chakra-ui/react'
 import { Card, CardBody } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { AreaChart } from '@saas-ui/charts'
 import React, { useState } from 'react'
-import { LuDownload } from 'react-icons/lu'
+import { LuDownload, LuPlus } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { EditablePdfPreview, FilteredCashFlowData } from './components/EditablePdfPreview'
 import { processTransactions } from './utils/processTransactions'
+import { CustomStatement } from './types'
 import jsPDF from 'jspdf'
+import { useModals } from '@saas-ui/react'
+import { z } from 'zod'
 
 interface BankTransaction {
   transaction_id: string;
@@ -60,6 +64,8 @@ export default function CashflowStatementPage() {
   const contentRef = React.useRef<HTMLDivElement>(null)
   const logoRef = React.useRef<HTMLImageElement>(null)
   const [isPdfPreviewOpen, setIsPdfPreviewOpen] = useState(false)
+  const [customStatements, setCustomStatements] = useState<CustomStatement[]>([])
+  const modals = useModals()
 
   // Initialize auth token and customer ID
   React.useEffect(() => {
@@ -516,34 +522,182 @@ export default function CashflowStatementPage() {
     }
   };
 
-  // Inside the component, update the memoized value for processed transactions
+  // Process transactions for the selected bank and month
   const processedData = React.useMemo(() => {
-    const data = processTransactions(filteredTransactions);
-    // Ensure the data matches FilteredCashFlowData type
-    const filteredData: FilteredCashFlowData = {
-      ...data,
-      period: data.period || {
-        startDate: new Date(),
-        endDate: new Date()
-      },
-      openingCashBalance: data.openingCashBalance || 0,
-      indirectMethod: data.indirectMethod || {
-        netProfit: 0,
-        adjustments: {
-          depreciation: 0,
-          amortization: 0,
-          interestExpense: 0
-        },
-        workingCapital: {
-          accountsReceivable: 0,
-          inventory: 0,
-          accountsPayable: 0,
-          vatPayable: 0
+    const filteredTransactions = transactions.filter(t => {
+      if (selectedBankId !== 'all' && t.bank_id !== selectedBankId) {
+        return false;
+      }
+
+      if (selectedMonth !== 'all') {
+        const transactionMonth = new Date(t.booking_date_time).getMonth().toString();
+        if (transactionMonth !== selectedMonth) {
+          return false;
         }
       }
+
+      return true;
+    });
+
+    // Get base data from transactions
+    const data = processTransactions(filteredTransactions);
+
+    // Create a new copy of the data to avoid mutating the original
+    const processedData = {
+      ...data,
+      investingActivities: data.investingActivities.filter(item => !item.isSubTotal),
+      financingActivities: data.financingActivities.filter(item => !item.isSubTotal)
     };
-    return filteredData;
-  }, [filteredTransactions]);
+
+    return processedData;
+  }, [transactions, selectedBankId, selectedMonth]);
+
+  // Calculate section totals including custom statements
+  const sectionTotals = React.useMemo(() => {
+    const investingTotal = 
+      processedData.investingActivities.reduce((sum, item) => sum + (item.amount2024 ?? 0), 0) +
+      customStatements
+        .filter(stmt => stmt.type === 'investing')
+        .reduce((sum, stmt) => sum + stmt.amount, 0);
+
+    const financingTotal = 
+      processedData.financingActivities.reduce((sum, item) => sum + (item.amount2024 ?? 0), 0) +
+      customStatements
+        .filter(stmt => stmt.type === 'financing')
+        .reduce((sum, stmt) => sum + stmt.amount, 0);
+
+    return {
+      investing: investingTotal,
+      financing: financingTotal
+    };
+  }, [processedData, customStatements]);
+
+  // Load custom statements from local storage on mount
+  React.useEffect(() => {
+    if (workspace?.id) {
+      const storageKey = `cashflowStatements_${workspace.id}`;
+      const savedStatements = localStorage.getItem(storageKey);
+      if (savedStatements) {
+        try {
+          const parsedStatements = JSON.parse(savedStatements);
+          setCustomStatements(parsedStatements);
+        } catch (error) {
+          console.error('Error parsing saved statements:', error);
+          localStorage.removeItem(storageKey);
+        }
+      }
+    }
+  }, [workspace?.id]);
+
+  // Save custom statements to local storage whenever they change
+  React.useEffect(() => {
+    if (workspace?.id) {
+      const storageKey = `cashflowStatements_${workspace.id}`;
+      localStorage.setItem(storageKey, JSON.stringify(customStatements));
+    }
+  }, [customStatements, workspace?.id]);
+
+  // Clear storage on auth token change (indicates login/logout)
+  React.useEffect(() => {
+    if (!authToken && workspace?.id) {
+      const storageKey = `cashflowStatements_${workspace.id}`;
+      localStorage.removeItem(storageKey);
+    }
+  }, [authToken, workspace?.id]);
+
+  const handleAddStatement = async (type: 'operating' | 'investing' | 'financing') => {
+    interface BaseFormData {
+      name: string;
+      amount: number;
+      date?: string;
+    }
+
+    interface OperatingFormData extends BaseFormData {
+      category: 'adjustment' | 'working_capital';
+    }
+
+    // Define schema based on activity type
+    const baseSchema = {
+      name: z.string().min(1, 'Name is required'),
+      amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
+      date: z.string().optional(),
+    };
+
+    const formSchema = type === 'operating' 
+      ? z.object({
+          ...baseSchema,
+          category: z.enum(['adjustment', 'working_capital']).default('adjustment')
+        })
+      : z.object(baseSchema);
+
+    const onSubmit = (formData: z.infer<typeof formSchema>) => {
+      const newStatement: CustomStatement = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: formData.name,
+        amount: formData.amount,
+        date: formData.date || new Date().toISOString().split('T')[0],
+        type,
+        category: type === 'operating'
+          ? (formData as OperatingFormData).category
+          : 'inflow'
+      };
+
+      setCustomStatements(prev => [...prev, newStatement]);
+
+      toast({
+        title: "Statement added",
+        description: `New ${type} activity statement has been added successfully`,
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+
+      modals.closeAll();
+      return true;
+    };
+
+    // Define form fields based on activity type
+    const baseFields = {
+      name: {
+        label: 'Statement Name',
+        placeholder: 'Enter statement name'
+      },
+      amount: {
+        label: 'Amount (AED)',
+        type: 'number',
+        placeholder: '0.00'
+      },
+      date: {
+        label: 'Date',
+        type: 'date'
+      }
+    };
+
+    const fields = type === 'operating' 
+      ? {
+          ...baseFields,
+          category: {
+            label: 'Category',
+            type: 'select',
+            options: [
+              { label: 'Adjustment', value: 'adjustment' },
+              { label: 'Working Capital', value: 'working_capital' }
+            ]
+          }
+        }
+      : baseFields;
+
+    modals.form({
+      title: `Add New ${type.charAt(0).toUpperCase() + type.slice(1)} Activity`,
+      schema: formSchema,
+      defaultValues: {
+        date: new Date().toISOString().split('T')[0],
+        ...(type === 'operating' ? { category: 'adjustment' as const } : {})
+      },
+      onSubmit,
+      fields
+    });
+  };
 
   return (
     <Box>
@@ -704,8 +858,16 @@ export default function CashflowStatementPage() {
 
                     {/* Operating Activities Section */}
                     <Box mb={8} borderRadius="lg" overflow="hidden">
-                      <Box bg="blue.50" p={4}>
-                        <Heading size="md" color="blue.700">CASH FLOWS FROM OPERATING ACTIVITIES</Heading>
+                      <Box bg="blue.50" p={4} display="flex" alignItems="center" justifyContent="space-between">
+                        <Heading size="md" color="blue.700">Operating Activities</Heading>
+                        <IconButton
+                          aria-label="Add operating activity"
+                          icon={<LuPlus />}
+                          size="sm"
+                          colorScheme="blue"
+                          variant="ghost"
+                          onClick={() => handleAddStatement('operating')}
+                        />
                       </Box>
                       <Box p={4} bg="white">
                         <VStack spacing={3} align="stretch">
@@ -731,6 +893,15 @@ export default function CashflowStatementPage() {
                                 <Text color="gray.600">Interest Expense</Text>
                                 <Text fontWeight="medium">{(processedData.indirectMethod?.adjustments?.interestExpense ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
                               </HStack>
+                              {/* Custom Operating Adjustments */}
+                              {customStatements
+                                .filter(stmt => stmt.type === 'operating' && stmt.category === 'adjustment')
+                                .map(stmt => (
+                                  <HStack key={stmt.id} justify="space-between">
+                                    <Text color="gray.600">{stmt.name}</Text>
+                                    <Text fontWeight="medium">{stmt.amount.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+                                  </HStack>
+                                ))}
                             </VStack>
                           </Box>
 
@@ -745,6 +916,15 @@ export default function CashflowStatementPage() {
                                 </HStack>
                                 <Text fontWeight="medium">{(processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
                               </HStack>
+                              {/* Custom Working Capital Adjustments */}
+                              {customStatements
+                                .filter(stmt => stmt.type === 'operating' && stmt.category === 'working_capital')
+                                .map(stmt => (
+                                  <HStack key={stmt.id} justify="space-between">
+                                    <Text color="gray.600">{stmt.name}</Text>
+                                    <Text fontWeight="medium">{stmt.amount.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+                                  </HStack>
+                                ))}
                               <HStack justify="space-between">
                                 <HStack>
                                   <Text color="gray.600">Inventory</Text>
@@ -781,7 +961,14 @@ export default function CashflowStatementPage() {
                                 (processedData.indirectMethod?.workingCapital?.accountsReceivable ?? 0) +
                                 (processedData.indirectMethod?.workingCapital?.inventory ?? 0) +
                                 (processedData.indirectMethod?.workingCapital?.accountsPayable ?? 0) +
-                                (processedData.indirectMethod?.workingCapital?.vatPayable ?? 0)
+                                (processedData.indirectMethod?.workingCapital?.vatPayable ?? 0) +
+                                // Add custom operating statements separately
+                                customStatements
+                                  .filter(stmt => stmt.type === 'operating' && stmt.category === 'adjustment')
+                                  .reduce((sum, stmt) => sum + stmt.amount, 0) +
+                                customStatements
+                                  .filter(stmt => stmt.type === 'operating' && stmt.category === 'working_capital')
+                                  .reduce((sum, stmt) => sum + stmt.amount, 0)
                               ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                             </Text>
                           </HStack>
@@ -791,35 +978,44 @@ export default function CashflowStatementPage() {
 
                     {/* Investing Activities Section */}
                     <Box mb={8} borderRadius="lg" overflow="hidden">
-                      <Box bg="green.50" p={4}>
-                        <Heading size="md" color="green.700">CASH FLOWS FROM INVESTING ACTIVITIES</Heading>
+                      <Box bg="purple.50" p={4} display="flex" alignItems="center" justifyContent="space-between">
+                        <Heading size="md" color="purple.700">Investing Activities</Heading>
+                        <IconButton
+                          aria-label="Add investing activity"
+                          icon={<LuPlus />}
+                          size="sm"
+                          colorScheme="purple"
+                          variant="ghost"
+                          onClick={() => handleAddStatement('investing')}
+                        />
                       </Box>
                       <Box p={4} bg="white">
                         <VStack spacing={3} align="stretch">
-                          <HStack justify="space-between">
-                            <Text color="gray.600">Purchase of Fixed Assets</Text>
-                            <Text fontWeight="medium" color="red.600">
-                              {Math.abs(processedData.investingActivities.find(x => x.description === 'Purchase of Fixed Assets')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                            </Text>
-                          </HStack>
-                          <HStack justify="space-between">
-                            <Text color="gray.600">Purchase of Intangible Assets</Text>
-                            <Text fontWeight="medium" color="red.600">
-                              {Math.abs(processedData.investingActivities.find(x => x.description === 'Purchase of Intangible Assets')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                            </Text>
-                          </HStack>
-                          <HStack justify="space-between">
-                            <Text color="gray.600">Sale of Assets</Text>
-                            <Text fontWeight="medium" color="green.600">
-                              {Math.abs(processedData.investingActivities.find(x => x.description === 'Sale of Assets')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                            </Text>
-                          </HStack>
+                          {/* Regular Investing Activities */}
+                          {processedData.investingActivities.map((item, index) => (
+                            <HStack key={index} justify="space-between">
+                              <Text color="gray.600">{item.description}</Text>
+                              <Text fontWeight="medium" color={item.amount2024 >= 0 ? "green.600" : "red.600"}>
+                                {Math.abs(item.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                              </Text>
+                            </HStack>
+                          ))}
+
+                          {/* Custom Investing Activities */}
+                          {customStatements
+                            .filter(stmt => stmt.type === 'investing')
+                            .map(stmt => (
+                              <HStack key={stmt.id} justify="space-between">
+                                <Text color="gray.600">{stmt.name}</Text>
+                                <Text fontWeight="medium">{stmt.amount.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+                              </HStack>
+                            ))}
                           
                           {/* Investing Cash Flow Total */}
                           <HStack justify="space-between" pt={4} borderTop="1px" borderColor="gray.200">
-                            <Text fontWeight="bold" color="green.700">Investing Cash Flow</Text>
-                            <Text fontWeight="bold" color="green.700">
-                              {(processedData.investingActivities.reduce((sum, item) => sum + (item.amount2024 ?? 0), 0)).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            <Text fontWeight="bold" color="purple.700">Investing Cash Flow</Text>
+                            <Text fontWeight="bold" color="purple.700">
+                              {sectionTotals.investing.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                             </Text>
                           </HStack>
                         </VStack>
@@ -828,41 +1024,44 @@ export default function CashflowStatementPage() {
 
                     {/* Financing Activities Section */}
                     <Box mb={8} borderRadius="lg" overflow="hidden">
-                      <Box bg="purple.50" p={4}>
-                        <Heading size="md" color="purple.700">CASH FLOWS FROM FINANCING ACTIVITIES</Heading>
+                      <Box bg="orange.50" p={4} display="flex" alignItems="center" justifyContent="space-between">
+                        <Heading size="md" color="orange.700">Financing Activities</Heading>
+                        <IconButton
+                          aria-label="Add financing activity"
+                          icon={<LuPlus />}
+                          size="sm"
+                          colorScheme="orange"
+                          variant="ghost"
+                          onClick={() => handleAddStatement('financing')}
+                        />
                       </Box>
                       <Box p={4} bg="white">
                         <VStack spacing={3} align="stretch">
-                          <HStack justify="space-between">
-                            <Text color="gray.600">Loan Proceeds</Text>
-                            <Text fontWeight="medium" color="green.600">
-                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Loan Proceeds')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                            </Text>
-                          </HStack>
-                          <HStack justify="space-between">
-                            <Text color="gray.600">Loan Principal Repayments</Text>
-                            <Text fontWeight="medium" color="red.600">
-                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Loan Principal Repayments')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                            </Text>
-                          </HStack>
-                          <HStack justify="space-between">
-                            <Text color="gray.600">Lease Principal Payments</Text>
-                            <Text fontWeight="medium" color="red.600">
-                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Lease Principal Payments')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                            </Text>
-                          </HStack>
-                          <HStack justify="space-between">
-                            <Text color="gray.600">Owner&apos;s Capital Contributions</Text>
-                            <Text fontWeight="medium" color="green.600">
-                              {Math.abs(processedData.financingActivities.find(x => x.description === 'Owner\'s Capital Contributions')?.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                            </Text>
-                          </HStack>
+                          {/* Regular Financing Activities */}
+                          {processedData.financingActivities.map((item, index) => (
+                            <HStack key={index} justify="space-between">
+                              <Text color="gray.600">{item.description}</Text>
+                              <Text fontWeight="medium" color={item.amount2024 >= 0 ? "green.600" : "red.600"}>
+                                {Math.abs(item.amount2024 ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                              </Text>
+                            </HStack>
+                          ))}
+
+                          {/* Custom Financing Activities */}
+                          {customStatements
+                            .filter(stmt => stmt.type === 'financing')
+                            .map(stmt => (
+                              <HStack key={stmt.id} justify="space-between">
+                                <Text color="gray.600">{stmt.name}</Text>
+                                <Text fontWeight="medium">{stmt.amount.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+                              </HStack>
+                            ))}
                           
                           {/* Financing Cash Flow Total */}
                           <HStack justify="space-between" pt={4} borderTop="1px" borderColor="gray.200">
-                            <Text fontWeight="bold" color="purple.700">Financing Cash Flow</Text>
-                            <Text fontWeight="bold" color="purple.700">
-                              {(processedData.financingActivities.reduce((sum, item) => sum + (item.amount2024 ?? 0), 0)).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                            <Text fontWeight="bold" color="orange.700">Financing Cash Flow</Text>
+                            <Text fontWeight="bold" color="orange.700">
+                              {sectionTotals.financing.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                             </Text>
                           </HStack>
                         </VStack>
