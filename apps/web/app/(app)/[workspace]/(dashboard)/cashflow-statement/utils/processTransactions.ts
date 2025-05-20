@@ -1,5 +1,3 @@
-import { CustomStatement } from '../types';
-
 interface BankTransaction {
   transaction_id: string;
   account_id: string;
