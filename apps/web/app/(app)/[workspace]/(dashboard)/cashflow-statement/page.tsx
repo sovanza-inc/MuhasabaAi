@@ -25,7 +25,6 @@ import { CustomStatement } from './types'
 import jsPDF from 'jspdf'
 import { useModals } from '@saas-ui/react'
 import { z } from 'zod'
-import { z as zod } from 'zod'
 
 interface BankTransaction {
   transaction_id: string;
