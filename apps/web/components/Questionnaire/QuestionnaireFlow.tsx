@@ -166,7 +166,7 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
           size="xl"
         >
           <ModalOverlay backdropFilter='blur(10px)' />
-          <ModalContent maxW="800px">
+          <ModalContent maxW="1100px">
             <ModalBody p={6}>
               <Text mb={4} fontSize="lg" fontWeight="bold">Please complete the questionnaire to continue</Text>
               <QuestionnaireForm onComplete={handleQuestionnaireComplete} />
