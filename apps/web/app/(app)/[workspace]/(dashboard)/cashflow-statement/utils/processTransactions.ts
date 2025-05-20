@@ -1,3 +1,5 @@
+import { CustomStatement } from '../types';
+
 interface BankTransaction {
   transaction_id: string;
   account_id: string;
@@ -50,7 +52,7 @@ interface CashFlowData {
   openingCashBalance: number;
 }
 
-export const processTransactions = (transactions: BankTransaction[]): CashFlowData => {
+export const processTransactions = (transactions: BankTransaction[], customStatements: CustomStatement[] = []) => {
   // Debug log incoming transactions
   console.log('Processing transactions:', {
     totalTransactions: transactions.length,
@@ -392,4 +394,42 @@ export const processTransactions = (transactions: BankTransaction[]): CashFlowDa
   });
 
   return returnData;
-}; 
+};
+
+// Helper functions to categorize transactions
+function isOperatingActivity(transaction: BankTransaction): boolean {
+  const description = transaction.transaction_information?.toLowerCase() || '';
+  return (
+    description.includes('sales') ||
+    description.includes('revenue') ||
+    description.includes('payment') ||
+    description.includes('salary') ||
+    description.includes('rent') ||
+    description.includes('utilities') ||
+    description.includes('supplies') ||
+    description.includes('inventory')
+  );
+}
+
+function isInvestingActivity(transaction: BankTransaction): boolean {
+  const description = transaction.transaction_information?.toLowerCase() || '';
+  return (
+    description.includes('equipment') ||
+    description.includes('property') ||
+    description.includes('asset') ||
+    description.includes('investment') ||
+    description.includes('securities')
+  );
+}
+
+function isFinancingActivity(transaction: BankTransaction): boolean {
+  const description = transaction.transaction_information?.toLowerCase() || '';
+  return (
+    description.includes('loan') ||
+    description.includes('dividend') ||
+    description.includes('capital') ||
+    description.includes('share') ||
+    description.includes('equity') ||
+    description.includes('debt')
+  );
+} 
