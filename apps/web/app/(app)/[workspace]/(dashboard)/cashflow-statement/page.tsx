@@ -700,7 +700,7 @@ export default function CashflowStatementPage() {
   return (
     <Box>
       <PageHeader />
-      <Box p={4}>
+      <Box pt={4}>
         {/* Hidden logo for PDF generation */}
         <Image
           ref={logoRef}
