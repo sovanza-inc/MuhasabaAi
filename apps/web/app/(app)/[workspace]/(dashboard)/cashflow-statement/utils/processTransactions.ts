@@ -17,37 +17,12 @@ interface BankTransaction {
   account_name?: string;
 }
 
-interface CashFlowItem {
+export interface CashFlowItem {
   description: string;
   amount2024: number;
   amount2023: number;
   indent?: number;
   isSubTotal?: boolean;
-}
-
-interface CashFlowData {
-  operatingActivities: CashFlowItem[];
-  investingActivities: CashFlowItem[];
-  financingActivities: CashFlowItem[];
-  indirectMethod: {
-    netProfit: number;
-    adjustments: {
-      depreciation: number;
-      amortization: number;
-      interestExpense: number;
-    };
-    workingCapital: {
-      accountsReceivable: number;
-      inventory: number;
-      accountsPayable: number;
-      vatPayable: number;
-    };
-  };
-  period: {
-    startDate: Date;
-    endDate: Date;
-  };
-  openingCashBalance: number;
 }
 
 export const processTransactions = (transactions: BankTransaction[]) => {
@@ -190,9 +165,8 @@ export const processTransactions = (transactions: BankTransaction[]) => {
           totals.investingExpenses += amount;
         }
       }
-
       // Financing Activities
-      if (info.includes('loan') || info.includes('borrowing') || info.includes('debt') || 
+      else if (info.includes('loan') || info.includes('borrowing') || info.includes('debt') || 
                info.includes('credit facility') || info.includes('financing')) {
         if (isCredit || info.includes('proceed') || info.includes('disbursement') || 
             info.includes('drawdown')) {
@@ -215,41 +189,15 @@ export const processTransactions = (transactions: BankTransaction[]) => {
         totals.financingInflows.ownerCapitalContributions += amount;
         categorizedTransactions.push({ type: 'capital_contribution', info, amount });
       }
-      // Rest of the categorization logic
-      else if (info.includes('depreciat') || info.includes('depr.')) {
-        totals.depreciation += amount;
-      }
-      else if (info.includes('amort') || info.includes('intangible')) {
-        totals.amortization += amount;
-      }
-      else if (info.includes('interest') || info.includes('int.')) {
-        totals.interestExpense += amount;
-      }
-      else if (info.includes('receivable') || info.includes('ar') || info.includes('account rec')) {
-        totals.accountsReceivable += (isCredit ? -amount : amount);
-      }
-      else if (info.includes('inventory') || info.includes('stock') || info.includes('goods')) {
-        totals.inventory += (isCredit ? -amount : amount);
-      }
-      else if (info.includes('payable') || info.includes('ap') || info.includes('account pay')) {
-        totals.accountsPayable += (isCredit ? amount : -amount);
-      }
-      else if (info.includes('vat') || info.includes('tax') || info.includes('duty')) {
-        totals.vatPayable += (isCredit ? amount : -amount);
-      }
-      else if (info.includes('equipment') || info.includes('investment') || info.includes('asset') || 
-               info.includes('property') || info.includes('machine')) {
-        if (isCredit) totals.investingIncome += amount;
-        else totals.investingExpenses += amount;
-      }
-      else if (info.includes('loan') || info.includes('dividend') || info.includes('capital') || 
-               info.includes('share') || info.includes('equity')) {
-        if (isCredit) totals.financingInflows.ownerCapitalContributions += amount;
-      }
+      // Operating Activities (default)
       else {
-        // Default to operating activities if no specific category matches
-        if (isCredit) totals.operatingIncome += amount;
-        else totals.operatingExpenses += amount;
+        if (isCredit) {
+          totals.operatingIncome += amount;
+          categorizedTransactions.push({ type: 'operating_income', info, amount });
+        } else {
+          totals.operatingExpenses += amount;
+          categorizedTransactions.push({ type: 'operating_expense', info, amount });
+        }
       }
     });
 
@@ -263,13 +211,6 @@ export const processTransactions = (transactions: BankTransaction[]) => {
       examples: categorizedTransactions.slice(0, 3)
     });
 
-    // Log investing activities totals
-    console.log('Investing Activities Totals:', {
-      income: totals.investingIncome,
-      expenses: totals.investingExpenses,
-      netInvesting: totals.investingIncome - totals.investingExpenses
-    });
-
     return totals;
   };
 
@@ -279,46 +220,63 @@ export const processTransactions = (transactions: BankTransaction[]) => {
   // Debug log final totals
   console.log('Final totals:', {
     currentYear: {
+      operating: {
+        income: currentYearTotals.operatingIncome,
+        expenses: currentYearTotals.operatingExpenses,
+        net: currentYearTotals.operatingIncome - currentYearTotals.operatingExpenses
+      },
       investing: {
         income: currentYearTotals.investingIncome,
-        expenses: currentYearTotals.investingExpenses
+        expenses: currentYearTotals.investingExpenses,
+        net: currentYearTotals.investingIncome - currentYearTotals.investingExpenses
       },
       financing: {
         inflows: currentYearTotals.financingInflows,
-        outflows: currentYearTotals.financingOutflows
+        outflows: currentYearTotals.financingOutflows,
+        net: (
+          currentYearTotals.financingInflows.loanProceeds + 
+          currentYearTotals.financingInflows.ownerCapitalContributions -
+          currentYearTotals.financingOutflows.loanRepayments -
+          currentYearTotals.financingOutflows.leasePayments
+        )
       }
     }
   });
 
-  // Create the return object with investing activities
-  const returnData: CashFlowData = {
+  return {
     operatingActivities: [
-      { description: 'Cash received from operations', amount2024: currentYearTotals.operatingIncome, amount2023: lastYearTotals.operatingIncome },
-      { description: 'Cash paid for operations', amount2024: -currentYearTotals.operatingExpenses, amount2023: -lastYearTotals.operatingExpenses, indent: 1 },
-      { description: 'Net cash from operating activities', 
+      { 
+        description: 'Operating Income',
+        amount2024: currentYearTotals.operatingIncome,
+        amount2023: lastYearTotals.operatingIncome
+      },
+      { 
+        description: 'Operating Expenses',
+        amount2024: -currentYearTotals.operatingExpenses,
+        amount2023: -lastYearTotals.operatingExpenses,
+        indent: 1
+      },
+      { 
+        description: 'Net Operating Cash Flow',
         amount2024: currentYearTotals.operatingIncome - currentYearTotals.operatingExpenses,
         amount2023: lastYearTotals.operatingIncome - lastYearTotals.operatingExpenses,
-        isSubTotal: true 
+        isSubTotal: true
       }
     ],
     investingActivities: [
       { 
-        description: 'Purchase of Fixed Assets',
-        amount2024: -Math.max(0, currentYearTotals.investingExpenses * 0.7), // 70% of investing expenses
-        amount2023: -Math.max(0, lastYearTotals.investingExpenses * 0.7)
-      },
-      { 
-        description: 'Purchase of Intangible Assets',
-        amount2024: -Math.max(0, currentYearTotals.investingExpenses * 0.3), // 30% of investing expenses
-        amount2023: -Math.max(0, lastYearTotals.investingExpenses * 0.3)
-      },
-      { 
         description: 'Sale of Assets',
-        amount2024: Math.max(0, currentYearTotals.investingIncome),
-        amount2023: Math.max(0, lastYearTotals.investingIncome)
+        amount2024: currentYearTotals.investingIncome,
+        amount2023: lastYearTotals.investingIncome
       },
       { 
-        description: 'Net cash used in investing activities',
+        description: 'Purchase of Fixed Assets',
+        amount2024: -currentYearTotals.investingExpenses,
+        amount2023: -lastYearTotals.investingExpenses,
+        indent: 1
+      },
+      { 
+        description: 'Net Investing Cash Flow',
         amount2024: currentYearTotals.investingIncome - currentYearTotals.investingExpenses,
         amount2023: lastYearTotals.investingIncome - lastYearTotals.investingExpenses,
         isSubTotal: true
@@ -326,37 +284,39 @@ export const processTransactions = (transactions: BankTransaction[]) => {
     ],
     financingActivities: [
       { 
-        description: 'Loan Proceeds', 
+        description: 'Loan Proceeds',
         amount2024: currentYearTotals.financingInflows.loanProceeds,
         amount2023: lastYearTotals.financingInflows.loanProceeds
       },
       { 
-        description: 'Loan Principal Repayments', 
-        amount2024: -currentYearTotals.financingOutflows.loanRepayments,
-        amount2023: -lastYearTotals.financingOutflows.loanRepayments
-      },
-      { 
-        description: 'Lease Principal Payments', 
-        amount2024: -currentYearTotals.financingOutflows.leasePayments,
-        amount2023: -lastYearTotals.financingOutflows.leasePayments
-      },
-      { 
-        description: 'Owner\'s Capital Contributions', 
+        description: 'Owner Capital Contributions',
         amount2024: currentYearTotals.financingInflows.ownerCapitalContributions,
         amount2023: lastYearTotals.financingInflows.ownerCapitalContributions
       },
       { 
-        description: 'Net cash from financing activities',
+        description: 'Loan Repayments',
+        amount2024: -currentYearTotals.financingOutflows.loanRepayments,
+        amount2023: -lastYearTotals.financingOutflows.loanRepayments,
+        indent: 1
+      },
+      { 
+        description: 'Lease Payments',
+        amount2024: -currentYearTotals.financingOutflows.leasePayments,
+        amount2023: -lastYearTotals.financingOutflows.leasePayments,
+        indent: 1
+      },
+      { 
+        description: 'Net Financing Cash Flow',
         amount2024: (
           currentYearTotals.financingInflows.loanProceeds + 
-          currentYearTotals.financingInflows.ownerCapitalContributions - 
-          currentYearTotals.financingOutflows.loanRepayments - 
+          currentYearTotals.financingInflows.ownerCapitalContributions -
+          currentYearTotals.financingOutflows.loanRepayments -
           currentYearTotals.financingOutflows.leasePayments
-        ), // Inflows - Outflows
+        ),
         amount2023: (
           lastYearTotals.financingInflows.loanProceeds + 
-          lastYearTotals.financingInflows.ownerCapitalContributions - 
-          lastYearTotals.financingOutflows.loanRepayments - 
+          lastYearTotals.financingInflows.ownerCapitalContributions -
+          lastYearTotals.financingOutflows.loanRepayments -
           lastYearTotals.financingOutflows.leasePayments
         ),
         isSubTotal: true
@@ -382,14 +342,4 @@ export const processTransactions = (transactions: BankTransaction[]) => {
     },
     openingCashBalance: openingBalance
   };
-
-  // Log final investing activities
-  console.log('Final Investing Activities:', {
-    fixedAssetsPurchase: returnData.investingActivities[0],
-    intangibleAssetsPurchase: returnData.investingActivities[1],
-    assetsSale: returnData.investingActivities[2],
-    netInvesting: returnData.investingActivities[3]
-  });
-
-  return returnData;
 }; 

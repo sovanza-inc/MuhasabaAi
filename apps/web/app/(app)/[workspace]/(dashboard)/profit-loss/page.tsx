@@ -191,7 +191,8 @@ export default function ProfitLossPage() {
     const schema = z.object({
       name: z.string().min(1, 'Name is required'),
       amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
-      date: z.string().optional()
+      date: z.string().optional(),
+      amountType: z.enum(['deposit', 'expense']).default('deposit')
     });
 
     type FormData = z.infer<typeof schema>;
@@ -200,9 +201,10 @@ export default function ProfitLossPage() {
       const newStatement: CustomStatement = {
         id: Math.random().toString(36).substr(2, 9),
         name: data.name,
-        amount: data.amount,
+        amount: data.amountType === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
         date: data.date || new Date().toISOString().split('T')[0],
-        type
+        type,
+        amountType: data.amountType
       };
 
       setCustomStatements(prev => [...prev, newStatement]);
@@ -235,6 +237,14 @@ export default function ProfitLossPage() {
           label: 'Amount (AED)',
           type: 'number',
           placeholder: '0.00'
+        },
+        amountType: {
+          label: 'Amount Type',
+          type: 'select',
+          options: [
+            { label: 'Deposit', value: 'deposit' },
+            { label: 'Expense', value: 'expense' }
+          ]
         },
         date: {
           label: 'Date',

@@ -4,7 +4,8 @@ export interface CustomStatement {
   amount: number;
   date: string;
   type: 'operating' | 'investing' | 'financing';
-  category: 'adjustment' | 'working_capital' | 'inflow';
+  category: string;
+  amountType: 'deposit' | 'expense';
 }
 
 export interface FilteredCashFlowData {
@@ -88,4 +89,12 @@ export interface FilteredCashFlowData {
     netCashFlow: number;
   };
   netCashFlow: number;
+}
+
+export interface OperatingFormData {
+  name: string;
+  amount: number;
+  date?: string;
+  category: 'adjustment' | 'working_capital';
+  amountType: 'deposit' | 'expense';
 } 

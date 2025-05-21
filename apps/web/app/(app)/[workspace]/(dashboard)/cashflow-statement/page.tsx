@@ -606,21 +606,12 @@ export default function CashflowStatementPage() {
   }, [authToken, workspace?.id]);
 
   const handleAddStatement = async (type: 'operating' | 'investing' | 'financing') => {
-    interface BaseFormData {
-      name: string;
-      amount: number;
-      date?: string;
-    }
-
-    interface OperatingFormData extends BaseFormData {
-      category: 'adjustment' | 'working_capital';
-    }
-
     // Define schema based on activity type
     const baseSchema = {
       name: z.string().min(1, 'Name is required'),
       amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
       date: z.string().optional(),
+      amountType: z.enum(['deposit', 'expense']).default('deposit')
     };
 
     const formSchema = type === 'operating' 
@@ -630,16 +621,15 @@ export default function CashflowStatementPage() {
         })
       : z.object(baseSchema);
 
-    const onSubmit = (formData: z.infer<typeof formSchema>) => {
+    const onSubmit = (formData: any) => {
       const newStatement: CustomStatement = {
         id: Math.random().toString(36).substr(2, 9),
         name: formData.name,
-        amount: formData.amount,
+        amount: formData.amountType === 'expense' ? -Math.abs(formData.amount) : Math.abs(formData.amount),
         date: formData.date || new Date().toISOString().split('T')[0],
         type,
-        category: type === 'operating'
-          ? (formData as OperatingFormData).category
-          : 'inflow'
+        category: type === 'operating' ? formData.category : 'inflow',
+        amountType: formData.amountType
       };
 
       setCustomStatements(prev => [...prev, newStatement]);
@@ -666,6 +656,14 @@ export default function CashflowStatementPage() {
         label: 'Amount (AED)',
         type: 'number',
         placeholder: '0.00'
+      },
+      amountType: {
+        label: 'Amount Type',
+        type: 'select',
+        options: [
+          { label: 'Deposit', value: 'deposit' },
+          { label: 'Expense', value: 'expense' }
+        ]
       },
       date: {
         label: 'Date',
@@ -1077,26 +1075,131 @@ export default function CashflowStatementPage() {
                             {(processedData.openingCashBalance ?? 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
                           </Text>
                         </HStack>
-                        <HStack justify="space-between">
+                                                <HStack justify="space-between">
                           <Text fontWeight="bold" color="gray.700">Net Cash Change</Text>
-                          <Text fontWeight="bold" color="gray.700">
-                            {(
-                              (processedData.operatingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
-                              (processedData.investingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
-                              (processedData.financingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0)
-                            ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                          </Text>
+                          {(() => {
+                            // Calculate operating activities total
+                            const operatingTotal = processedData.operatingActivities.reduce((sum, item) => {
+                              if (!item.isSubTotal) {
+                                return sum + (item.amount2024 ?? 0);
+                              }
+                              return sum;
+                            }, 0);
+                            
+                            // Calculate operating custom statements
+                            const operatingCustom = customStatements
+                              .filter(stmt => stmt.type === 'operating')
+                              .reduce((total, stmt) => total + stmt.amount, 0);
+
+                            // Calculate investing activities total
+                            const investingTotal = processedData.investingActivities.reduce((sum, item) => {
+                              if (!item.isSubTotal) {
+                                return sum + (item.amount2024 ?? 0);
+                              }
+                              return sum;
+                            }, 0);
+                            
+                            // Calculate investing custom statements
+                            const investingCustom = customStatements
+                              .filter(stmt => stmt.type === 'investing')
+                              .reduce((total, stmt) => total + stmt.amount, 0);
+
+                            // Calculate financing activities total
+                            const financingTotal = processedData.financingActivities.reduce((sum, item) => {
+                              if (!item.isSubTotal) {
+                                return sum + (item.amount2024 ?? 0);
+                              }
+                              return sum;
+                            }, 0);
+                            
+                            // Calculate financing custom statements
+                            const financingCustom = customStatements
+                              .filter(stmt => stmt.type === 'financing')
+                              .reduce((total, stmt) => total + stmt.amount, 0);
+                            
+                            console.log('Detailed Net Cash Change Calculation:', {
+                              operatingTotal,
+                              operatingCustom,
+                              investingTotal,
+                              investingCustom,
+                              financingTotal,
+                              financingCustom,
+                              customStatements,
+                              total: operatingTotal + operatingCustom + investingTotal + investingCustom + financingTotal + financingCustom
+                            });
+                            
+                            const total = operatingTotal + operatingCustom + investingTotal + investingCustom + financingTotal + financingCustom;
+                            return (
+                              <Text fontWeight="bold" color="gray.700">
+                                {total.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                              </Text>
+                            );
+                          })()}
                         </HStack>
                         <HStack justify="space-between" pt={4} borderTop="2px" borderColor="gray.300">
                           <Text fontWeight="bold" fontSize="lg" color="gray.700">Closing Cash Balance</Text>
-                          <Text fontWeight="bold" fontSize="lg" color="gray.700">
-                            {(
-                              (processedData.openingCashBalance ?? 0) +
-                              (processedData.operatingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
-                              (processedData.investingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0) +
-                              (processedData.financingActivities.find(x => x.isSubTotal)?.amount2024 ?? 0)
-                            ).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
-                          </Text>
+                          {(() => {
+                            // Calculate operating activities total
+                            const operatingTotal = processedData.operatingActivities.reduce((sum, item) => {
+                              if (!item.isSubTotal) {
+                                return sum + (item.amount2024 ?? 0);
+                              }
+                              return sum;
+                            }, 0);
+                            
+                            // Calculate operating custom statements
+                            const operatingCustom = customStatements
+                              .filter(stmt => stmt.type === 'operating')
+                              .reduce((total, stmt) => total + stmt.amount, 0);
+
+                            // Calculate investing activities total
+                            const investingTotal = processedData.investingActivities.reduce((sum, item) => {
+                              if (!item.isSubTotal) {
+                                return sum + (item.amount2024 ?? 0);
+                              }
+                              return sum;
+                            }, 0);
+                            
+                            // Calculate investing custom statements
+                            const investingCustom = customStatements
+                              .filter(stmt => stmt.type === 'investing')
+                              .reduce((total, stmt) => total + stmt.amount, 0);
+
+                            // Calculate financing activities total
+                            const financingTotal = processedData.financingActivities.reduce((sum, item) => {
+                              if (!item.isSubTotal) {
+                                return sum + (item.amount2024 ?? 0);
+                              }
+                              return sum;
+                            }, 0);
+                            
+                            // Calculate financing custom statements
+                            const financingCustom = customStatements
+                              .filter(stmt => stmt.type === 'financing')
+                              .reduce((total, stmt) => total + stmt.amount, 0);
+
+                            // Get opening balance
+                            const openingBalance = processedData.openingCashBalance ?? 0;
+                            
+                            console.log('Detailed Closing Balance Calculation:', {
+                              openingBalance,
+                              operatingTotal,
+                              operatingCustom,
+                              investingTotal,
+                              investingCustom,
+                              financingTotal,
+                              financingCustom,
+                              customStatements,
+                              total: openingBalance + operatingTotal + operatingCustom + investingTotal + investingCustom + financingTotal + financingCustom
+                            });
+                            
+                            const total = openingBalance + operatingTotal + operatingCustom + investingTotal + investingCustom + financingTotal + financingCustom;
+                            return (
+                              <Text fontWeight="bold" fontSize="lg" color="gray.700">
+                                {total.toLocaleString('en-US', { style: 'currency', currency: 'AED' })}
+                              </Text>
+                            );
+                          })()}
                         </HStack>
                       </VStack>
                     </Box>
@@ -1105,44 +1208,35 @@ export default function CashflowStatementPage() {
               </>
             )}
           </Box>
+
+          {/* Add EditablePdfPreview component */}
+          <EditablePdfPreview
+            isOpen={isPdfPreviewOpen}
+            onClose={() => setIsPdfPreviewOpen(false)}
+            onExport={handleExportPdfData}
+            data={processedData}
+            logoRef={logoRef}
+          />
+
+          {/* Summary Footer */}
+          <Box
+            bg="teal.700"
+            color="white"
+            p={4}
+            data-summary-footer
+            position="sticky"
+            bottom={0}
+            zIndex={1}
+          >
+            <HStack justify="space-between">
+              <Text>Summary: Cash Flow</Text>
+              <Text>Net Cash Flow: {filteredTransactions.reduce((total, transaction) => {
+                const amount = transaction.amount.amount;
+                return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
+              }, 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
+            </HStack>
+          </Box>
         </Box>
-
-        {/* Add Export PDF button */}
-        {/* <Button
-          leftIcon={<LuFileText />}
-          colorScheme="blue"
-          size="sm"
-          onClick={handleExportPDF}
-        >
-          Export PDF
-        </Button> */}
-
-        {/* Add EditablePdfPreview component */}
-        <EditablePdfPreview
-          isOpen={isPdfPreviewOpen}
-          onClose={() => setIsPdfPreviewOpen(false)}
-          onExport={handleExportPdfData}
-          data={processedData}
-          logoRef={logoRef}
-        />
-      </Box>
-      {/* Summary Footer */}
-      <Box
-        bg="teal.700"
-        color="white"
-        p={4}
-        data-summary-footer
-        position="sticky"
-        bottom={0}
-        zIndex={1}
-      >
-        <HStack justify="space-between">
-          <Text>Summary: Cash Flow</Text>
-          <Text>Net Cash Flow: {filteredTransactions.reduce((total, transaction) => {
-            const amount = transaction.amount.amount;
-            return total + (transaction.credit_debit_indicator === 'CREDIT' ? amount : -amount);
-          }, 0).toLocaleString('en-US', { style: 'currency', currency: 'AED' })}</Text>
-        </HStack>
       </Box>
     </Box>
   )
