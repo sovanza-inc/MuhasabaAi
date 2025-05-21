@@ -1037,7 +1037,8 @@ export default function BalanceSheetPage() {
       name: z.string().min(1, 'Name is required'),
       amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
       date: z.string().optional(),
-      category: z.enum(['current', 'non-current']).default('current')
+      category: z.enum(['current', 'non-current']).default('current'),
+      amountType: z.enum(['deposit', 'expense']).default('deposit')
     });
 
     type FormData = z.infer<typeof schema>;
@@ -1046,12 +1047,13 @@ export default function BalanceSheetPage() {
       const newStatement: CustomBalanceSheetStatement = {
         id: Math.random().toString(36).substr(2, 9),
         name: data.name,
-        amount: data.amount,
+        amount: data.amountType === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
         date: data.date || new Date().toISOString().split('T')[0],
         type: type === 'liability' ? 
           (data.category === 'current' ? 'liability' : 'liability') : 
           (type === 'asset' ? 'asset' : 'equity'),
-        category: type === 'equity' ? 'current' : data.category
+        category: type === 'equity' ? 'current' : data.category,
+        amountType: data.amountType
       };
 
       setCustomStatements(prev => [...prev, newStatement]);
@@ -1100,6 +1102,14 @@ export default function BalanceSheetPage() {
           type: 'number',
           placeholder: '0.00'
         },
+        amountType: {
+          label: 'Amount Type',
+          type: 'select',
+          options: [
+            { label: 'Deposit', value: 'deposit' },
+            { label: 'Expense', value: 'expense' }
+          ]
+        },
         date: {
           label: 'Date',
           type: 'date'
@@ -1114,7 +1124,8 @@ export default function BalanceSheetPage() {
       name: z.string().min(1, 'Name is required'),
       amount: z.string().min(1, 'Amount is required').transform(val => Number(val)),
       date: z.string().optional(),
-      section: z.enum(['equity', 'current_liability', 'non_current_liability'])
+      section: z.enum(['equity', 'current_liability', 'non_current_liability']),
+      amountType: z.enum(['deposit', 'expense']).default('deposit')
     });
 
     type FormData = z.infer<typeof schema>;
@@ -1123,10 +1134,11 @@ export default function BalanceSheetPage() {
       const newStatement: CustomBalanceSheetStatement = {
         id: Math.random().toString(36).substr(2, 9),
         name: data.name,
-        amount: data.amount,
+        amount: data.amountType === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
         date: data.date || new Date().toISOString().split('T')[0],
         type: data.section === 'equity' ? 'equity' : 'liability',
-        category: data.section === 'current_liability' ? 'current' : 'non-current'
+        category: data.section === 'current_liability' ? 'current' : 'non-current',
+        amountType: data.amountType
       };
 
       setCustomStatements(prev => [...prev, newStatement]);
@@ -1169,6 +1181,14 @@ export default function BalanceSheetPage() {
           label: 'Amount (AED)',
           type: 'number',
           placeholder: '0.00'
+        },
+        amountType: {
+          label: 'Amount Type',
+          type: 'select',
+          options: [
+            { label: 'Deposit', value: 'deposit' },
+            { label: 'Expense', value: 'expense' }
+          ]
         },
         date: {
           label: 'Date',
@@ -1283,15 +1303,27 @@ export default function BalanceSheetPage() {
                       <SimpleGrid columns={3} gap={4}>
                         <Box>
                           <Text color="gray.600" fontSize="sm">Current:</Text>
-                          <Text fontSize="md">AED {calculateCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                          <Text fontSize="md">AED {Math.abs(calculateCurrentAssets() + 
+                            customStatements
+                              .filter(statement => statement.type === 'asset' && statement.category === 'current')
+                              .reduce((total, statement) => total + statement.amount, 0)
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                         </Box>
                         <Box>
                           <Text color="gray.600" fontSize="sm">Non-Current:</Text>
-                          <Text fontSize="md">AED {calculateNonCurrentAssets().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                          <Text fontSize="md">AED {Math.abs(calculateNonCurrentAssets() + 
+                            customStatements
+                              .filter(statement => statement.type === 'asset' && statement.category === 'non-current')
+                              .reduce((total, statement) => total + statement.amount, 0)
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                         </Box>
                         <Box>
                           <Text color="gray.600" fontSize="sm">Total:</Text>
-                          <Text fontSize="md">AED {(calculateCurrentAssets() + calculateNonCurrentAssets()).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                          <Text fontSize="md">AED {Math.abs(calculateCurrentAssets() + calculateNonCurrentAssets() + 
+                            customStatements
+                              .filter(statement => statement.type === 'asset')
+                              .reduce((total, statement) => total + statement.amount, 0)
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                         </Box>
                       </SimpleGrid>
                       </CardBody>
@@ -1303,15 +1335,27 @@ export default function BalanceSheetPage() {
                       <SimpleGrid columns={3} gap={4}>
                         <Box>
                           <Text color="gray.600" fontSize="sm">Current:</Text>
-                          <Text fontSize="md">AED {calculateCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                          <Text fontSize="md">AED {Math.abs(calculateCurrentLiabilities() + 
+                            customStatements
+                              .filter(statement => statement.type === 'liability' && statement.category === 'current')
+                              .reduce((total, statement) => total + statement.amount, 0)
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                         </Box>
                         <Box>
                           <Text color="gray.600" fontSize="sm">Non-Current:</Text>
-                          <Text fontSize="md">AED {calculateNonCurrentLiabilities().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                          <Text fontSize="md">AED {Math.abs(calculateNonCurrentLiabilities() + 
+                            customStatements
+                              .filter(statement => statement.type === 'liability' && statement.category === 'non-current')
+                              .reduce((total, statement) => total + statement.amount, 0)
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                         </Box>
                         <Box>
                           <Text color="gray.600" fontSize="sm">Equity:</Text>
-                          <Text fontSize="md">AED {calculateTotalEquity().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                          <Text fontSize="md">AED {Math.abs(calculateTotalEquity() + 
+                            customStatements
+                              .filter(statement => statement.type === 'equity')
+                              .reduce((total, statement) => total + statement.amount, 0)
+                          ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                         </Box>
                       </SimpleGrid>
                     </CardBody>
@@ -1436,7 +1480,7 @@ export default function BalanceSheetPage() {
                             <HStack justify="space-between">
                               <Text fontWeight="bold" fontSize="lg" color="green.700">TOTAL ASSETS</Text>
                               <Text fontWeight="bold" fontSize="lg" color="green.700">
-                                AED {(calculateCurrentAssets() + calculateNonCurrentAssets() + 
+                                AED {Math.abs(calculateCurrentAssets() + calculateNonCurrentAssets() + 
                                   customStatements
                                     .filter(statement => statement.type === 'asset')
                                     .reduce((total, statement) => total + statement.amount, 0)
@@ -1583,7 +1627,7 @@ export default function BalanceSheetPage() {
                             <HStack justify="space-between">
                               <Text fontWeight="bold" fontSize="lg" color="blue.700">TOTAL EQUITY AND LIABILITIES</Text>
                               <Text fontWeight="bold" fontSize="lg" color="blue.700">
-                                AED {(
+                                AED {Math.abs(
                                   calculateTotalEquity() + 
                                   calculateCurrentLiabilities() + 
                                   calculateNonCurrentLiabilities() +
