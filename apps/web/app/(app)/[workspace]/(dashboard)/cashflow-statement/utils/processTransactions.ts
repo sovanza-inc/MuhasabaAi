@@ -25,31 +25,6 @@ interface CashFlowItem {
   isSubTotal?: boolean;
 }
 
-interface CashFlowData {
-  operatingActivities: CashFlowItem[];
-  investingActivities: CashFlowItem[];
-  financingActivities: CashFlowItem[];
-  indirectMethod: {
-    netProfit: number;
-    adjustments: {
-      depreciation: number;
-      amortization: number;
-      interestExpense: number;
-    };
-    workingCapital: {
-      accountsReceivable: number;
-      inventory: number;
-      accountsPayable: number;
-      vatPayable: number;
-    };
-  };
-  period: {
-    startDate: Date;
-    endDate: Date;
-  };
-  openingCashBalance: number;
-}
-
 export const processTransactions = (transactions: BankTransaction[]) => {
   // Debug log incoming transactions
   console.log('Processing transactions:', {

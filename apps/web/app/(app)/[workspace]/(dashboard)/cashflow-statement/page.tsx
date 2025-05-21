@@ -638,7 +638,7 @@ export default function CashflowStatementPage() {
         amount: formData.amountType === 'expense' ? -Math.abs(formData.amount) : Math.abs(formData.amount),
         date: formData.date || new Date().toISOString().split('T')[0],
         type,
-        category: type === 'operating' && 'category' in formData ? formData.category : 'inflow',
+        category: type === 'operating' ? formData.category : 'inflow',
         amountType: formData.amountType
       };
 
