@@ -62,4 +62,15 @@ export interface CustomStatement {
   amount: number;
   date: string;
   type: 'income' | 'expense';
+  amountType: 'deposit' | 'expense';
+}
+
+export interface CustomProfitLossStatement {
+  id: string;
+  name: string;
+  amount: number;
+  date: string;
+  type: 'income' | 'expense';
+  category: string;
+  amountType: 'deposit' | 'expense';
 } 
