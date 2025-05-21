@@ -606,12 +606,6 @@ export default function CashflowStatementPage() {
   }, [authToken, workspace?.id]);
 
   const handleAddStatement = async (type: 'operating' | 'investing' | 'financing') => {
-    interface BaseFormData {
-      name: string;
-      amount: number;
-      date?: string;
-    }
-
     // Define schema based on activity type
     const baseSchema = {
       name: z.string().min(1, 'Name is required'),
