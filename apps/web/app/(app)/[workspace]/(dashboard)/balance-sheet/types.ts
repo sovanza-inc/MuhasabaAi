@@ -5,6 +5,7 @@ export interface CustomBalanceSheetStatement {
   date: string;
   type: 'asset' | 'liability' | 'equity';
   category: 'current' | 'non-current';
+  amountType: 'deposit' | 'expense';
 }
 
 export interface BalanceSheetData {
