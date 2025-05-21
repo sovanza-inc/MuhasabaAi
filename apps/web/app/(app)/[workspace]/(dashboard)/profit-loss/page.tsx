@@ -201,7 +201,7 @@ export default function ProfitLossPage() {
       const newStatement: CustomStatement = {
         id: Math.random().toString(36).substr(2, 9),
         name: data.name,
-        amount: data.amountType === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
+        amount: type === 'expense' ? -Math.abs(data.amount) : Math.abs(data.amount),
         date: data.date || new Date().toISOString().split('T')[0],
         type,
         amountType: data.amountType
@@ -217,7 +217,7 @@ export default function ProfitLossPage() {
         isClosable: true,
       });
 
-      modals.closeAll(); // Explicitly close all modals after successful submission
+      modals.closeAll();
       return true;
     };
 
@@ -225,7 +225,8 @@ export default function ProfitLossPage() {
       title: `Add New ${type === 'income' ? 'Income' : 'Expense'} Statement`,
       schema,
       defaultValues: {
-        date: new Date().toISOString().split('T')[0]
+        date: new Date().toISOString().split('T')[0],
+        amountType: type === 'income' ? 'deposit' : 'expense'
       },
       onSubmit,
       fields: {
@@ -987,10 +988,10 @@ export default function ProfitLossPage() {
                                   customStatements
                                     .filter(statement => statement.type === 'income')
                                     .reduce((total, statement) => total + statement.amount, 0) -
-                                  // Subtract custom expense statements
+                                  // Subtract custom expense statements (make sure they're negative)
                                   customStatements
                                     .filter(statement => statement.type === 'expense')
-                                    .reduce((total, statement) => total + statement.amount, 0)
+                                    .reduce((total, statement) => total + Math.abs(statement.amount), 0)
                                 ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </Td>
                             </Tr>
