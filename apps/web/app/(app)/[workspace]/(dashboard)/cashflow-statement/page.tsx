@@ -612,10 +612,6 @@ export default function CashflowStatementPage() {
       date?: string;
     }
 
-    interface OperatingFormData extends BaseFormData {
-      category: 'adjustment' | 'working_capital';
-    }
-
     // Define schema based on activity type
     const baseSchema = {
       name: z.string().min(1, 'Name is required'),

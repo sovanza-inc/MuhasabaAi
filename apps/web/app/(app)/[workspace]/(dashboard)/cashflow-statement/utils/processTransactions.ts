@@ -17,7 +17,7 @@ interface BankTransaction {
   account_name?: string;
 }
 
-interface CashFlowItem {
+export interface CashFlowItem {
   description: string;
   amount2024: number;
   amount2023: number;
