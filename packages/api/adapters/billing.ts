@@ -13,8 +13,9 @@ export interface BillingAdapter {
    */
   createCustomer?: (params: {
     accountId: string
-    name?: string
-    email?: string
+    name?: string | null
+    email?: string | null
+    userId?: string
   }) => Promise<string>
 
   /**
@@ -94,4 +95,16 @@ export interface BillingAdapter {
     featureId: string
     quantity: number
   }) => Promise<void>
+
+  /**
+   * Creates a payment intent for direct payment processing
+   */
+  createPaymentIntent: (params: {
+    amount: number
+    currency: string
+    metadata?: Record<string, string>
+    receipt_email?: string
+  }) => Promise<{
+    clientSecret: string
+  }>
 }

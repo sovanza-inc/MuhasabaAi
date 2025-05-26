@@ -52,15 +52,17 @@ export class StripeAdapter implements BillingAdapter {
 
   async createCustomer(params: {
     accountId: string
-    email?: string
-    name?: string
-  }) {
+    name?: string | null
+    email?: string | null
+    userId?: string
+  }): Promise<string> {
     const customer = await this.stripe.customers.create({
-      name: params.name ?? params.accountId,
-      email: params.email,
       metadata: {
         accountId: params.accountId,
+        userId: params.userId || '',
       },
+      ...(params.name ? { name: params.name } : {}),
+      ...(params.email ? { email: params.email } : {}),
     })
 
     return customer.id
@@ -328,5 +330,26 @@ export class StripeAdapter implements BillingAdapter {
         stripe_customer_id: params.customerId,
       },
     })
+  }
+
+  async createPaymentIntent(params: {
+    amount: number
+    currency: string
+    metadata?: Record<string, string>
+    receipt_email?: string
+  }) {
+    const paymentIntent = await this.stripe.paymentIntents.create({
+      amount: Math.round(params.amount * 100), // Convert to cents
+      currency: params.currency.toLowerCase(),
+      metadata: params.metadata,
+      receipt_email: params.receipt_email,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    return {
+      clientSecret: paymentIntent.client_secret!,
+    };
   }
 }

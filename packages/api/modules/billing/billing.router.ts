@@ -54,6 +54,7 @@ export const billingRouter = createTRPCRouter({
           accountId: input.workspaceId,
           name: ctx.workspace?.name,
           email: input?.email ?? undefined,
+          userId: ctx.session?.user?.id
         })
 
         await upsertAccount({
@@ -300,5 +301,49 @@ export const billingRouter = createTRPCRouter({
         customerId: customerId,
         returnUrl: input.returnUrl,
       })
+    }),
+
+  createPaymentIntent: adminProcedure
+    .input(
+      z.object({
+        workspaceId: z.string(),
+        planId: z.string(),
+        amount: z.number(),
+        currency: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.adapters.billing) {
+        throw new TRPCError({
+          code: 'NOT_IMPLEMENTED',
+          message: 'Billing adapter is not configured',
+        })
+      }
+
+      const account = await getAccount(input.workspaceId)
+      const email = account?.email ?? ctx.session.user.email ?? undefined
+
+      try {
+        const result = await ctx.adapters.billing.createPaymentIntent({
+          amount: input.amount,
+          currency: input.currency,
+          metadata: {
+            workspaceId: input.workspaceId,
+            planId: input.planId,
+          },
+          receipt_email: email,
+        })
+
+        return {
+          clientSecret: result.clientSecret,
+        }
+      } catch (error) {
+        ctx.logger.error('Error creating payment intent', error)
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to create payment intent',
+          cause: error,
+        })
+      }
     }),
 })

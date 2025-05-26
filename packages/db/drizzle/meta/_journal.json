@@ -43,6 +43,20 @@
       "when": 1747204371934,
       "tag": "0005_milky_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1748075379273,
+      "tag": "0006_shocking_black_bolt",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1748237687172,
+      "tag": "0007_striped_spot",
+      "breakpoints": true
     }
   ]
 }

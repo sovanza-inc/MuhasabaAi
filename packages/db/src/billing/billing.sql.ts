@@ -44,6 +44,20 @@ export const billingSubscriptionStatus = pgEnum(
   statuses,
 )
 
+export const userSubscriptions = pgTable('user_subscriptions', {
+  id: varchar('id', { length: 36 }).primaryKey().$defaultFn(() => crypto.randomUUID()),
+  userId: varchar('user_id', { length: 255 }).notNull(),
+  planId: varchar('plan_id', { length: 255 }).notNull(),
+  status: varchar('status', { length: 50 }).notNull().default('free'),
+  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }),
+  currentPeriodStart: timestamp('current_period_start', { withTimezone: true }),
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+})
+
 export const billingSubscriptions = pgTable('billing_subscriptions', {
   id: varchar('id', { length: 255 }).notNull().primaryKey(),
   accountId: varchar('account_id', { length: 255 })

@@ -1,4 +1,6 @@
 import Stripe from 'stripe'
+import { db, userSubscriptions } from '@acme/db'
+import { eq } from 'drizzle-orm'
 
 import { StripeAdapter } from './stripe.adapter'
 
@@ -38,6 +40,35 @@ export const createStripeWebhookHandler =
           await adapter.syncSubscriptionStatus({
             subscriptionId: subscription.id,
           })
+
+          // Update our new user_subscriptions table
+          const customer = subscription.customer as Stripe.Customer
+          const userId = customer.metadata.userId // Make sure to set this when creating customer
+
+          if (userId) {
+            await db
+              .insert(userSubscriptions)
+              .values({
+                id: userId,
+                status: subscription.status === 'active' ? 'active' : 'free',
+                stripeCustomerId: customer.id,
+                stripeSubscriptionId: subscription.id,
+                currentPeriodStart: new Date(subscription.current_period_start * 1000),
+                currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+                cancelAtPeriodEnd: subscription.cancel_at_period_end,
+              })
+              .onConflictDoUpdate({
+                target: userSubscriptions.id,
+                set: {
+                  status: subscription.status === 'active' ? 'active' : 'free',
+                  stripeCustomerId: customer.id,
+                  stripeSubscriptionId: subscription.id,
+                  currentPeriodStart: new Date(subscription.current_period_start * 1000),
+                  currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+                  cancelAtPeriodEnd: subscription.cancel_at_period_end,
+                },
+              })
+          }
           break
         }
         case 'checkout.session.completed': {
