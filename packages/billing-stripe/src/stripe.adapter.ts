@@ -127,6 +127,7 @@ export class StripeAdapter implements BillingAdapter {
         const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
         const userId = customer.metadata?.userId
 
+        // Then create the checkout session
         const response = await this.stripe.checkout.sessions.create({
           mode: 'subscription',
           payment_method_types: ['card'],
@@ -136,12 +137,12 @@ export class StripeAdapter implements BillingAdapter {
           allow_promotion_codes: true,
           metadata: {
             planId: params.planId,
-            userId: userId || '',
+            userId: customer.metadata?.userId || '',
           },
           subscription_data: {
             metadata: {
               planId: params.planId,
-              userId: userId || '',
+              userId: customer.metadata?.userId || '',
             },
           },
           success_url: params.successUrl,

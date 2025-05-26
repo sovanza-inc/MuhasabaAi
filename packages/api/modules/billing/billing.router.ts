@@ -7,6 +7,8 @@ import {
   publicProcedure,
 } from '#trpc'
 
+import { db, userSubscriptions } from '@acme/db'
+
 import { UpdateBillingAccountSchema } from './billing.schema'
 import {
   getAccount,
@@ -301,6 +303,38 @@ export const billingRouter = createTRPCRouter({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to create or retrieve customer ID',
           })
+        }
+
+        // First save the subscription data in our database
+        try {
+          await db
+            .insert(userSubscriptions)
+            .values({
+              userId: ctx.session.user.id,
+              planId: input.planId,
+              status: 'active',
+              stripeCustomerId: customerId,
+              stripeSubscriptionId: null, // We don't have this yet
+              currentPeriodStart: new Date(),
+              currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              cancelAtPeriodEnd: false,
+            })
+            .onConflictDoUpdate({
+              target: [userSubscriptions.userId],
+              set: {
+                planId: input.planId,
+                status: 'active',
+                stripeCustomerId: customerId,
+              },
+            })
+
+          ctx.logger.info('Saved subscription to database', {
+            userId: ctx.session.user.id,
+            planId: input.planId,
+          })
+        } catch (error) {
+          ctx.logger.error('Error saving subscription to database:', error)
+          // Continue even if DB save fails - we can update it later via webhook
         }
 
         return ctx.adapters.billing.createCheckoutSession({
