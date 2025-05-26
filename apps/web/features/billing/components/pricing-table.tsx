@@ -20,8 +20,11 @@ import {
 } from '@chakra-ui/react'
 import { BillingInterval, BillingPlan } from '@saas-ui-pro/billing'
 import { LuCheck } from 'react-icons/lu'
+import { useRouter } from 'next/navigation'
 
 import { SegmentedControl } from '@acme/ui/segmented-control'
+import { api } from '#lib/trpc/react'
+import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
 const defaultIntervals: PricingPeriod[] = [
   {
@@ -69,10 +72,25 @@ export const PricingTable: React.FC<PricingTableProps> = (props) => {
   const currentPlan = allPlans.find((plan) => plan.id === planId)
 
   const [loading, setLoading] = React.useState(false)
+  const router = useRouter()
+  const [workspace] = useCurrentWorkspace()
+  const createCheckoutSession = api.billing.createCheckoutSession.useMutation({
+    onSuccess: (data) => {
+      if (data.url) {
+        router.push(data.url)
+      }
+    },
+  })
+
   const updatePlan = async (plan: BillingPlan) => {
     setLoading(true)
     try {
-      await onUpdatePlan?.(plan)
+      createCheckoutSession.mutate({
+        planId: plan.id,
+        workspaceId: workspace.id,
+        successUrl: `${window.location.origin}/${workspace.slug}?success=true`,
+        cancelUrl: `${window.location.origin}/${workspace.slug}?canceled=true`,
+      })
     } finally {
       setLoading(false)
     }

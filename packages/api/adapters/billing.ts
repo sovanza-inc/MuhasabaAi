@@ -1,4 +1,7 @@
+import type Stripe from 'stripe'
+
 export interface BillingAdapter {
+  stripe?: Stripe
   /**
    * Returns the customer ID.
    */
@@ -26,6 +29,7 @@ export interface BillingAdapter {
     accountId: string
     name?: string
     email?: string
+    userId?: string
   }) => Promise<void>
 
   /**

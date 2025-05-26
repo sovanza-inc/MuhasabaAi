@@ -186,41 +186,122 @@ export const billingRouter = createTRPCRouter({
           try {
             const foundCustomerId = await ctx.adapters.billing.findCustomerId?.({
               id: account.customerId,
-              accountId: input.workspaceId,
-              email,
-            });
-            
-            // Convert null to undefined to satisfy TypeScript
-            customerId = foundCustomerId || undefined;
+            })
+
+            if (foundCustomerId && ctx.adapters.billing.updateCustomer) {
+              customerId = foundCustomerId
+              // Update customer metadata to ensure userId is set
+              await ctx.adapters.billing.updateCustomer({
+                customerId: foundCustomerId,
+                accountId: input.workspaceId,
+                email,
+                name: ctx.workspace?.name,
+                userId: ctx.session.user.id,
+              })
+            }
           } catch (error) {
             ctx.logger.error('Error finding customer', error)
-            // Continue with creating a new customer
           }
         }
 
         // If customer not found or error occurred, create a new one
         if (!customerId && ctx.adapters.billing.createCustomer) {
+          if (!ctx.session?.user?.id) {
+            throw new TRPCError({
+              code: 'UNAUTHORIZED',
+              message: 'User must be logged in to create a subscription',
+            })
+          }
+
           customerId = await ctx.adapters.billing.createCustomer?.({
             accountId: input.workspaceId,
             name: ctx.workspace?.name,
             email,
+            userId: ctx.session.user.id,
           })
 
           await upsertAccount({
             id: input.workspaceId,
             customerId,
           })
-        } else if (!customerId) {
-          ctx.logger.debug('createCustomer not implemented')
+        }
 
-          // if the adapter does not support upserting customers, we don't need to store the reference ID
-          // but instead will use the workspace ID as a reference in checkout.
-          customerId = input.workspaceId
+        // Always ensure we have a customer ID and it has proper metadata
+        // Update customer metadata to ensure userId is set
+        if (customerId) {
+          if (!ctx.session?.user?.id) {
+            throw new TRPCError({
+              code: 'UNAUTHORIZED',
+              message: 'User must be logged in to create a subscription',
+            })
+          }
+
+          if (!ctx.adapters.billing.updateCustomer) {
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Billing adapter does not support updating customer metadata',
+            })
+          }
+
+          await ctx.adapters.billing.updateCustomer({
+            customerId,
+            accountId: input.workspaceId,
+            name: ctx.workspace?.name,
+            email,
+            userId: ctx.session.user.id,
+          })
+        }
+        if (!customerId) {
+          if (!ctx.session?.user?.id) {
+            throw new TRPCError({
+              code: 'UNAUTHORIZED',
+              message: 'User must be logged in to create a subscription',
+            })
+          }
+
+          // Create a new customer even if createCustomer is not implemented
+          try {
+            if (!ctx.adapters.billing.stripe) {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Stripe adapter not initialized',
+              })
+            }
+
+            const customer = await ctx.adapters.billing.stripe.customers.create({
+              metadata: {
+                accountId: input.workspaceId,
+                userId: ctx.session.user.id,
+              },
+              name: ctx.workspace?.name,
+              email,
+            })
+            customerId = customer.id
+
+            await upsertAccount({
+              id: input.workspaceId,
+              customerId,
+            })
+          } catch (error) {
+            ctx.logger.error('Error creating customer:', error)
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to create customer',
+              cause: error,
+            })
+          }
         }
 
         const counts = await getFeatureCounts({
           accountId: input.workspaceId,
         })
+
+        if (!customerId) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create or retrieve customer ID',
+          })
+        }
 
         return ctx.adapters.billing.createCheckoutSession({
           customerId,
@@ -264,11 +345,23 @@ export const billingRouter = createTRPCRouter({
         email,
       })
 
+      // If we found an existing customer, ensure it has the userId in metadata
+      if (customerId && ctx.adapters.billing.updateCustomer && ctx.session?.user?.id) {
+        await ctx.adapters.billing.updateCustomer({
+          customerId,
+          accountId: input.workspaceId,
+          userId: ctx.session.user.id,
+          email,
+          name: ctx.workspace?.name,
+        })
+      }
+
       if (!customerId && ctx.adapters.billing.createCustomer) {
         customerId = await ctx.adapters.billing.createCustomer?.({
           accountId: input.workspaceId,
           name: ctx.workspace?.name,
           email,
+          userId: ctx.session?.user?.id,
         })
 
         await upsertAccount({

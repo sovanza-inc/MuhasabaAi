@@ -42,32 +42,59 @@ export const createStripeWebhookHandler =
           })
 
           // Update our new user_subscriptions table
-          const customer = subscription.customer as Stripe.Customer
-          const userId = customer.metadata.userId // Make sure to set this when creating customer
+          const customer = await adapter.stripe.customers.retrieve(subscription.customer as string) as Stripe.Customer
+          const userId = customer.metadata?.userId // Make sure to set this when creating customer
+
+          console.log('[Stripe] Processing subscription update:', {
+            subscriptionId: subscription.id,
+            customerId: customer.id,
+            userId,
+            metadata: customer.metadata,
+            status: subscription.status,
+          })
 
           if (userId) {
-            await db
-              .insert(userSubscriptions)
-              .values({
-                id: userId,
-                status: subscription.status === 'active' ? 'active' : 'free',
+            try {
+              const planId = subscription.metadata?.planId || ''
+              const status = subscription.status === 'active' ? 'active' as const : 'free' as const
+              const values = {
+                userId,
+                planId,
+                status,
                 stripeCustomerId: customer.id,
                 stripeSubscriptionId: subscription.id,
                 currentPeriodStart: new Date(subscription.current_period_start * 1000),
                 currentPeriodEnd: new Date(subscription.current_period_end * 1000),
                 cancelAtPeriodEnd: subscription.cancel_at_period_end,
-              })
-              .onConflictDoUpdate({
-                target: userSubscriptions.id,
-                set: {
-                  status: subscription.status === 'active' ? 'active' : 'free',
-                  stripeCustomerId: customer.id,
-                  stripeSubscriptionId: subscription.id,
-                  currentPeriodStart: new Date(subscription.current_period_start * 1000),
-                  currentPeriodEnd: new Date(subscription.current_period_end * 1000),
-                  cancelAtPeriodEnd: subscription.cancel_at_period_end,
-                },
-              })
+              } as const
+
+              // First try to find if a subscription already exists
+              const existingSub = await db
+                .select()
+                .from(userSubscriptions)
+                .where(eq(userSubscriptions.userId, userId))
+                .limit(1)
+
+              if (existingSub.length > 0) {
+                // Update existing subscription
+                await db
+                  .update(userSubscriptions)
+                  .set(values)
+                  .where(eq(userSubscriptions.userId, userId))
+              } else {
+                // Insert new subscription
+                await db
+                  .insert(userSubscriptions)
+                  .values(values)
+              }
+
+              console.log('[Stripe] Successfully updated user_subscriptions table with values:', values)
+
+            } catch (error) {
+              console.error('[Stripe] Error updating user_subscriptions for subscription update:', error)
+            }
+          } else {
+            console.error('[Stripe] No userId found in customer metadata for subscription update:', customer.metadata)
           }
           break
         }
@@ -75,13 +102,95 @@ export const createStripeWebhookHandler =
           const checkoutSession = event.data.object as Stripe.Checkout.Session
           if (
             checkoutSession.mode === 'subscription' &&
-            checkoutSession.subscription
+            checkoutSession.subscription &&
+            checkoutSession.customer
           ) {
             const subscriptionId =
               typeof checkoutSession.subscription === 'string'
                 ? checkoutSession.subscription
                 : checkoutSession.subscription.id
 
+            // Get the full subscription details
+            const subscription = await adapter.stripe.subscriptions.retrieve(subscriptionId)
+            const customer = await adapter.stripe.customers.retrieve(checkoutSession.customer as string) as Stripe.Customer
+            const workspaceId = customer.metadata?.accountId
+            // Try to get userId from multiple places
+            const userId = customer.metadata?.userId
+
+            if (!userId) {
+              console.error('[Stripe] No userId found in customer metadata:', customer.metadata)
+              return // Skip processing if no userId is found
+            }
+
+            // Ensure subscription metadata has userId
+            if (userId && subscription.metadata?.userId !== userId) {
+              await adapter.stripe.subscriptions.update(subscriptionId, {
+                metadata: {
+                  ...subscription.metadata,
+                  userId,
+                  planId: subscription.metadata?.planId || checkoutSession.metadata?.planId || '',
+                }
+              })
+            }
+
+            console.log('[Stripe] Processing checkout session completion:', {
+              subscriptionId,
+              customerId: customer.id,
+              workspaceId,
+              userId,
+              metadata: {
+                customer: customer.metadata,
+                subscription: subscription.metadata,
+                session: checkoutSession.metadata,
+              },
+            })
+
+            // First update the user_subscriptions table
+            if (userId) {
+              try {
+                const planId = subscription.metadata?.planId || checkoutSession.metadata?.planId || ''
+                const status = subscription.status === 'active' ? 'active' as const : 'free' as const
+                const values = {
+                  userId,
+                  planId,
+                  status,
+                  stripeCustomerId: customer.id,
+                  stripeSubscriptionId: subscription.id,
+                  currentPeriodStart: new Date(subscription.current_period_start * 1000),
+                  currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+                  cancelAtPeriodEnd: subscription.cancel_at_period_end,
+                } as const
+
+                // First try to find if a subscription already exists
+                const existingSub = await db
+                  .select()
+                  .from(userSubscriptions)
+                  .where(eq(userSubscriptions.userId, userId))
+                  .limit(1)
+
+                if (existingSub.length > 0) {
+                  // Update existing subscription
+                  await db
+                    .update(userSubscriptions)
+                    .set(values)
+                    .where(eq(userSubscriptions.userId, userId))
+                } else {
+                  // Insert new subscription
+                  await db
+                    .insert(userSubscriptions)
+                    .values(values)
+                }
+
+                console.log('[Stripe] Successfully updated user_subscriptions table with values:', values)
+
+              } catch (error) {
+                console.error('[Stripe] Error updating user_subscriptions:', error)
+              }
+            } else {
+              console.error('[Stripe] No userId found in customer metadata:', customer.metadata)
+            }
+
+            // Then update the billing_subscriptions table
             await adapter.syncSubscriptionStatus({
               subscriptionId,
               initial: true,
