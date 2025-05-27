@@ -73,6 +73,8 @@
     "@chakra-ui/icons": "2.2.4",
     "@fontsource/lato": "^5.1.1",
     "@leantechnologies/node-sdk": "^0.3.2",
+    "@stripe/react-stripe-js": "^3.7.0",
+    "@stripe/stripe-js": "^7.3.0",
     "jspdf-autotable": "^5.0.2",
     "openai": "^4.91.1"
   }

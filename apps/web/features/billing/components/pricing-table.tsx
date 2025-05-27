@@ -20,8 +20,12 @@ import {
 } from '@chakra-ui/react'
 import { BillingInterval, BillingPlan } from '@saas-ui-pro/billing'
 import { LuCheck } from 'react-icons/lu'
+import { useRouter } from 'next/navigation'
 
 import { SegmentedControl } from '@acme/ui/segmented-control'
+import { api } from '#lib/trpc/react'
+import { TRPCClientError } from '@trpc/client'
+import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 
 const defaultIntervals: PricingPeriod[] = [
   {
@@ -69,11 +73,81 @@ export const PricingTable: React.FC<PricingTableProps> = (props) => {
   const currentPlan = allPlans.find((plan) => plan.id === planId)
 
   const [loading, setLoading] = React.useState(false)
+  const router = useRouter()
+  const [workspace] = useCurrentWorkspace()
+  const createCheckoutSession = api.billing.createCheckoutSession.useMutation({
+    onMutate: (variables) => {
+      console.log('Starting checkout session creation with:', {
+        planId: variables.planId,
+        workspaceId: variables.workspaceId,
+        successUrl: variables.successUrl,
+        cancelUrl: variables.cancelUrl
+      })
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        console.log('Checkout session created successfully:', {
+          url: data.url,
+          workspace: workspace.id,
+          slug: workspace.slug
+        })
+        router.push(data.url)
+      } else {
+        console.error('No URL returned from checkout session creation')
+      }
+    },
+    onError: (error) => {
+      console.error('Error creating checkout session:', {
+        error,
+        workspace: workspace.id,
+        errorMessage: error.message,
+        data: error.data
+      })
+      setLoading(false)
+    }
+  })
+
+  const initializeSubscription = api.billing.initializeSubscription.useMutation()
+
   const updatePlan = async (plan: BillingPlan) => {
     setLoading(true)
+    console.log('Starting plan update:', {
+      planId: plan.id,
+      workspaceId: workspace.id,
+      workspaceSlug: workspace.slug,
+      origin: window.location.origin
+    })
     try {
-      await onUpdatePlan?.(plan)
-    } finally {
+      // First initialize the subscription
+      await initializeSubscription.mutateAsync({
+        planId: plan.id,
+        workspaceId: workspace.id,
+      })
+
+      const successUrl = `${window.location.origin}/${workspace.slug}?success=true`
+      const cancelUrl = `${window.location.origin}/${workspace.slug}?canceled=true`
+      
+      console.log('Calling createCheckoutSession with:', {
+        planId: plan.id,
+        workspaceId: workspace.id,
+        successUrl,
+        cancelUrl
+      })
+
+      await createCheckoutSession.mutateAsync({
+        planId: plan.id,
+        workspaceId: workspace.id,
+        successUrl,
+        cancelUrl,
+      })
+    } catch (error) {
+      console.error('Error in updatePlan:', {
+        error,
+        planId: plan.id,
+        workspaceId: workspace.id,
+        errorMessage: error instanceof TRPCClientError ? error.message : String(error),
+        errorData: error instanceof TRPCClientError ? error.data : undefined
+      })
       setLoading(false)
     }
   }

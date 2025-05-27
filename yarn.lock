@@ -7418,6 +7418,26 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@stripe/react-stripe-js@npm:^3.7.0":
+  version: 3.7.0
+  resolution: "@stripe/react-stripe-js@npm:3.7.0"
+  dependencies:
+    prop-types: "npm:^15.7.2"
+  peerDependencies:
+    "@stripe/stripe-js": ">=1.44.1 <8.0.0"
+    react: ">=16.8.0 <20.0.0"
+    react-dom: ">=16.8.0 <20.0.0"
+  checksum: 10c0/663e9176b0a710632abe64bb7efca63a22d8cf690942a4507d57ba1d4fb6328cd08e3cf9040ea95348540c47ed8dbc5250982b150b38eb9564861dc0ecd83d72
+  languageName: node
+  linkType: hard
+
+"@stripe/stripe-js@npm:^7.3.0":
+  version: 7.3.0
+  resolution: "@stripe/stripe-js@npm:7.3.0"
+  checksum: 10c0/251383a9832d711f9b31779e735b7069e8effd5f6fd382a40b8858990c17dad57e0356086441996cb5c7e91cfc73599bb279b32f5be6e76fdde6619db942c605
+  languageName: node
+  linkType: hard
+
 "@supabase/auth-js@npm:2.67.3":
   version: 2.67.3
   resolution: "@supabase/auth-js@npm:2.67.3"
@@ -16772,6 +16792,8 @@ __metadata:
     "@formatjs/cli": "npm:^6.3.15"
     "@leantechnologies/node-sdk": "npm:^0.3.2"
     "@ngneat/falso": "npm:^7.3.0"
+    "@stripe/react-stripe-js": "npm:^3.7.0"
+    "@stripe/stripe-js": "npm:^7.3.0"
     "@trivago/prettier-plugin-sort-imports": "npm:^5.2.1"
     "@turbo/gen": "npm:^2.3.3"
     "@types/node": "npm:^20.17.10"
@@ -18163,7 +18185,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prop-types@npm:^15.6.2, prop-types@npm:^15.8.1":
+"prop-types@npm:^15.6.2, prop-types@npm:^15.7.2, prop-types@npm:^15.8.1":
   version: 15.8.1
   resolution: "prop-types@npm:15.8.1"
   dependencies:

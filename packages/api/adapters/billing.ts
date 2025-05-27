@@ -1,4 +1,7 @@
+import type Stripe from 'stripe'
+
 export interface BillingAdapter {
+  stripe?: Stripe
   /**
    * Returns the customer ID.
    */
@@ -13,8 +16,9 @@ export interface BillingAdapter {
    */
   createCustomer?: (params: {
     accountId: string
-    name?: string
-    email?: string
+    name?: string | null
+    email?: string | null
+    userId?: string
   }) => Promise<string>
 
   /**
@@ -25,6 +29,7 @@ export interface BillingAdapter {
     accountId: string
     name?: string
     email?: string
+    userId?: string
   }) => Promise<void>
 
   /**
@@ -33,6 +38,7 @@ export interface BillingAdapter {
   createCheckoutSession: (params: {
     customerId: string
     planId: string
+    userId: string
     counts?: Record<string, number>
     successUrl: string
     cancelUrl: string
@@ -94,4 +100,16 @@ export interface BillingAdapter {
     featureId: string
     quantity: number
   }) => Promise<void>
+
+  /**
+   * Creates a payment intent for direct payment processing
+   */
+  createPaymentIntent: (params: {
+    amount: number
+    currency: string
+    metadata?: Record<string, string>
+    receipt_email?: string
+  }) => Promise<{
+    clientSecret: string
+  }>
 }

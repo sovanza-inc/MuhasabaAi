@@ -83,3 +83,5 @@ export {
 export type { ActivityLogModel } from './activity-logs/activity-logs.sql'
 
 export * from './questionnaire/questionnaire.sql'
+
+export * from './billing/user-subscriptions.sql'

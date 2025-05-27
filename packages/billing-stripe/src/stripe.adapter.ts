@@ -2,6 +2,7 @@ import Stripe from 'stripe'
 
 import * as billingService from '@acme/api/modules/billing/billing.service'
 import type { BillingAdapter } from '@acme/api'
+import { db, userSubscriptions } from '@acme/db'
 
 import pkg from '../package.json'
 import { toISODateTime } from './utils'
@@ -52,15 +53,17 @@ export class StripeAdapter implements BillingAdapter {
 
   async createCustomer(params: {
     accountId: string
-    email?: string
-    name?: string
-  }) {
+    name?: string | null
+    email?: string | null
+    userId?: string
+  }): Promise<string> {
     const customer = await this.stripe.customers.create({
-      name: params.name ?? params.accountId,
-      email: params.email,
       metadata: {
         accountId: params.accountId,
+        userId: params.userId || '',
       },
+      ...(params.name ? { name: params.name } : {}),
+      ...(params.email ? { email: params.email } : {}),
     })
 
     return customer.id
@@ -71,12 +74,14 @@ export class StripeAdapter implements BillingAdapter {
     accountId: string
     email?: string
     name?: string
+    userId?: string
   }) {
     await this.stripe.customers.update(params.customerId, {
       name: params.name,
       email: params.email,
       metadata: {
         accountId: params.accountId,
+        userId: params.userId || '',
       },
     })
   }
@@ -84,6 +89,7 @@ export class StripeAdapter implements BillingAdapter {
   async createCheckoutSession(params: {
     customerId: string
     planId: string
+    userId: string
     counts?: Record<string, number>
     successUrl: string
     cancelUrl: string
@@ -118,6 +124,11 @@ export class StripeAdapter implements BillingAdapter {
           throw new Error('Invalid pricing plan')
         }
 
+        // Get customer to get userId
+        const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
+        const userId = customer.metadata?.userId
+
+        // Then create the checkout session
         const response = await this.stripe.checkout.sessions.create({
           mode: 'subscription',
           payment_method_types: ['card'],
@@ -125,9 +136,14 @@ export class StripeAdapter implements BillingAdapter {
           customer: params.customerId,
           line_items: lineItems,
           allow_promotion_codes: true,
+          metadata: {
+            planId: params.planId,
+            userId: params.userId,
+          },
           subscription_data: {
             metadata: {
               planId: params.planId,
+              userId: params.userId,
             },
           },
           success_url: params.successUrl,
@@ -156,21 +172,30 @@ export class StripeAdapter implements BillingAdapter {
         throw new Error('Invalid pricing plan')
       }
 
-      const response = await this.stripe.checkout.sessions.create({
-        mode: 'subscription',
-        payment_method_types: ['card'],
-        billing_address_collection: 'required',
-        customer: params.customerId,
-        line_items: lineItems,
-        allow_promotion_codes: true,
-        subscription_data: {
+        // Get customer to get userId
+        const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
+        const userId = customer.metadata?.userId
+
+        const response = await this.stripe.checkout.sessions.create({
+          mode: 'subscription',
+          payment_method_types: ['card'],
+          billing_address_collection: 'required',
+          customer: params.customerId,
+          line_items: lineItems,
+          allow_promotion_codes: true,
           metadata: {
             planId: params.planId,
+            userId: userId || '',
           },
-        },
-        success_url: params.successUrl,
-        cancel_url: params.cancelUrl,
-      })
+          subscription_data: {
+            metadata: {
+              planId: params.planId,
+              userId: userId || '',
+            },
+          },
+          success_url: params.successUrl,
+          cancel_url: params.cancelUrl,
+        })
 
       return {
         id: response.id,
@@ -188,26 +213,24 @@ export class StripeAdapter implements BillingAdapter {
   }) {
     const subscription = await this.stripe.subscriptions.retrieve(
       params.subscriptionId,
-      {
-        expand: ['default_payment_method', 'customer'],
-      },
     )
 
-    const customer = subscription.customer as Stripe.Customer
+    const customer = await this.stripe.customers.retrieve(
+      subscription.customer as string,
+    ) as Stripe.Customer
 
-    const accountId = customer.metadata.accountId
-    const planId = subscription.metadata.planId
+    const accountId = customer.metadata?.accountId
+    const userId = customer.metadata?.userId
 
-    if (!planId) {
-      throw new Error(
-        `Plan for price id ${subscription.items.data[0].price.id} not found`,
-      )
+    if (!accountId) {
+      throw new Error('No accountId found in customer metadata')
     }
 
+    // Update billing_subscriptions table
     await billingService.upsertSubscription({
       id: params.subscriptionId,
       accountId,
-      planId,
+      planId: subscription.metadata?.planId || '',
       metadata: subscription.metadata,
       status: subscription.status,
       quantity: 1,
@@ -229,6 +252,38 @@ export class StripeAdapter implements BillingAdapter {
         ? toISODateTime(subscription.trial_end)
         : null,
     })
+
+    // Update user_subscriptions table
+    if (userId) {
+      try {
+        await db
+          .insert(userSubscriptions)
+          .values({
+            userId,
+            planId: subscription.metadata?.planId || '',
+            status: subscription.status === 'active' ? 'active' : 'free',
+            stripeCustomerId: customer.id,
+            stripeSubscriptionId: subscription.id,
+            currentPeriodStart: new Date(subscription.current_period_start * 1000),
+            currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+            cancelAtPeriodEnd: subscription.cancel_at_period_end,
+          })
+          .onConflictDoUpdate({
+            target: [userSubscriptions.userId],
+            set: {
+              planId: subscription.metadata?.planId || '',
+              status: subscription.status === 'active' ? 'active' : 'free',
+              stripeCustomerId: customer.id,
+              stripeSubscriptionId: subscription.id,
+              currentPeriodStart: new Date(subscription.current_period_start * 1000),
+              currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+              cancelAtPeriodEnd: subscription.cancel_at_period_end,
+            },
+          })
+      } catch (error) {
+        console.error('[Stripe] Error updating user_subscriptions in syncSubscriptionStatus:', error)
+      }
+    }
 
     if (params.initial) {
       await billingService.updateAccount({
@@ -328,5 +383,26 @@ export class StripeAdapter implements BillingAdapter {
         stripe_customer_id: params.customerId,
       },
     })
+  }
+
+  async createPaymentIntent(params: {
+    amount: number
+    currency: string
+    metadata?: Record<string, string>
+    receipt_email?: string
+  }) {
+    const paymentIntent = await this.stripe.paymentIntents.create({
+      amount: Math.round(params.amount * 100), // Convert to cents
+      currency: params.currency.toLowerCase(),
+      metadata: params.metadata,
+      receipt_email: params.receipt_email,
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    return {
+      clientSecret: paymentIntent.client_secret!,
+    };
   }
 }

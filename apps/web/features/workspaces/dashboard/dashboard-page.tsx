@@ -28,6 +28,8 @@ import { AreaChart, BarChart } from '@saas-ui/charts'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { usePath } from '#features/common/hooks/use-path'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
+import { useSearchParams } from 'next/navigation'
+import { api } from '#lib/trpc/react'
 import { FinancialKPIs } from './metrics/financial-kpis'
 
 interface ConnectedBank {
@@ -74,13 +76,41 @@ interface BankTransaction {
 }
 
 export function DashboardPage() {
+  const searchParams = useSearchParams()
+  const handleSubscriptionSuccess = api.billing.handleSubscriptionSuccess.useMutation()
+  const [workspace] = useCurrentWorkspace()
+
+  // Handle subscription success
+  React.useEffect(() => {
+    const success = searchParams.get('success')
+    const handled = searchParams.get('handled')
+    
+    if (success === 'true' && !handled && workspace?.id && !handleSubscriptionSuccess.isPending) {
+      console.log('Updating subscription for workspace:', workspace.id)
+      handleSubscriptionSuccess.mutate(
+        { workspaceId: workspace.id },
+        {
+          onSuccess: () => {
+            console.log('Subscription updated successfully')
+            // Update URL to prevent multiple calls
+            const url = new URL(window.location.href)
+            url.searchParams.set('handled', 'true')
+            window.history.replaceState({}, '', url.toString())
+          },
+          onError: (error) => {
+            console.error('Failed to update subscription:', error)
+          }
+        }
+      )
+    }
+  }, [searchParams, workspace?.id, handleSubscriptionSuccess])
+
   const [isLoading, setIsLoading] = useState(true)
   const [transactions, setTransactions] = useState<BankTransaction[]>([])
   const [authToken, setAuthToken] = useState<string | null>(null)
   const [customerId, setCustomerId] = useState<string | null>(null)
   const [connectedBanks, setConnectedBanks] = useState<ConnectedBank[]>([])
   const [accounts, setAccounts] = useState<BankAccount[]>([])
-  const [workspace] = useCurrentWorkspace()
   const [selectedBankId, setSelectedBankId] = useState<string>('all')
   const { CACHE_KEYS, prefetchData } = useApiCache()
 

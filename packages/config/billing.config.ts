@@ -2,138 +2,47 @@ import type { BillingPlan } from '@saas-ui-pro/billing'
 
 export const plans: BillingPlan[] = [
   {
-    id: 'free@1',
+    id: 'premium',
     active: true,
-    name: 'Free',
-    description: 'For individuals.',
+    name: 'Premium Plan',
+    description: 'Full access to all features for 499 AED per month.',
     currency: 'AED',
     interval: 'month',
-    trialDays: 0,
     features: [
       {
         id: 'users',
+        priceId: 'price_1RSDvmB7S6nOH9harkSZJrQY',
         type: 'per_unit',
-        price: 0,
-        limit: 1,
+        price: 499,
+        label: 'Unlimited users',
+        included: true
       },
       {
         id: 'inbox',
+        included: true
       },
       {
         id: 'contacts',
+        included: true
       },
       {
         id: 'monthly_active_contacts',
-        label: 'Max 1000 MACs',
-        price: 0,
-        limit: 1000,
-      },
-    ],
-    metadata: {
-      price: 'AED 0',
-      priceLabel: 'per user/month',
-    },
-  },
-  {
-    id: 'basic@1',
-    active: true,
-    name: 'Professional',
-    description: 'For small teams.',
-    currency: 'AED',
-    interval: 'month',
-    trialDays: 14,
-    features: [
-      {
-        id: 'users',
-        label: 'Max 3',
-        priceId: 'price_1R1ZEKB7S6nOH9halTjxq2Jk',
-        type: 'per_unit',
-        price: 999,
-        limit: 3,
-      },
-      {
-        id: 'inbox',
-      },
-      {
-        id: 'contacts',
-      },
-      {
-        id: 'monthly_active_contacts',
-        label: '10000 MACs included',
-        price: 0,
-        tiers: [
-          {
-            upTo: 10000,
-            price: 0,
-          },
-          {
-            upTo: 100000,
-            price: 0.0001,
-          },
-          {
-            upTo: 'inf',
-            price: 0.00005,
-          },
-        ],
-      },
-    ],
-    metadata: {
-      price: 'AED 999',
-      priceLabel: 'per user/month',
-      productId: 'prod_RvQ4JGk6XGfhch',
-    },
-  },
-  {
-    id: 'premium@1',
-    active: true,
-    name: 'Enterprise',
-    description: 'For growing teams.',
-    currency: 'AED',
-    interval: 'month',
-    trialDays: 14,
-    features: [
-      {
-        id: 'users',
-        priceId: 'price_1R1ZGjB7S6nOH9haSPomIis9',
-        type: 'per_unit',
-        price: 4000,
-      },
-      {
-        id: 'inbox',
-      },
-      {
-        id: 'contacts',
-      },
-      {
-        id: 'monthly_active_contacts',
-        label: '10000 MACs included',
-        price: 0,
-        tiers: [
-          {
-            upTo: 10000,
-            price: 0,
-          },
-          {
-            upTo: 100000,
-            price: 0.0001,
-          },
-          {
-            upTo: 'inf',
-            price: 0.00005,
-          },
-        ],
+        label: 'Unlimited MACs',
+        included: true
       },
       {
         id: 'api',
+        included: true
       },
       {
         id: 'automations',
+        included: true
       },
     ],
     metadata: {
-      price: 'AED 4000',
-      priceLabel: 'per user/month',
-      productId: 'prod_RvQ6aOWR2I6IzV',
+      price: '499',
+      priceLabel: 'AED per month',
+      productId: 'prod_SMxr61ySaXc0h9',
     },
   },
 ]
