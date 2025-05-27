@@ -38,6 +38,7 @@ export interface BillingAdapter {
   createCheckoutSession: (params: {
     customerId: string
     planId: string
+    userId: string
     counts?: Record<string, number>
     successUrl: string
     cancelUrl: string

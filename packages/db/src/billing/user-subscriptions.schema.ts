@@ -10,7 +10,7 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', [
 
 export const userSubscriptions = pgTable('user_subscriptions', {
   id: uuid('id').primaryKey().defaultRandom(),
-  userId: uuid('user_id').notNull(),
+  userId: text('user_id').notNull(),
   planId: text('plan_id').notNull(),
   status: subscriptionStatusEnum('status').default('free').notNull(),
   stripeCustomerId: text('stripe_customer_id'),

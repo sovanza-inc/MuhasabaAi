@@ -57,6 +57,13 @@
       "when": 1748237687172,
       "tag": "0007_striped_spot",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1748324774722,
+      "tag": "0008_peaceful_johnny_blaze",
+      "breakpoints": true
     }
   ]
 }

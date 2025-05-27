@@ -7,7 +7,9 @@ import {
   publicProcedure,
 } from '#trpc'
 
-import { db, userSubscriptions } from '@acme/db'
+import { eq, desc, and } from 'drizzle-orm'
+
+import { db, userSubscriptions, workspaces } from '@acme/db'
 
 import { UpdateBillingAccountSchema } from './billing.schema'
 import {
@@ -19,6 +21,110 @@ import {
 } from './billing.service'
 
 export const billingRouter = createTRPCRouter({
+  /**
+   * Handle subscription success callback
+   */
+  handleSubscriptionSuccess: adminProcedure
+    .input(
+      z.object({}),
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.session?.user?.id) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'User not authenticated',
+        })
+      }
+
+      const now = new Date()
+      const thirtyDaysFromNow = new Date(now)
+      thirtyDaysFromNow.setDate(now.getDate() + 30)
+
+      // Find the subscription to update
+      const subscription = await db
+        .select()
+        .from(userSubscriptions)
+        .where(
+          and(
+            eq(userSubscriptions.userId, ctx.session.user.id),
+            eq(userSubscriptions.status, 'cancelled')
+          )
+        )
+        .orderBy(desc(userSubscriptions.createdAt))
+        .limit(1)
+        .execute()
+
+      // If no cancelled subscription is found, check if user has an active subscription
+      if (!subscription || subscription.length === 0) {
+        const activeSubscription = await db
+          .select()
+          .from(userSubscriptions)
+          .where(
+            and(
+              eq(userSubscriptions.userId, ctx.session.user.id),
+              eq(userSubscriptions.status, 'active')
+            )
+          )
+          .limit(1)
+          .execute()
+
+        if (activeSubscription && activeSubscription.length > 0) {
+          // User already has an active subscription, just return success
+          return { success: true }
+        }
+
+        // No active or cancelled subscription found
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'No subscription found for this user',
+        })
+      }
+
+      // Update the subscription to active
+      await db
+        .update(userSubscriptions)
+        .set({
+          status: 'active',
+          currentPeriodStart: now,
+          currentPeriodEnd: thirtyDaysFromNow,
+          updatedAt: now,
+        })
+        .where(eq(userSubscriptions.id, subscription[0].id))
+        .execute()
+
+      return { success: true }
+    }),
+  /**
+   * Initialize subscription before checkout
+   * @private
+   */
+  initializeSubscription: adminProcedure
+    .input(
+      z.object({
+        planId: z.string(),
+      }),
+    )
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.session?.user?.id) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'User must be logged in to create a subscription',
+        })
+      }
+
+      const now = new Date()
+      
+      // Create initial subscription record with cancelled status
+      await db.insert(userSubscriptions).values({
+        userId: ctx.session.user.id,
+        planId: input.planId,
+        status: 'cancelled', // Initial status before checkout
+        createdAt: now,
+        updatedAt: now,
+      })
+
+      return { success: true }
+    }),
   /**
    * Get available billing plans
    * @public
@@ -305,8 +411,43 @@ export const billingRouter = createTRPCRouter({
           })
         }
 
+        // Status update will be handled by handleSubscriptionSuccess endpoint
+
         // First save the subscription data in our database
+        ctx.logger.info('Starting subscription data save', {
+          userId: ctx.session?.user?.id,
+          planId: input.planId,
+          customerId,
+          sessionInfo: {
+            user: ctx.session?.user,
+            workspace: ctx.workspace
+          }
+        })
+
         try {
+          if (!ctx.session?.user?.id) {
+            const error = new Error('User ID is required')
+            ctx.logger.error('Missing user ID in session', {
+              session: ctx.session,
+              error
+            })
+            throw error
+          }
+
+          const now = new Date()
+          const thirtyDaysFromNow = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000)
+
+          ctx.logger.info('Inserting subscription data', {
+            insertData: {
+              userId: ctx.session.user.id,
+              planId: input.planId,
+              status: 'active',
+              stripeCustomerId: customerId,
+              currentPeriodStart: now,
+              currentPeriodEnd: thirtyDaysFromNow
+            }
+          })
+
           await db
             .insert(userSubscriptions)
             .values({
@@ -315,9 +456,11 @@ export const billingRouter = createTRPCRouter({
               status: 'active',
               stripeCustomerId: customerId,
               stripeSubscriptionId: null, // We don't have this yet
-              currentPeriodStart: new Date(),
-              currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days from now
+              currentPeriodStart: now,
+              currentPeriodEnd: thirtyDaysFromNow,
               cancelAtPeriodEnd: false,
+              createdAt: now,
+              updatedAt: now,
             })
             .onConflictDoUpdate({
               target: [userSubscriptions.userId],
@@ -325,21 +468,38 @@ export const billingRouter = createTRPCRouter({
                 planId: input.planId,
                 status: 'active',
                 stripeCustomerId: customerId,
+                currentPeriodStart: now,
+                currentPeriodEnd: thirtyDaysFromNow,
+                updatedAt: now,
               },
             })
 
-          ctx.logger.info('Saved subscription to database', {
+          ctx.logger.info('Successfully saved subscription data', {
             userId: ctx.session.user.id,
             planId: input.planId,
+            customerId
           })
         } catch (error) {
-          ctx.logger.error('Error saving subscription to database:', error)
-          // Continue even if DB save fails - we can update it later via webhook
+          ctx.logger.error('Error saving subscription to database:', {
+            error,
+            userId: ctx.session?.user?.id,
+            planId: input.planId,
+            customerId
+          })
+          // Continue even if DB save fails - we'll still create the checkout session
+        }
+
+        if (!ctx.session?.user?.id) {
+          throw new TRPCError({
+            code: 'UNAUTHORIZED',
+            message: 'User must be logged in to create a subscription',
+          })
         }
 
         return ctx.adapters.billing.createCheckoutSession({
           customerId,
           planId: input.planId,
+          userId: ctx.session.user.id,
           counts,
           successUrl: input.successUrl,
           cancelUrl: input.cancelUrl,

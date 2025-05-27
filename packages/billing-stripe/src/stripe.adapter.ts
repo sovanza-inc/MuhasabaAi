@@ -89,6 +89,7 @@ export class StripeAdapter implements BillingAdapter {
   async createCheckoutSession(params: {
     customerId: string
     planId: string
+    userId: string
     counts?: Record<string, number>
     successUrl: string
     cancelUrl: string
@@ -137,12 +138,12 @@ export class StripeAdapter implements BillingAdapter {
           allow_promotion_codes: true,
           metadata: {
             planId: params.planId,
-            userId: customer.metadata?.userId || '',
+            userId: params.userId,
           },
           subscription_data: {
             metadata: {
               planId: params.planId,
-              userId: customer.metadata?.userId || '',
+              userId: params.userId,
             },
           },
           success_url: params.successUrl,
