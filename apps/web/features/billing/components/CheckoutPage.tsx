@@ -7,7 +7,7 @@ import {
   useToast,
   Button,
 } from '@chakra-ui/react';
-import { useRouter } from 'next/navigation';
+// Router import removed as it's not being used
 import { api } from '#lib/trpc/react';
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace';
 import {
@@ -31,7 +31,7 @@ const CheckoutForm = () => {
   const elements = useElements();
   const [isLoading, setIsLoading] = React.useState(false);
   const [workspace] = useCurrentWorkspace();
-  const router = useRouter();
+  // Router instance removed as it's not being used
   const toast = useToast();
   const utils = api.useUtils();
 
@@ -60,10 +60,18 @@ const CheckoutForm = () => {
           status: 'error',
         });
       } else if (paymentIntent.status === 'succeeded') {
-        // Create subscription in database and update workspace
+        // Invalidate cache and redirect to dashboard with success parameter
         try {
+          // Invalidate workspace data to ensure fresh data is fetched
           await utils.workspaces.invalidate();
-          router.push(`/${workspace.slug}`);
+          
+          // Construct the dashboard URL with success parameter
+          const dashboardUrl = `/${workspace.slug}?success=true`;
+          
+          // Use replace instead of push to prevent going back to checkout
+          window.location.href = dashboardUrl;
+          
+          // Show success toast (though user will be redirected)
           toast({
             title: 'Payment successful',
             description: 'Your subscription has been activated.',

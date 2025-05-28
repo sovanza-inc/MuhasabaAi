@@ -56,13 +56,30 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
         hasCheckedSubscription.current = true
 
         if (subscriptionResponse.status === 404) {
-          router.push(`/${workspace.slug}/settings/plans`)
+          // Only redirect to plans page if we're not already there and there's no subscription at all
+          if (!pathname.includes('/settings/plans')) {
+            router.push(`/${workspace.slug}/settings/plans`)
+          }
           if (isMounted) {
             setIsLoading(false)
           }
           return
         }
 
+        // If we got a successful response but the subscription is not active
+        if (subscriptionResponse.ok) {
+          const data = await subscriptionResponse.json()
+          // If the subscription exists but is not active, don't redirect
+          // The dashboard will handle showing the appropriate UI
+          if (!data.hasActiveSubscription) {
+            if (isMounted) {
+              setIsLoading(false)
+            }
+            return
+          }
+        }
+
+        
         setIsLoading(false)
       } catch {
         if (isMounted) {
