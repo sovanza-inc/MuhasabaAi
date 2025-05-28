@@ -95,7 +95,6 @@ export function PlansPage() {
         planId={currentPlan?.id}
         plans={plans}
         features={features}
-        onUpdatePlan={onUpdatePlan}
         intervals={[]}
       />
     </SettingsPage>
