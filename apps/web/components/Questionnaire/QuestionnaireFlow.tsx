@@ -3,6 +3,7 @@
 import React from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
+import { useAuth } from '@saas-ui/auth-provider'
 import { QuestionnaireForm } from './QuestionnaireForm'
 import {
   Modal,
@@ -23,69 +24,111 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
   const router = useRouter()
   const pathname = usePathname()
   const toast = useToast()
+  const { user } = useAuth()
   const [workspace, workspaceState] = useCurrentWorkspace()
   const [showQuestionnaire, setShowQuestionnaire] = React.useState(false)
   const [isLoading, setIsLoading] = React.useState(true)
+  const hasCheckedSubscription = React.useRef(false)
   const hasCheckedQuestionnaire = React.useRef(false)
   const isNavigating = React.useRef(false)
 
-  // Reset states when workspace changes
-  React.useEffect(() => {
-    hasCheckedQuestionnaire.current = false
-    isNavigating.current = false
-    setShowQuestionnaire(false)
-    setIsLoading(true)
-  }, [workspace?.id])
-
-  // Check if user needs to fill questionnaire
+  // First check subscription
   React.useEffect(() => {
     let isMounted = true
 
-    const checkQuestionnaire = async () => {
-      // Don't proceed if we're navigating or if workspace is not ready
-      if (isNavigating.current || !workspace?.id || !workspaceState.isSuccess) {
+    const checkSubscription = async () => {
+      if (isNavigating.current || !workspace?.id || !workspaceState.isSuccess || !user?.id) {
         return
       }
 
-      // Prevent multiple checks in the same session
-      if (hasCheckedQuestionnaire.current) {
+      if (hasCheckedSubscription.current) {
         return
       }
 
       try {
-        // First check if questionnaire exists
-        const response = await fetch(`/api/questionnaire?workspaceId=${workspace.id}`, {
+        const subscriptionResponse = await fetch(`/api/user-subscriptions?user_id=${user?.id}`, {
           method: 'GET',
           headers: {
             'Content-Type': 'application/json',
           },
         })
 
-        // If no questionnaire found, show the form
-        if (response.status === 404) {
+        hasCheckedSubscription.current = true
+
+        if (subscriptionResponse.status === 404) {
+          router.push(`/${workspace.slug}/settings/plans`)
+          if (isMounted) {
+            setIsLoading(false)
+          }
+          return
+        }
+
+        setIsLoading(false)
+      } catch (error) {
+        if (isMounted) {
+          toast({
+            title: 'Error',
+            description: 'Failed to check subscription status.',
+            status: 'error',
+            duration: 5000,
+            isClosable: true,
+          })
+          setIsLoading(false)
+        }
+      }
+    }
+
+    checkSubscription()
+
+    return () => {
+      isMounted = false
+    }
+  }, [workspace?.id, workspaceState.isSuccess, pathname, router, toast, user?.id])
+
+  // Then check questionnaire only if subscription exists and we're not on plans page
+  React.useEffect(() => {
+    let isMounted = true
+
+    const checkQuestionnaire = async () => {
+      if (isNavigating.current || !workspace?.id || !workspaceState.isSuccess || !user?.id) {
+        return
+      }
+
+      if (!hasCheckedSubscription.current || pathname.includes('/settings/plans')) {
+        return
+      }
+
+      if (hasCheckedQuestionnaire.current) {
+        return
+      }
+
+      try {
+        const questionnaireResponse = await fetch(`/api/questionnaire?userId=${user?.id}&workspaceId=${workspace.id}`, {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+        })
+
+        if (questionnaireResponse.status === 404) {
           if (isMounted) {
             setShowQuestionnaire(true)
-            setIsLoading(false)
             hasCheckedQuestionnaire.current = true
           }
           return
         }
 
-        // If questionnaire exists, check customer
-        await response.json()
+        await questionnaireResponse.json()
         
         if (isMounted) {
           hasCheckedQuestionnaire.current = true
           await checkCustomer()
         }
-      } catch {
+      } catch (error) {
         if (isMounted) {
-          setShowQuestionnaire(true)
-          setIsLoading(false)
-          hasCheckedQuestionnaire.current = true
           toast({
             title: 'Error',
-            description: 'Failed to check questionnaire status. Please try again.',
+            description: 'Failed to check questionnaire status.',
             status: 'error',
             duration: 5000,
             isClosable: true,
@@ -94,14 +137,12 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
       }
     }
 
-    if (workspace?.id && workspaceState.isSuccess) {
-      checkQuestionnaire()
-    }
+    checkQuestionnaire()
 
     return () => {
       isMounted = false
     }
-  }, [workspace?.id, workspaceState.isSuccess, pathname, router, toast])
+  }, [workspace?.id, workspaceState.isSuccess, pathname, router, toast, user?.id, hasCheckedSubscription.current])
 
   const checkCustomer = async () => {
     if (!workspace?.id) return
@@ -116,8 +157,6 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
         headers: { 'Authorization': `Bearer ${authData.access_token}` }
       })
 
-      // Just navigate to workspace root regardless of customer status
-      // This will let the normal bank integration flow handle 404 cases
       if (pathname !== `/${workspace.slug}`) {
         router.push(`/${workspace.slug}`)
       }
@@ -144,7 +183,6 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
     }
   }
 
-  // Show loading spinner only while workspace is loading and we're not navigating
   if ((!workspaceState.isSuccess && !isNavigating.current) || isLoading) {
     return (
       <Center h="100vh">
@@ -156,8 +194,7 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
   return (
     <>
       {children}
-      {/* Show the questionnaire modal if needed */}
-      {showQuestionnaire && (
+      {showQuestionnaire && !pathname.includes('/settings/plans') && (
         <Modal 
           isOpen={true}
           onClose={() => {}} 
