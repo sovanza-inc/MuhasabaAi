@@ -21,13 +21,7 @@ export function PlansPage() {
   const { currentPlan, plans } = useBilling()
   const [workspace] = useCurrentWorkspace()
   const utils = api.useUtils()
-  const [selectedPlan, setSelectedPlan] = React.useState<BillingPlan | null>(null)
-
-  const upgradePlan = api.billing.setSubscriptionPlan.useMutation({
-    onSuccess() {
-      utils.workspaces.invalidate()
-    },
-  })
+  const [selectedPlan] = React.useState<BillingPlan | null>(null)
 
   // Check for success parameter in URL and show success message
   React.useEffect(() => {
