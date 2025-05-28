@@ -17,9 +17,33 @@ import { ManageBillingButton } from './manage-billing-button'
 import { CheckoutPage } from '#features/billing/components/CheckoutPage'
 
 export function PlansPage() {
+  const snackbar = useSnackbar()
   const { currentPlan, plans } = useBilling()
   const [workspace] = useCurrentWorkspace()
+  const utils = api.useUtils()
   const [selectedPlan, setSelectedPlan] = React.useState<BillingPlan | null>(null)
+
+  const upgradePlan = api.billing.setSubscriptionPlan.useMutation({
+    onSuccess() {
+      utils.workspaces.invalidate()
+    },
+  })
+
+  // Check for success parameter in URL and show success message
+  React.useEffect(() => {
+    const url = new URL(window.location.href)
+    const success = url.searchParams.get('success')
+    
+    if (success === 'true') {
+      url.searchParams.delete('success')
+      window.history.replaceState({}, '', url.toString())
+      utils.workspaces.invalidate()
+      snackbar.success({
+        title: 'Payment successful',
+        description: 'Your subscription has been updated. It may take a moment to reflect in your account.',
+      })
+    }
+  }, [snackbar, utils.workspaces])
 
   if (selectedPlan) {
     return (
