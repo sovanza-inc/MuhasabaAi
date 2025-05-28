@@ -124,7 +124,7 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
           hasCheckedQuestionnaire.current = true
           await checkCustomer()
         }
-      } catch (error) {
+      } catch (_) {
         if (isMounted) {
           toast({
             title: 'Error',
@@ -160,7 +160,7 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
       if (pathname !== `/${workspace.slug}`) {
         router.push(`/${workspace.slug}`)
       }
-    } catch {
+    } catch (_) {
       toast({
         title: 'Error',
         description: 'Failed to verify customer status.',

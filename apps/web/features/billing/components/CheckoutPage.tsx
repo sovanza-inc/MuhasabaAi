@@ -21,11 +21,8 @@ import { loadStripe } from '@stripe/stripe-js';
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 interface CheckoutPageProps {
-  planId: string;
-  planName: string;
   price: number;
   currency: string;
-  priceLabel: string;
 }
 
 const CheckoutForm = ({ planId }: { planId: string }) => {
@@ -115,11 +112,8 @@ const CheckoutForm = ({ planId }: { planId: string }) => {
 };
 
 export const CheckoutPage = ({
-  planId,
-  planName,
   price,
   currency,
-  priceLabel,
 }: CheckoutPageProps) => {
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
   const [workspace] = useCurrentWorkspace();
@@ -142,12 +136,12 @@ export const CheckoutPage = ({
     if (workspace) {
       createPaymentIntent.mutate({
         workspaceId: workspace.id,
-        planId,
+        planId: '',
         amount: price,
         currency,
       });
     }
-  }, [workspace, planId, price, currency]);
+  }, [workspace, price, currency]);
 
   if (!clientSecret) {
     return (
@@ -160,7 +154,7 @@ export const CheckoutPage = ({
   return (
     <Container maxW="container.sm" py={8}>
       <Elements stripe={stripePromise} options={{ clientSecret }}>
-        <CheckoutForm planId={planId} />
+        <CheckoutForm planId="" />
       </Elements>
     </Container>
   );
