@@ -9,7 +9,7 @@ import {
 
 import { eq, desc, and } from 'drizzle-orm'
 
-import { db, userSubscriptions, workspaces } from '@acme/db'
+import { db, userSubscriptions } from '@acme/db'
 
 import { UpdateBillingAccountSchema } from './billing.schema'
 import {
@@ -196,7 +196,7 @@ export const billingRouter = createTRPCRouter({
   /**
    * List invoices for a customer (workspace)
    */
-  listInvoices: adminProcedure.query(async ({ input, ctx }) => {
+  listInvoices: adminProcedure.input(z.object({ workspaceId: z.string() })).query(async ({ input, ctx }) => {
     const account = await getAccount(input.workspaceId)
 
     if (!account) {

@@ -1,5 +1,5 @@
-import { and, db, eq } from '@acme/db'
-import { userSubscriptions } from '@acme/db/billing'
+import { db, eq } from '@acme/db'
+import { userSubscriptions } from '@acme/db'
 import { TRPCError } from '@trpc/server'
 
 import { CreateUserSubscriptionSchema, UpdateUserSubscriptionSchema } from './user-subscriptions.schema'

@@ -22,10 +22,8 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 
 interface CheckoutPageProps {
   planId: string;
-  planName: string;
   price: number;
   currency: string;
-  priceLabel: string;
 }
 
 const CheckoutForm = ({ planId }: { planId: string }) => {
@@ -116,10 +114,8 @@ const CheckoutForm = ({ planId }: { planId: string }) => {
 
 export const CheckoutPage = ({
   planId,
-  planName,
   price,
   currency,
-  priceLabel,
 }: CheckoutPageProps) => {
   const [clientSecret, setClientSecret] = React.useState<string | null>(null);
   const [workspace] = useCurrentWorkspace();
