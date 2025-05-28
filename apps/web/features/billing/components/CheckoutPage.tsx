@@ -62,7 +62,7 @@ const CheckoutForm = ({ planId }: { planId: string }) => {
           status: 'error',
         });
       } else if (paymentIntent.status === 'succeeded') {
-        // Create subscription in database
+        // Create subscription in database and update workspace
         try {
           await utils.workspaces.invalidate();
           router.push(`/${workspace.slug}`);
