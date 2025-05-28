@@ -64,7 +64,7 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
         }
 
         setIsLoading(false)
-      } catch (_error) {
+      } catch {
         if (isMounted) {
           toast({
             title: 'Error',
@@ -124,7 +124,7 @@ export function QuestionnaireFlow({ children }: QuestionnaireFlowProps) {
           hasCheckedQuestionnaire.current = true
           await checkCustomer()
         }
-      } catch (_error) {
+      } catch {
         if (isMounted) {
           toast({
             title: 'Error',

@@ -25,10 +25,7 @@ export const billingRouter = createTRPCRouter({
    * Handle subscription success callback
    */
   handleSubscriptionSuccess: adminProcedure
-    .input(
-      z.object({}),
-    )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ ctx }) => {
       if (!ctx.session?.user?.id) {
         throw new TRPCError({
           code: 'UNAUTHORIZED',
