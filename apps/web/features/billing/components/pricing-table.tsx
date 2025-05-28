@@ -59,7 +59,6 @@ export const PricingTable: React.FC<PricingTableProps> = (props) => {
     planId,
     plans: allPlans,
     features,
-    onUpdatePlan,
     defaultInterval = 'month',
     intervals = defaultIntervals,
     ...rest

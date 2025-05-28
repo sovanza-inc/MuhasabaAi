@@ -1,4 +1,4 @@
-import { and, db, eq } from '@acme/db'
+import { db, eq } from '@acme/db'
 import { userSubscriptions } from '@acme/db/billing'
 import { TRPCError } from '@trpc/server'
 

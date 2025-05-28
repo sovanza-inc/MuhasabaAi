@@ -1,5 +1,4 @@
 import { pgTable, text, timestamp, boolean, uuid, pgEnum } from 'drizzle-orm/pg-core'
-import { sql } from 'drizzle-orm'
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'free',
@@ -20,13 +19,9 @@ export const userSubscriptions = pgTable('user_subscriptions', {
   cancelAtPeriodEnd: boolean('cancel_at_period_end').default(false).notNull(),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-}, (table) => ({
-  // Add any indexes or constraints here if needed
-}))
+})
 
 export type UserSubscription = typeof userSubscriptions.$inferSelect
 export type NewUserSubscription = typeof userSubscriptions.$inferInsert
 
-// This is needed for Drizzle to recognize this as a migration file
-// @ts-ignore
-sql`CREATE TYPE subscription_status AS ENUM ('free', 'active', 'cancelled', 'expired')`;
+

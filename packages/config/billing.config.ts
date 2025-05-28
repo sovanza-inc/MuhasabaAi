@@ -1,6 +1,16 @@
 import type { BillingPlan } from '@saas-ui-pro/billing'
 
-export const plans: BillingPlan[] = [
+// Extend the BillingFeature type to include the 'included' property
+type CustomBillingFeature = BillingPlan['features'][number] & {
+  included?: boolean
+}
+
+// Update the BillingPlan type to use our custom feature type
+type CustomBillingPlan = Omit<BillingPlan, 'features'> & {
+  features: CustomBillingFeature[]
+}
+
+export const plans: CustomBillingPlan[] = [
   {
     id: 'premium',
     active: true,

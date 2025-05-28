@@ -6440,6 +6440,17 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@saas-ui-pro/billing@npm:^0.14.0":
+  version: 0.14.0
+  resolution: "@saas-ui-pro/billing@npm:0.14.0"
+  dependencies:
+    date-fns: "npm:^4.1.0"
+  peerDependencies:
+    react: ">=18"
+  checksum: 10c0/6fa837560ec1b8c9d012f130ce1440c0459ac21a8fe806ef9fc787a7eaf72222a7b8b14eca9625e27aa983b594b50afdfc15d20ea373adaf693d2b5ab63d79e8
+  languageName: node
+  linkType: hard
+
 "@saas-ui-pro/feature-flags@npm:^0.17.0":
   version: 0.17.0
   resolution: "@saas-ui-pro/feature-flags@npm:0.17.0"
@@ -16792,6 +16803,7 @@ __metadata:
     "@formatjs/cli": "npm:^6.3.15"
     "@leantechnologies/node-sdk": "npm:^0.3.2"
     "@ngneat/falso": "npm:^7.3.0"
+    "@saas-ui-pro/billing": "npm:^0.14.0"
     "@stripe/react-stripe-js": "npm:^3.7.0"
     "@stripe/stripe-js": "npm:^7.3.0"
     "@trivago/prettier-plugin-sort-imports": "npm:^5.2.1"
