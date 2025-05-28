@@ -49,7 +49,6 @@ export interface PricingTableProps {
   planId?: string | null
   plans: BillingPlan[]
   features: PricingFeature[]
-  onUpdatePlan?(plan: BillingPlan): Promise<void>
   defaultInterval?: BillingInterval
   intervals?: PricingPeriod[]
 }

@@ -24,4 +24,5 @@ export const userSubscriptions = pgTable('user_subscriptions', {
 export type UserSubscription = typeof userSubscriptions.$inferSelect
 export type NewUserSubscription = typeof userSubscriptions.$inferInsert
 
-
+// This is needed for Drizzle to recognize this as a migration file
+// The SQL type is created by the pgEnum above, so we don't need to execute it here

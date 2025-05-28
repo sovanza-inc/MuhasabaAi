@@ -21,6 +21,7 @@ import { loadStripe } from '@stripe/stripe-js';
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 interface CheckoutPageProps {
+  planId: string;
   price: number;
   currency: string;
 }
@@ -59,7 +60,7 @@ const CheckoutForm = () => {
           status: 'error',
         });
       } else if (paymentIntent.status === 'succeeded') {
-        // Create subscription in database
+        // Create subscription in database and update workspace
         try {
           await utils.workspaces.invalidate();
           router.push(`/${workspace.slug}`);
@@ -112,6 +113,7 @@ const CheckoutForm = () => {
 };
 
 export const CheckoutPage = ({
+  planId,
   price,
   currency,
 }: CheckoutPageProps) => {
@@ -136,12 +138,12 @@ export const CheckoutPage = ({
     if (workspace) {
       createPaymentIntent.mutate({
         workspaceId: workspace.id,
-        planId: '',
+        planId,
         amount: price,
         currency,
       });
     }
-  }, [workspace, price, currency]);
+  }, [workspace, planId, price, currency]);
 
   if (!clientSecret) {
     return (

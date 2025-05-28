@@ -25,9 +25,6 @@ export const billingRouter = createTRPCRouter({
    * Handle subscription success callback
    */
   handleSubscriptionSuccess: adminProcedure
-    .input(
-      z.object({}),
-    )
     .mutation(async ({ ctx }) => {
       if (!ctx.session?.user?.id) {
         throw new TRPCError({
@@ -196,7 +193,7 @@ export const billingRouter = createTRPCRouter({
   /**
    * List invoices for a customer (workspace)
    */
-  listInvoices: adminProcedure.query(async ({ input, ctx }) => {
+  listInvoices: adminProcedure.input(z.object({ workspaceId: z.string() })).query(async ({ input, ctx }) => {
     const account = await getAccount(input.workspaceId)
 
     if (!account) {

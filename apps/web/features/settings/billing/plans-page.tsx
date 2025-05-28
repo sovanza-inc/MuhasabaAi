@@ -21,13 +21,7 @@ export function PlansPage() {
   const { currentPlan, plans } = useBilling()
   const [workspace] = useCurrentWorkspace()
   const utils = api.useUtils()
-  const [selectedPlan, setSelectedPlan] = React.useState<BillingPlan | null>(null)
-
-  const upgradePlan = api.billing.setSubscriptionPlan.useMutation({
-    onSuccess() {
-      utils.workspaces.invalidate()
-    },
-  })
+  const [selectedPlan] = React.useState<BillingPlan | null>(null)
 
   // Check for success parameter in URL and show success message
   React.useEffect(() => {
@@ -45,33 +39,10 @@ export function PlansPage() {
     }
   }, [snackbar, utils.workspaces])
 
-  const onUpdatePlan = async (plan: BillingPlan) => {
-    try {
-      if (!workspace.subscription || !workspace.subscription.accountId) {
-        setSelectedPlan(plan);
-      } else {
-        await upgradePlan.mutateAsync({
-          workspaceId: workspace.id,
-          planId: plan.id,
-        })
-
-        snackbar.success({
-          title: 'Plan upgraded',
-          description: `You are now on the ${plan.name} plan.`,
-        })
-      }
-    } catch (error: any) {
-      console.error(error)
-      snackbar.error({
-        title: 'Failed to upgrade plan',
-        description: error.message,
-      })
-    }
-  }
-
   if (selectedPlan) {
     return (
       <CheckoutPage
+        planId={selectedPlan.id}
         price={selectedPlan.features.find(f => f.price)?.price || 0}
         currency={selectedPlan.currency}
       />
@@ -94,7 +65,6 @@ export function PlansPage() {
         planId={currentPlan?.id}
         plans={plans}
         features={features}
-        onUpdatePlan={onUpdatePlan}
         intervals={[]}
       />
     </SettingsPage>

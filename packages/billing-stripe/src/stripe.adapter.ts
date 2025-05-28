@@ -124,6 +124,9 @@ export class StripeAdapter implements BillingAdapter {
           throw new Error('Invalid pricing plan')
         }
 
+        // Get customer to get metadata
+        const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
+
         // Then create the checkout session
         const response = await this.stripe.checkout.sessions.create({
           mode: 'subscription',
@@ -134,12 +137,12 @@ export class StripeAdapter implements BillingAdapter {
           allow_promotion_codes: true,
           metadata: {
             planId: params.planId,
-            userId: params.userId,
+            userId: customer.metadata?.userId || params.userId,
           },
           subscription_data: {
             metadata: {
               planId: params.planId,
-              userId: params.userId,
+              userId: customer.metadata?.userId || params.userId,
             },
           },
           success_url: params.successUrl,
@@ -168,27 +171,30 @@ export class StripeAdapter implements BillingAdapter {
         throw new Error('Invalid pricing plan')
       }
 
-      // Then create the checkout session
-      const response = await this.stripe.checkout.sessions.create({
-        mode: 'subscription',
-        payment_method_types: ['card'],
-        billing_address_collection: 'required',
-        customer: params.customerId,
-        line_items: lineItems,
-        allow_promotion_codes: true,
-        metadata: {
-          planId: params.planId,
-          userId: params.userId,
-        },
-        subscription_data: {
+        // Get customer to get userId
+        const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
+        const userId = customer.metadata?.userId
+
+        const response = await this.stripe.checkout.sessions.create({
+          mode: 'subscription',
+          payment_method_types: ['card'],
+          billing_address_collection: 'required',
+          customer: params.customerId,
+          line_items: lineItems,
+          allow_promotion_codes: true,
           metadata: {
             planId: params.planId,
-            userId: params.userId,
+            userId: userId || '',
           },
-        },
-        success_url: params.successUrl,
-        cancel_url: params.cancelUrl,
-      })
+          subscription_data: {
+            metadata: {
+              planId: params.planId,
+              userId: userId || '',
+            },
+          },
+          success_url: params.successUrl,
+          cancel_url: params.cancelUrl,
+        })
 
       return {
         id: response.id,
