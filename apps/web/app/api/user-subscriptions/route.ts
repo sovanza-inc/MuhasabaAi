@@ -36,14 +36,13 @@ export async function GET(request: Request) {
 
     const userSubscription = subscription[0]
 
-    // Only return 404 if the subscription is not active
-    if (userSubscription.status !== 'active') {
-      return new NextResponse('No active subscription found', { status: 404 })
-    }
-
-    return NextResponse.json(userSubscription)
+    // Return the subscription with its current status
+    return NextResponse.json({
+      ...userSubscription,
+      hasActiveSubscription: userSubscription.status === 'active'
+    })
   } catch (error) {
     console.error('Error fetching user subscription:', error)
     return new NextResponse('Internal Server Error', { status: 500 })
   }
-} 
+}
