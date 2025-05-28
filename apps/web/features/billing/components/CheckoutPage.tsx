@@ -7,7 +7,7 @@ import {
   useToast,
   Button,
 } from '@chakra-ui/react';
-import { useRouter } from 'next/navigation';
+// Router import removed as it's not being used
 import { api } from '#lib/trpc/react';
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace';
 import {
@@ -31,7 +31,7 @@ const CheckoutForm = () => {
   const elements = useElements();
   const [isLoading, setIsLoading] = React.useState(false);
   const [workspace] = useCurrentWorkspace();
-  const router = useRouter();
+  // Router instance removed as it's not being used
   const toast = useToast();
   const utils = api.useUtils();
 
