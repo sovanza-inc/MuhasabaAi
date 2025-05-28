@@ -1,5 +1,4 @@
 import { pgTable, text, timestamp, boolean, uuid, pgEnum } from 'drizzle-orm/pg-core'
-import { sql } from 'drizzle-orm'
 
 export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'free',
