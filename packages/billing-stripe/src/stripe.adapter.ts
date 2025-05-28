@@ -124,9 +124,8 @@ export class StripeAdapter implements BillingAdapter {
           throw new Error('Invalid pricing plan')
         }
 
-        // Get customer to get userId
+        // Get customer
         const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
-        const userId = customer.metadata?.userId
 
         // Then create the checkout session
         const response = await this.stripe.checkout.sessions.create({
@@ -172,30 +171,29 @@ export class StripeAdapter implements BillingAdapter {
         throw new Error('Invalid pricing plan')
       }
 
-        // Get customer to get userId
-        const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
-        const userId = customer.metadata?.userId
+      // Get customer
+      const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
 
-        const response = await this.stripe.checkout.sessions.create({
-          mode: 'subscription',
-          payment_method_types: ['card'],
-          billing_address_collection: 'required',
-          customer: params.customerId,
-          line_items: lineItems,
-          allow_promotion_codes: true,
+      const response = await this.stripe.checkout.sessions.create({
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        billing_address_collection: 'required',
+        customer: params.customerId,
+        line_items: lineItems,
+        allow_promotion_codes: true,
+        metadata: {
+          planId: params.planId,
+          userId: customer.metadata?.userId || '',
+        },
+        subscription_data: {
           metadata: {
             planId: params.planId,
-            userId: userId || '',
+            userId: customer.metadata?.userId || '',
           },
-          subscription_data: {
-            metadata: {
-              planId: params.planId,
-              userId: userId || '',
-            },
-          },
-          success_url: params.successUrl,
-          cancel_url: params.cancelUrl,
-        })
+        },
+        success_url: params.successUrl,
+        cancel_url: params.cancelUrl,
+      })
 
       return {
         id: response.id,

@@ -9,7 +9,7 @@ import {
 
 import { eq, desc, and } from 'drizzle-orm'
 
-import { db, userSubscriptions, workspaces } from '@acme/db'
+import { db, userSubscriptions } from '@acme/db'
 
 import { UpdateBillingAccountSchema } from './billing.schema'
 import {
@@ -28,7 +28,7 @@ export const billingRouter = createTRPCRouter({
     .input(
       z.object({}),
     )
-    .mutation(async ({ input, ctx }) => {
+    .mutation(async ({ ctx }) => {
       if (!ctx.session?.user?.id) {
         throw new TRPCError({
           code: 'UNAUTHORIZED',

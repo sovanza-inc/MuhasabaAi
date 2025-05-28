@@ -25,7 +25,7 @@ interface CheckoutPageProps {
   currency: string;
 }
 
-const CheckoutForm = ({ planId }: { planId: string }) => {
+const CheckoutForm = () => {
   const stripe = useStripe();
   const elements = useElements();
   const [isLoading, setIsLoading] = React.useState(false);
@@ -154,7 +154,7 @@ export const CheckoutPage = ({
   return (
     <Container maxW="container.sm" py={8}>
       <Elements stripe={stripePromise} options={{ clientSecret }}>
-        <CheckoutForm planId="" />
+        <CheckoutForm />
       </Elements>
     </Container>
   );
