@@ -73,10 +73,8 @@ export function PlansPage() {
     return (
       <CheckoutPage
         planId={selectedPlan.id}
-        planName={selectedPlan.name}
         price={selectedPlan.features.find(f => f.price)?.price || 0}
         currency={selectedPlan.currency}
-        priceLabel={selectedPlan.metadata.priceLabel}
       />
     );
   }
