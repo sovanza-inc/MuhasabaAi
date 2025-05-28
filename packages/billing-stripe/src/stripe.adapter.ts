@@ -124,9 +124,6 @@ export class StripeAdapter implements BillingAdapter {
           throw new Error('Invalid pricing plan')
         }
 
-        // Get customer
-        const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
-
         // Then create the checkout session
         const response = await this.stripe.checkout.sessions.create({
           mode: 'subscription',
@@ -171,9 +168,7 @@ export class StripeAdapter implements BillingAdapter {
         throw new Error('Invalid pricing plan')
       }
 
-      // Get customer
-      const customer = await this.stripe.customers.retrieve(params.customerId) as Stripe.Customer
-
+      // Then create the checkout session
       const response = await this.stripe.checkout.sessions.create({
         mode: 'subscription',
         payment_method_types: ['card'],
@@ -183,12 +178,12 @@ export class StripeAdapter implements BillingAdapter {
         allow_promotion_codes: true,
         metadata: {
           planId: params.planId,
-          userId: customer.metadata?.userId || '',
+          userId: params.userId,
         },
         subscription_data: {
           metadata: {
             planId: params.planId,
-            userId: customer.metadata?.userId || '',
+            userId: params.userId,
           },
         },
         success_url: params.successUrl,
