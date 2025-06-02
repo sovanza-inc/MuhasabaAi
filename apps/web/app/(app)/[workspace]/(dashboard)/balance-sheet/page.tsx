@@ -1,6 +1,6 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack, IconButton, ButtonGroup, Table, TableContainer, Tbody, Tr, Td, Tooltip } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack, IconButton, ButtonGroup, Tooltip } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
@@ -1332,7 +1332,7 @@ export default function BalanceSheetPage() {
                 <Box>
                   <Heading size="lg" mb={2}>Balance Sheet</Heading>
                   <Text color="gray.600" mb={4} fontSize="md">
-                    View your company's financial position with real-time balance sheet data.
+                    View your company&apos;s financial position with real-time balance sheet data.
                   </Text>
                 </Box>
                 <ButtonGroup>
