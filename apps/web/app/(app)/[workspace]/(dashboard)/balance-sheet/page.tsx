@@ -1,11 +1,11 @@
 'use client'
 
-import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack, IconButton } from '@chakra-ui/react'
+import { Box, Heading, Text, SimpleGrid, HStack, Card, CardBody, Select, Spinner, Button, useToast, Image, VStack, IconButton, ButtonGroup, Table, TableContainer, Tbody, Tr, Td, Tooltip } from '@chakra-ui/react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import React, { useRef, useState } from 'react'
-import { LuDownload, LuPlus } from 'react-icons/lu'
+import { LuDownload, LuPlus, LuRefreshCw } from 'react-icons/lu'
 import jsPDF from 'jspdf'
 import { EditablePdfPreview, FilteredBalanceSheetData } from './components/EditablePdfPreview'
 import { CustomBalanceSheetStatement } from './types'
@@ -247,71 +247,72 @@ export default function BalanceSheetPage() {
     }
   }, [authToken, customerId, prefetchData, CACHE_KEYS.TRANSACTIONS])
 
-  // Fetch all data
-  React.useEffect(() => {
-    const fetchAllData = async () => {
-      if (!customerId || !authToken) return
+  // Fetch all data function
+  const fetchAllData = React.useCallback(async () => {
+    if (!customerId || !authToken) return;
 
-      setIsLoading(true)
-      try {
-        const connectedBanks = await fetchConnectedBanks()
-        console.log('Connected Banks Response:', connectedBanks)
+    setIsLoading(true);
+    try {
+      const connectedBanks = await fetchConnectedBanks();
+      console.log('Connected Banks Response:', connectedBanks);
+      
+      const banksWithAccounts: BankWithAccounts[] = [];
+      let allTransactions: Transaction[] = [];
+      
+      for (const bank of connectedBanks) {
+        const accounts = await fetchAccountsForBank(bank.id);
+        console.log(`Accounts for bank ${bank.name}:`, accounts);
         
-        const banksWithAccounts: BankWithAccounts[] = []
-        let allTransactions: Transaction[] = []
+        const accountsWithBalances: AccountWithBalance[] = [];
         
-        for (const bank of connectedBanks) {
-          const accounts = await fetchAccountsForBank(bank.id)
-          console.log(`Accounts for bank ${bank.name}:`, accounts)
+        for (const account of accounts) {
+          const balance = await fetchBalanceForAccount(account.account_id, bank.id);
+          console.log(`Balance for account ${account.account_id}:`, balance);
           
-          const accountsWithBalances: AccountWithBalance[] = []
-          
-          for (const account of accounts) {
-            const balance = await fetchBalanceForAccount(account.account_id, bank.id)
-            console.log(`Balance for account ${account.account_id}:`, balance)
-            
-            accountsWithBalances.push({
-              ...account,
-              balance,
-              bank_id: bank.id,
-              bank_name: bank.bank_identifier || bank.name
-            })
+          accountsWithBalances.push({
+            ...account,
+            balance,
+            bank_id: bank.id,
+            bank_name: bank.bank_identifier || bank.name
+          });
 
-            const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id)
-            allTransactions = [...allTransactions, ...accountTransactions.map((t: any) => ({
-              ...t,
-              bank_name: bank.bank_identifier || bank.name
-            }))]
-          }
-
-          if (accountsWithBalances.length > 0) {
-            banksWithAccounts.push({
-              id: bank.id,
-              name: bank.bank_identifier || bank.name,
-              accounts: accountsWithBalances
-            })
-          }
+          const accountTransactions = await fetchTransactionsForAccount(account.account_id, bank.id);
+          allTransactions = [...allTransactions, ...accountTransactions.map((t: any) => ({
+            ...t,
+            bank_name: bank.bank_identifier || bank.name
+          }))];
         }
 
-        // Sort transactions by date (most recent first)
-        allTransactions.sort((a, b) => 
-          new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
-        )
-
-        setBankAccounts(banksWithAccounts)
-        setTransactions(allTransactions)
-      } catch (err) {
-        console.error('Error fetching data:', err)
-        setError('Failed to fetch balance sheet data')
-      } finally {
-        setIsLoading(false)
+        if (accountsWithBalances.length > 0) {
+          banksWithAccounts.push({
+            id: bank.id,
+            name: bank.bank_identifier || bank.name,
+            accounts: accountsWithBalances
+          });
+        }
       }
-    }
 
-    if (customerId && authToken) {
-      fetchAllData()
+      // Sort transactions by date (most recent first)
+      allTransactions.sort((a, b) => 
+        new Date(b.booking_date_time).getTime() - new Date(a.booking_date_time).getTime()
+      );
+
+      setBankAccounts(banksWithAccounts);
+      setTransactions(allTransactions);
+    } catch (err) {
+      console.error('Error fetching data:', err);
+      setError('Failed to fetch balance sheet data');
+    } finally {
+      setIsLoading(false);
     }
-  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchBalanceForAccount, fetchTransactionsForAccount])
+  }, [customerId, authToken, fetchConnectedBanks, fetchAccountsForBank, fetchBalanceForAccount, fetchTransactionsForAccount]);
+
+  // Fetch all data on mount
+  React.useEffect(() => {
+    if (customerId && authToken) {
+      fetchAllData();
+    }
+  }, [customerId, authToken, fetchAllData]);
 
   // Filter transactions based on selected account
   const filteredTransactions = React.useMemo(() => {
@@ -862,9 +863,15 @@ export default function BalanceSheetPage() {
   };
 
   const calculateInventory = () => {
-    // For now, use a percentage of total assets as inventory
+    // Get bank data calculation (15% of total assets)
     const totalAssets = calculateCashAndEquivalents() + calculateAccountsReceivable();
-    return totalAssets * 0.15; // Assume 15% of total assets is inventory
+    const bankInventory = totalAssets * 0.15; // 15% of total assets
+
+    // Get questionnaire data if available
+    const questionnaireInventory = customStatements.find(s => s.id === 'inventory')?.amount || 0;
+
+    // Return combined total
+    return bankInventory + questionnaireInventory;
   };
 
   const calculateVATReceivable = () => {
@@ -1198,6 +1205,79 @@ export default function BalanceSheetPage() {
     });
   };
 
+  const handleRevalidate = async () => {
+    try {
+      setIsLoading(true);
+      toast({
+        title: "Revalidating data...",
+        status: "info",
+        duration: 2000,
+        isClosable: true,
+      });
+
+      // Fetch questionnaire responses first
+      const questionnaireResponse = await fetch(`/api/questionnaire/${workspace.id}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      });
+      
+      const questionnaireData = await questionnaireResponse.json();
+      
+      // Get inventory value from questionnaire if available
+      const inventoryFromQuestionnaire = questionnaireData.responses?.calculateCogs ? 
+        Number(questionnaireData.responses.endingInventory) || 0 : 0;
+
+      // Get inventory value from bank data (using existing calculation)
+      const inventoryFromBankData = calculateInventory();
+
+      // Combine both inventory values
+      const totalInventory = inventoryFromQuestionnaire + inventoryFromBankData;
+
+      // Update custom statements with combined inventory
+      if (totalInventory !== 0) {
+        const inventoryStatement: CustomBalanceSheetStatement = {
+          id: 'inventory',
+          name: 'Inventory',
+          amount: totalInventory,
+          date: new Date().toISOString().split('T')[0],
+          type: 'asset',
+          category: 'current',
+          amountType: 'deposit'
+        };
+
+        setCustomStatements(prev => {
+          // Remove any existing inventory statement
+          const filtered = prev.filter(s => s.id !== 'inventory');
+          return [...filtered, inventoryStatement];
+        });
+      }
+
+      // Fetch all data
+      await fetchAllData();
+      
+      toast({
+        title: "Data revalidated",
+        description: "Your balance sheet has been updated with the latest data",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error revalidating data:', error);
+      toast({
+        title: "Revalidation failed",
+        description: "There was an error updating your balance sheet",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (error) {
     return (
       <Box p={8}>
@@ -1252,9 +1332,18 @@ export default function BalanceSheetPage() {
                 <Box>
                   <Heading size="lg" mb={2}>Balance Sheet</Heading>
                   <Text color="gray.600" mb={4} fontSize="md">
-                    View your complete financial position with assets, liabilities, and equity in one comprehensive report.
+                    View your company's financial position with real-time balance sheet data.
                   </Text>
                 </Box>
+                <ButtonGroup>
+                  <Button
+                    leftIcon={<LuRefreshCw />}
+                    colorScheme="blue"
+                    onClick={handleRevalidate}
+                    isLoading={isLoading}
+                  >
+                    Revalidate
+                  </Button>
                 <Button
                   leftIcon={<LuDownload />}
                   colorScheme="green"
@@ -1263,6 +1352,7 @@ export default function BalanceSheetPage() {
                 >
                   Export as PDF
                 </Button>
+                </ButtonGroup>
               </HStack>
             </Box>
 
@@ -1444,10 +1534,50 @@ export default function BalanceSheetPage() {
                                   <Text color="gray.600">Accounts Receivable</Text>
                                   <Text fontWeight="medium">AED {calculateAccountsReceivable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
                                 </HStack>
+                                
+                                {/* Inventory with Combined Data and Tooltip */}
                                 <HStack justify="space-between">
-                                  <Text color="gray.600">Inventory</Text>
-                                  <Text fontWeight="medium">AED {calculateInventory().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>
+                                  <Tooltip
+                                    hasArrow
+                                    label={
+                                      <VStack align="start" p={2} spacing={2}>
+                                        <Text fontWeight="bold">Inventory Breakdown:</Text>
+                                        <HStack justify="space-between" width="100%">
+                                          <Text>Bank Data (15% of assets):</Text>
+                                          <Text>AED {(
+                                            (calculateCashAndEquivalents() + calculateAccountsReceivable()) * 0.15
+                                          ).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                        </HStack>
+                                        <HStack justify="space-between" width="100%">
+                                          <Text>Questionnaire Data:</Text>
+                                          <Text>AED {(
+                                            customStatements.find(s => s.id === 'inventory')?.amount || 0
+                                          ).toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                        </HStack>
+                                        <Box pt={2} borderTop="1px" borderColor="gray.200" width="100%">
+                                          <HStack justify="space-between" width="100%">
+                                            <Text fontWeight="bold">Total Inventory:</Text>
+                                            <Text fontWeight="bold">AED {calculateInventory()
+                                              .toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                          </HStack>
+                                        </Box>
+                                      </VStack>
+                                    }
+                                    bg="gray.700"
+                                    color="white"
+                                    placement="right"
+                                  >
+                                    <HStack>
+                                      <Text color="gray.600">Inventory</Text>
+                                      <Text fontSize="xs" color="gray.500">(Click for breakdown)</Text>
+                                    </HStack>
+                                  </Tooltip>
+                                  <Text fontWeight="medium">
+                                    AED {calculateInventory()
+                                      .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </Text>
                                 </HStack>
+                                
                                 <HStack justify="space-between">
                                   <Text color="gray.600">VAT Receivable</Text>
                                   <Text fontWeight="medium">AED {calculateVATReceivable().toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Text>

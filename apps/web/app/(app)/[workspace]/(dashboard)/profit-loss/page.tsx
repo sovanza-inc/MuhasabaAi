@@ -21,12 +21,15 @@ import {
   Button,
   useToast,
   Image,
-  IconButton
+  IconButton,
+  ButtonGroup,
+  Tooltip,
+  VStack
 } from '@chakra-ui/react'
 import React, { useState } from 'react'
 import { PageHeader } from '#features/common/components/page-header'
 import { useProfitLoss } from '#features/bank-integrations/hooks/use-profit-loss'
-import { LuDownload, LuPlus } from 'react-icons/lu'
+import { LuDownload, LuPlus, LuRefreshCw } from 'react-icons/lu'
 import { useCurrentWorkspace } from '#features/common/hooks/use-current-workspace'
 import { useApiCache } from '#features/common/hooks/use-api-cache'
 import jsPDF from 'jspdf'
@@ -545,6 +548,77 @@ export default function ProfitLossPage() {
     }
   };
 
+  const handleRevalidate = async () => {
+    try {
+      toast({
+        title: "Revalidating data...",
+        status: "info",
+        duration: 2000,
+        isClosable: true,
+      });
+      
+      // Fetch questionnaire responses first
+      const questionnaireResponse = await fetch(`/api/questionnaire/${workspace.id}`, {
+        method: 'GET',
+        headers: {
+          'Cache-Control': 'no-cache',
+        }
+      });
+      
+      const questionnaireData = await questionnaireResponse.json();
+      
+      // Calculate COGS from questionnaire if available
+      const cogsFromQuestionnaire = questionnaireData.responses?.calculateCogs ? 
+        (Number(questionnaireData.responses.beginningInventory) || 0) +
+        (Number(questionnaireData.responses.purchases) || 0) -
+        (Number(questionnaireData.responses.endingInventory) || 0) : 0;
+
+      // Calculate COGS from bank data (40% of expenses as before)
+      const cogsFromBankData = Number(data?.expenses?.totalSpending || 0) * 0.4;
+
+      // Combine both COGS values
+      const totalCogs = cogsFromQuestionnaire + cogsFromBankData;
+
+      // Update custom statements with combined COGS
+      if (totalCogs !== 0) {
+        const cogsStatement: CustomStatement = {
+          id: 'cogs',
+          name: 'Cost of Goods Sold (COGS)',
+          amount: -Math.abs(totalCogs), // Make it negative as it's an expense
+          date: new Date().toISOString().split('T')[0],
+          type: 'expense',
+          amountType: 'expense'
+        };
+
+        setCustomStatements(prev => {
+          // Remove any existing COGS statement
+          const filtered = prev.filter(s => s.id !== 'cogs');
+          return [...filtered, cogsStatement];
+        });
+      }
+      
+      // Revalidate the data by refetching
+      await selectBank(selectedBankId);
+      
+      toast({
+        title: "Data revalidated",
+        description: "Your report has been updated with the latest data",
+        status: "success",
+        duration: 3000,
+        isClosable: true,
+      });
+    } catch (error) {
+      console.error('Error revalidating data:', error);
+      toast({
+        title: "Revalidation failed",
+        description: "There was an error updating your report",
+        status: "error",
+        duration: 3000,
+        isClosable: true,
+      });
+    }
+  };
+
   if (error) {
     return (
       <Box p={8}>
@@ -602,14 +676,24 @@ export default function ProfitLossPage() {
                     Effortlessly view and analyze your financial reports in one place with real-time insights and data updates.
                   </Text>
                 </Box>
-                <Button
-                  leftIcon={<LuDownload />}
-                  colorScheme="green"
-                  onClick={handleExportClick}
-                  isLoading={isLoading}
-                >
-                  Export as PDF
-                </Button>
+                <ButtonGroup>
+                  <Button
+                    leftIcon={<LuRefreshCw />}
+                    colorScheme="blue"
+                    onClick={handleRevalidate}
+                    isLoading={isLoading}
+                  >
+                    Revalidate
+                  </Button>
+                  <Button
+                    leftIcon={<LuDownload />}
+                    colorScheme="green"
+                    onClick={handleExportClick}
+                    isLoading={isLoading}
+                  >
+                    Export as PDF
+                  </Button>
+                </ButtonGroup>
               </HStack>
             </Box>
 
@@ -790,32 +874,82 @@ export default function ProfitLossPage() {
                             <Tbody>
                             {data?.expenses?.transactions && (
                               <>
-                                  {/* COGS */}
-                                <Tr>
-                                  <Td pl={8}>Cost of Goods Sold (COGS)</Td>
-                                  <Td isNumeric>
-                                    AED {(Number(data.expenses.totalSpending) * 0.4).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </Td>
-                                </Tr>
+                                  {/* COGS - Now shown as a single statement with tooltip */}
+                                  {customStatements.find(s => s.id === 'cogs') ? (
+                                    <Tr>
+                                      <Td pl={8}>
+                                        <Tooltip
+                                          hasArrow
+                                          label={
+                                            <VStack align="start" p={2} spacing={2}>
+                                              <Text fontWeight="bold">COGS Breakdown:</Text>
+                                              <HStack justify="space-between" width="100%">
+                                                <Text>Bank Data (40% of expenses):</Text>
+                                                <Text>AED {(Number(data?.expenses?.totalSpending || 0) * 0.4)
+                                                  .toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                              </HStack>
+                                              <HStack justify="space-between" width="100%">
+                                                <Text>Inventory Calculation:</Text>
+                                                <Text>AED {(Math.abs(customStatements.find(s => s.id === 'cogs')?.amount || 0) - 
+                                                  (Number(data?.expenses?.totalSpending || 0) * 0.4))
+                                                  .toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                              </HStack>
+                                              <Box pt={2} borderTop="1px" borderColor="gray.200" width="100%">
+                                                <HStack justify="space-between" width="100%">
+                                                  <Text fontWeight="bold">Total COGS:</Text>
+                                                  <Text fontWeight="bold">AED {Math.abs(customStatements.find(s => s.id === 'cogs')?.amount || 0)
+                                                    .toLocaleString('en-US', { minimumFractionDigits: 2 })}</Text>
+                                                </HStack>
+                                              </Box>
+                                            </VStack>
+                                          }
+                                          bg="gray.700"
+                                          color="white"
+                                          placement="right"
+                                        >
+                                          <HStack>
+                                            <Text>Cost of Goods Sold (COGS)</Text>
+                                            <Text fontSize="xs" color="gray.500">
+                                              (Click for breakdown)
+                                            </Text>
+                                          </HStack>
+                                        </Tooltip>
+                                      </Td>
+                                      <Td isNumeric>
+                                        AED {Math.abs(customStatements.find(s => s.id === 'cogs')?.amount || 0)
+                                          .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </Td>
+                                    </Tr>
+                                  ) : (
+                                    <Tr>
+                                      <Td pl={8}>Cost of Goods Sold (COGS)</Td>
+                                      <Td isNumeric>
+                                        AED {(Number(data.expenses.totalSpending) * 0.4)
+                                          .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                      </Td>
+                                    </Tr>
+                                  )}
 
-                                  {/* Custom Expense Statements */}
+                                  {/* Custom Expense Statements (excluding COGS) */}
                                   {customStatements
-                                    .filter(statement => statement.type === 'expense')
+                                    .filter(statement => statement.type === 'expense' && statement.id !== 'cogs')
                                     .map(statement => (
                                       <Tr key={statement.id}>
                                         <Td pl={8}>{statement.name}</Td>
-                                        <Td isNumeric>AED {statement.amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
+                                        <Td isNumeric>AED {Math.abs(statement.amount)
+                                          .toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</Td>
                                       </Tr>
                                     ))
                                   }
 
-                                  {/* Gross Profit Calculation */}
+                                  {/* Gross Profit Calculation - Updated to use combined COGS */}
                                   <Tr borderTop="1px" borderColor="gray.100" bg="gray.50">
                                     <Td fontWeight="bold" color="blue.700">Gross Profit</Td>
                                     <Td isNumeric fontWeight="bold" color="blue.700">
                                       AED {(
                                         Number(data?.revenues?.totalSpending || 0) - 
-                                        (Number(data.expenses.totalSpending) * 0.4)
+                                        Math.abs(customStatements.find(s => s.id === 'cogs')?.amount || 
+                                          (Number(data.expenses.totalSpending) * 0.4))
                                       ).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                     </Td>
                                   </Tr>
